@@ -1,0 +1,155 @@
+'use client';
+
+import { useState } from 'react';
+import type { SchoolClass, Teacher, ClassSchedule } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { Plus, Trash2, Edit, Eye } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import CreateClassDialog from './create-class-dialog';
+import ClassTimetableDialog from './class-timetable-dialog';
+
+interface ClassListProps {
+  initialClasses: SchoolClass[];
+  allTeachers: Teacher[];
+}
+
+export default function ClassList({ initialClasses, allTeachers }: ClassListProps) {
+  const [classes, setClasses] = useState<SchoolClass[]>(initialClasses);
+  const [isCreateClassOpen, setCreateClassOpen] = useState(false);
+  const [classToView, setClassToView] = useState<SchoolClass | null>(null);
+  const [classToEditSchedule, setClassToEditSchedule] = useState<SchoolClass | null>(null);
+
+  const handleAddClass = (className: string) => {
+    const newClass: SchoolClass = {
+      id: `c${Date.now()}`,
+      name: className,
+      schedule: {}, // Initially empty schedule
+    };
+    setClasses(prev => [...prev, newClass]);
+  };
+
+  const handleDeleteClass = (classId: string) => {
+    setClasses(prev => prev.filter(c => c.id !== classId));
+  };
+  
+  const handleUpdateSchedule = (classId: string, newSchedule: ClassSchedule) => {
+    setClasses(prev => prev.map(c => c.id === classId ? { ...c, schedule: newSchedule } : c));
+    setClassToEditSchedule(null);
+  };
+
+
+  return (
+    <Card className="mt-6">
+      <div className="flex items-center justify-between p-6">
+        <div>
+            <h2 className="text-xl font-semibold text-foreground">כיתות לימוד</h2>
+            <p className="text-sm text-muted-foreground">ניהול מערכת השעות הכיתתית.</p>
+        </div>
+        <Button onClick={() => setCreateClassOpen(true)}>
+          <Plus className="ml-2 h-4 w-4" />
+          הוסף כיתה
+        </Button>
+      </div>
+
+      <div className="p-6 pt-0">
+        {classes.length > 0 ? (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {classes.map((schoolClass) => (
+              <Card key={schoolClass.id}>
+                <CardHeader>
+                  <CardTitle>{schoolClass.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription>
+                    לחץ לצפייה או עריכת מערכת השעות.
+                  </CardDescription>
+                </CardContent>
+                <CardFooter className="grid grid-cols-3 gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setClassToView(schoolClass)}>
+                    <Eye className="ml-1 h-4 w-4" />
+                    צפה
+                  </Button>
+                   <Button variant="outline" size="sm" onClick={() => setClassToEditSchedule(schoolClass)}>
+                    <Edit className="ml-1 h-4 w-4" />
+                    ערוך
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="ml-1 h-4 w-4" />
+                        מחק
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          פעולה זו תמחק את הכיתה לצמיתות. לא ניתן לבטל את הפעולה.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>ביטול</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteClass(schoolClass.id)}>
+                          מחק
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-12 text-center">
+            <h3 className="text-lg font-semibold text-foreground">לא נמצאו כיתות</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              התחל על ידי יצירת כיתה חדשה.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <CreateClassDialog
+        isOpen={isCreateClassOpen}
+        onOpenChange={setCreateClassOpen}
+        onAddClass={handleAddClass}
+      />
+      
+      <ClassTimetableDialog
+        isOpen={!!classToView}
+        onOpenChange={() => setClassToView(null)}
+        schoolClass={classToView}
+        allTeachers={allTeachers}
+        isEditing={false}
+      />
+
+      <ClassTimetableDialog
+        isOpen={!!classToEditSchedule}
+        onOpenChange={() => setClassToEditSchedule(null)}
+        schoolClass={classToEditSchedule}
+        allTeachers={allTeachers}
+        onUpdateSchedule={handleUpdateSchedule}
+        isEditing={true}
+      />
+
+    </Card>
+  );
+}

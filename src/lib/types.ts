@@ -20,3 +20,16 @@ export interface AbsenceDay {
   startTime: string;
   endTime: string;
 }
+
+export interface Lesson {
+  subject: string;
+  teacherId: string | null;
+}
+
+export type ClassSchedule = Record<string, Record<string, Lesson | null>>;
+
+export interface SchoolClass {
+  id: string;
+  name: string;
+  schedule: ClassSchedule;
+}

@@ -5,13 +5,11 @@ import type { Teacher } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { timeSlots, daysOfWeek } from '@/lib/constants';
 
 interface TimetableProps {
   allTeachers: Teacher[];
 }
-
-const timeSlots = Array.from({ length: 12 }, (_, i) => `${(i + 7).toString().padStart(2, '0')}:00`); // 07:00 to 18:00
-const daysOfWeek = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
 
 const parseTimeToNumber = (time: string) => parseInt(time.split(':')[0], 10);
 
@@ -49,7 +47,7 @@ export default function Timetable({ allTeachers }: TimetableProps) {
   return (
     <Card className="mt-6">
       <CardHeader>
-        <CardTitle>מערכת שעות בית ספרית</CardTitle>
+        <CardTitle>זמינות כלל המורים המחליפים</CardTitle>
         <p className="text-muted-foreground text-sm">
           הצגת זמינות המורים המחליפים לפי שעה.
         </p>
@@ -60,7 +58,7 @@ export default function Timetable({ allTeachers }: TimetableProps) {
                 <table className="w-full text-sm text-center">
                     <thead>
                         <tr className="bg-muted">
-                        <th className="sticky right-0 bg-muted p-2 w-24">שעה</th>
+                        <th className="sticky right-0 bg-muted p-2 w-24 z-10">שעה</th>
                         {daysOfWeek.map(day => (
                             <th key={day} className="p-2 min-w-[150px]">{day}</th>
                         ))}
@@ -69,11 +67,11 @@ export default function Timetable({ allTeachers }: TimetableProps) {
                     <tbody>
                         {timeSlots.map(time => (
                         <tr key={time} className="border-t">
-                            <td className="sticky right-0 font-semibold bg-card p-2 w-24">{time}</td>
+                            <td className="sticky right-0 font-semibold bg-card p-2 w-24 z-10">{time}</td>
                             {daysOfWeek.map(day => (
                             <td key={`${day}-${time}`} className="p-2 align-top h-24">
                                 <div className="flex flex-wrap gap-1 justify-center">
-                                    {timetableData[day][time].length > 0 ? (
+                                    {timetableData[day]?.[time]?.length > 0 ? (
                                         timetableData[day][time].map(teacherName => (
                                         <Badge key={teacherName} variant="secondary" className="text-xs">
                                             {teacherName}

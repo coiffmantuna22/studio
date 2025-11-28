@@ -1,4 +1,5 @@
-import type { Teacher } from './types';
+import type { Teacher, SchoolClass } from './types';
+import { timeSlots, daysOfWeek } from './constants';
 
 const defaultAvailability = [
   { day: 'ראשון', slots: [] },
@@ -49,7 +50,7 @@ export const initialTeachers: Teacher[] = [
     preferences: 'בעל ניסיון עם חינוך מיוחד',
   },
   {
-    id: '4,',
+    id: '4',
     name: 'فاطمة الفاسي',
     subjects: ['אמנות', 'מוזיקה'],
     availability: [
@@ -79,3 +80,41 @@ export const initialTeachers: Teacher[] = [
     preferences: 'יכול לאמן גם קבוצות ספורט',
   },
 ];
+
+const generateEmptySchedule = () => {
+    const schedule = {};
+    daysOfWeek.forEach(day => {
+        schedule[day] = {};
+        timeSlots.forEach(time => {
+            schedule[day][time] = null;
+        });
+    });
+    return schedule;
+};
+
+
+export const initialClasses: SchoolClass[] = [
+    {
+        id: 'c1',
+        name: 'כיתה י׳1',
+        schedule: {
+            ...generateEmptySchedule(),
+            'שני': {
+                ...generateEmptySchedule()['שני'],
+                '09:00': { subject: 'מתמטיקה', teacherId: '1' },
+                '10:00': { subject: 'מתמטיקה', teacherId: '1' },
+                '11:00': { subject: 'אנגלית', teacherId: '2' },
+            },
+            'רביעי': {
+                ...generateEmptySchedule()['רביעי'],
+                '11:00': { subject: 'כימיה', teacherId: '3' },
+                '12:00': { subject: 'כימיה', teacherId: '3' },
+            }
+        }
+    },
+    {
+        id: 'c2',
+        name: 'כיתה י״א3',
+        schedule: generateEmptySchedule(),
+    }
+]
