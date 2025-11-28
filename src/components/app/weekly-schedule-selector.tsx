@@ -12,7 +12,7 @@ interface WeeklyScheduleSelectorProps {
 }
 
 const daysOfWeek = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
-const timeSlots = Array.from({ length: 13 }, (_, i) => `${(i + 7).toString().padStart(2, '0')}:00`); // 07:00 to 19:00
+const timeSlots = Array.from({ length: 12 }, (_, i) => `${(i + 7).toString().padStart(2, '0')}:00`); // 07:00 to 18:00
 
 const parseTimeToNumber = (time: string) => parseInt(time.split(':')[0], 10);
 
@@ -103,7 +103,7 @@ export default function WeeklyScheduleSelector({ value, onChange }: WeeklySchedu
     <div className="flex flex-col gap-2" dir="rtl">
       <div className="grid grid-cols-[auto_1fr] gap-x-2">
         <div className="w-24"></div> {/* Spacer for alignment */}
-        <div className="grid grid-cols-13 text-center text-xs text-muted-foreground">
+        <div className="grid grid-cols-12 text-center text-xs text-muted-foreground">
           {timeSlots.map(time => (
             <div key={time}>{time}</div>
           ))}
@@ -117,7 +117,7 @@ export default function WeeklyScheduleSelector({ value, onChange }: WeeklySchedu
                 <Trash2 className="h-3.5 w-3.5 text-muted-foreground"/>
              </Button>
           </div>
-          <div className="grid grid-cols-13 gap-px bg-border rounded-md overflow-hidden" dir="ltr">
+          <div className="grid grid-cols-12 gap-px bg-border rounded-md overflow-hidden" dir="ltr">
             {timeSlots.map((time, index) => {
               const hour = index + 7;
               const isSelected = selectedSlots[day]?.includes(hour);
