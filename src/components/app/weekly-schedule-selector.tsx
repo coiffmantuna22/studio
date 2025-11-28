@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import type { DayAvailability } from '@/lib/types';
@@ -48,15 +50,19 @@ export default function WeeklyScheduleSelector({ value, onChange }: WeeklySchedu
       initialSlots[day] = [];
     });
 
-    value.forEach(dayAvailability => {
-      dayAvailability.slots.forEach(slot => {
-        const startHour = parseTimeToNumber(slot.start);
-        const endHour = parseTimeToNumber(slot.end);
-        for (let hour = startHour; hour < endHour; hour++) {
-          initialSlots[dayAvailability.day]?.push(hour);
-        }
-      });
-    });
+    if (Array.isArray(value)) {
+        value.forEach(dayAvailability => {
+            if (dayAvailability.slots && initialSlots[dayAvailability.day]) {
+                dayAvailability.slots.forEach(slot => {
+                    const startHour = parseTimeToNumber(slot.start);
+                    const endHour = parseTimeToNumber(slot.end);
+                    for (let hour = startHour; hour < endHour; hour++) {
+                    initialSlots[dayAvailability.day]?.push(hour);
+                    }
+                });
+            }
+        });
+    }
     setSelectedSlots(initialSlots);
   }, [value]);
 
@@ -75,20 +81,19 @@ export default function WeeklyScheduleSelector({ value, onChange }: WeeklySchedu
       daySlots.push(hour);
     }
 
-    setSelectedSlots(newSelectedSlots);
-    
-    const updatedAvailability: DayAvailability[] = Object.entries(newSelectedSlots).map(([day, slots]) => ({
-      day,
-      slots: groupConsecutiveSlots(slots),
-    }));
-    onChange(updatedAvailability);
+    updateAvailability(newSelectedSlots);
   };
   
   const clearDay = (day: string) => {
     const newSelectedSlots = { ...selectedSlots, [day]: [] };
+    updateAvailability(newSelectedSlots);
+  }
+
+  const updateAvailability = (newSelectedSlots: Record<string, number[]>) => {
     setSelectedSlots(newSelectedSlots);
-    const updatedAvailability: DayAvailability[] = Object.entries(newSelectedSlots).map(([dayName, slots]) => ({
-      day: dayName,
+    
+    const updatedAvailability: DayAvailability[] = Object.entries(newSelectedSlots).map(([day, slots]) => ({
+      day,
       slots: groupConsecutiveSlots(slots),
     }));
     onChange(updatedAvailability);
@@ -97,7 +102,7 @@ export default function WeeklyScheduleSelector({ value, onChange }: WeeklySchedu
   return (
     <div className="flex flex-col gap-2" dir="rtl">
       <div className="grid grid-cols-[auto_1fr] gap-x-2">
-        <div></div>
+        <div className="w-24"></div> {/* Spacer for alignment */}
         <div className="grid grid-cols-13 text-center text-xs text-muted-foreground">
           {timeSlots.map(time => (
             <div key={time}>{time}</div>
@@ -106,10 +111,10 @@ export default function WeeklyScheduleSelector({ value, onChange }: WeeklySchedu
       </div>
       {daysOfWeek.map(day => (
         <div key={day} className="grid grid-cols-[auto_1fr] items-center gap-x-2">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm w-12 text-right">{day}</span>
-             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => clearDay(day)}>
-                <Trash2 className="h-3 w-3 text-muted-foreground"/>
+          <div className="flex items-center justify-end gap-2 w-24">
+            <span className="font-semibold text-sm">{day}</span>
+             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => clearDay(day)}>
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground"/>
              </Button>
           </div>
           <div className="grid grid-cols-13 gap-px bg-border rounded-md overflow-hidden" dir="ltr">
@@ -121,7 +126,7 @@ export default function WeeklyScheduleSelector({ value, onChange }: WeeklySchedu
                   key={`${day}-${time}`}
                   onClick={() => handleSlotClick(day, hour)}
                   className={cn(
-                    'h-6 w-full cursor-pointer transition-colors',
+                    'h-7 w-full cursor-pointer transition-colors',
                     isSelected ? 'bg-primary' : 'bg-card hover:bg-secondary'
                   )}
                 />
