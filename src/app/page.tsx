@@ -1,5 +1,7 @@
 import Header from '@/components/app/header';
 import TeacherList from '@/components/app/teacher-list';
+import Timetable from '@/components/app/timetable';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { initialTeachers } from '@/lib/data';
 
 export default function Home() {
@@ -7,7 +9,18 @@ export default function Home() {
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
       <main className="flex-1 p-4 sm:p-6 md:p-8">
-        <TeacherList initialTeachers={initialTeachers} />
+        <Tabs defaultValue="teachers" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+            <TabsTrigger value="teachers">פרופילי מורים</TabsTrigger>
+            <TabsTrigger value="timetable">מערכת שעות</TabsTrigger>
+          </TabsList>
+          <TabsContent value="teachers">
+            <TeacherList initialTeachers={initialTeachers} />
+          </TabsContent>
+          <TabsContent value="timetable">
+            <Timetable allTeachers={initialTeachers} />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
