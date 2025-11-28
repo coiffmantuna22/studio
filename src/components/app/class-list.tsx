@@ -29,10 +29,10 @@ import ClassTimetableDialog from './class-timetable-dialog';
 interface ClassListProps {
   initialClasses: SchoolClass[];
   allTeachers: Teacher[];
+  onClassesUpdate: (classes: SchoolClass[]) => void;
 }
 
-export default function ClassList({ initialClasses, allTeachers }: ClassListProps) {
-  const [classes, setClasses] = useState<SchoolClass[]>(initialClasses);
+export default function ClassList({ initialClasses, allTeachers, onClassesUpdate }: ClassListProps) {
   const [isCreateClassOpen, setCreateClassOpen] = useState(false);
   const [classToView, setClassToView] = useState<SchoolClass | null>(null);
   const [classToEditSchedule, setClassToEditSchedule] = useState<SchoolClass | null>(null);
@@ -43,15 +43,15 @@ export default function ClassList({ initialClasses, allTeachers }: ClassListProp
       name: className,
       schedule: {}, // Initially empty schedule
     };
-    setClasses(prev => [...prev, newClass]);
+    onClassesUpdate([...initialClasses, newClass]);
   };
 
   const handleDeleteClass = (classId: string) => {
-    setClasses(prev => prev.filter(c => c.id !== classId));
+    onClassesUpdate(initialClasses.filter(c => c.id !== classId));
   };
   
   const handleUpdateSchedule = (classId: string, newSchedule: ClassSchedule) => {
-    setClasses(prev => prev.map(c => c.id === classId ? { ...c, schedule: newSchedule } : c));
+    onClassesUpdate(initialClasses.map(c => c.id === classId ? { ...c, schedule: newSchedule } : c));
     setClassToEditSchedule(null);
   };
 
@@ -70,9 +70,9 @@ export default function ClassList({ initialClasses, allTeachers }: ClassListProp
       </div>
 
       <div className="p-6 pt-0">
-        {classes.length > 0 ? (
+        {initialClasses.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {classes.map((schoolClass) => (
+            {initialClasses.map((schoolClass) => (
               <Card key={schoolClass.id}>
                 <CardHeader>
                   <CardTitle>{schoolClass.name}</CardTitle>

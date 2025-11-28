@@ -33,3 +33,13 @@ export interface SchoolClass {
   name: string;
   schedule: ClassSchedule;
 }
+
+export interface AffectedLesson {
+    classId: string;
+    className: string;
+    date: Date;
+    time: string;
+    lesson: Lesson;
+    recommendation: string | null;
+    reasoning: string | null;
+}

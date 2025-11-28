@@ -1,11 +1,39 @@
+'use client';
+
+import { useState } from 'react';
 import Header from '@/components/app/header';
 import TeacherList from '@/components/app/teacher-list';
 import Timetable from '@/components/app/timetable';
 import ClassList from '@/components/app/class-list';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { initialTeachers, initialClasses } from '@/lib/data';
+import { initialTeachers, initialClasses as defaultClasses } from '@/lib/data';
+import type { SchoolClass, Teacher } from '@/lib/types';
 
 export default function Home() {
+  const [teachers, setTeachers] = useState<Teacher[]>(initialTeachers);
+  const [schoolClasses, setSchoolClasses] = useState<SchoolClass[]>(defaultClasses);
+
+  const handleTimetablesUpdate = (updatedSchedules: { classId: string; schedule: any }[]) => {
+      setSchoolClasses(prevClasses => {
+          const newClasses = [...prevClasses];
+          updatedSchedules.forEach(({ classId, schedule }) => {
+              const classIndex = newClasses.findIndex(c => c.id === classId);
+              if (classIndex !== -1) {
+                  newClasses[classIndex] = { ...newClasses[classIndex], schedule };
+              }
+          });
+          return newClasses;
+      });
+  };
+
+  const handleTeachersUpdate = (updatedTeachers: Teacher[]) => {
+    setTeachers(updatedTeachers);
+  };
+  
+  const handleClassesUpdate = (updatedClasses: SchoolClass[]) => {
+    setSchoolClasses(updatedClasses);
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
@@ -17,13 +45,22 @@ export default function Home() {
             <TabsTrigger value="timetable">זמינות מחליפים</TabsTrigger>
           </TabsList>
           <TabsContent value="teachers">
-            <TeacherList initialTeachers={initialTeachers} />
+            <TeacherList 
+              initialTeachers={teachers} 
+              allClasses={schoolClasses} 
+              onTeachersUpdate={handleTeachersUpdate} 
+              onTimetablesUpdate={handleTimetablesUpdate} 
+            />
           </TabsContent>
            <TabsContent value="classes">
-            <ClassList initialClasses={initialClasses} allTeachers={initialTeachers} />
+            <ClassList 
+              initialClasses={schoolClasses} 
+              allTeachers={teachers}
+              onClassesUpdate={handleClassesUpdate}
+            />
           </TabsContent>
           <TabsContent value="timetable">
-            <Timetable allTeachers={initialTeachers} />
+            <Timetable allTeachers={teachers} />
           </TabsContent>
         </Tabs>
       </main>

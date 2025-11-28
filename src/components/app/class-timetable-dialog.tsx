@@ -24,7 +24,8 @@ import {
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { X } from 'lucide-react';
+import { X, Book, User } from 'lucide-react';
+import { Separator } from '../ui/separator';
 
 interface ClassTimetableDialogProps {
   isOpen: boolean;
@@ -41,16 +42,19 @@ interface EditSlotPopoverProps {
     lesson: Lesson | null;
     onSave: (day: string, time: string, lesson: Lesson | null) => void;
     allTeachers: Teacher[];
+    schoolClass: SchoolClass;
 }
 
-function EditSlotPopover({ day, time, lesson, onSave, allTeachers }: EditSlotPopoverProps) {
+function EditSlotPopover({ day, time, lesson, onSave, allTeachers, schoolClass }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [subject, setSubject] = useState(lesson?.subject || '');
     const [teacherId, setTeacherId] = useState(lesson?.teacherId || null);
 
     useEffect(() => {
-        setSubject(lesson?.subject || '');
-        setTeacherId(lesson?.teacherId || null);
+        if(isOpen) {
+            setSubject(lesson?.subject || '');
+            setTeacherId(lesson?.teacherId || null);
+        }
     }, [lesson, isOpen]);
 
     const availableTeachersForSubject = useMemo(() => {
@@ -61,7 +65,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers }: EditSlotPop
     const allSubjects = useMemo(() => {
         const subjects = new Set<string>();
         allTeachers.forEach(t => t.subjects.forEach(s => subjects.add(s)));
-        return Array.from(subjects);
+        return Array.from(subjects).sort();
     }, [allTeachers]);
 
 
@@ -78,27 +82,33 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers }: EditSlotPop
         onSave(day, time, null);
         setIsOpen(false);
     };
+    
+    const currentTeacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
                 <div className={cn(
-                    "w-full h-full p-2 flex flex-col justify-center items-center text-center cursor-pointer min-h-[6rem] transition-colors",
-                    lesson ? 'bg-primary/10 hover:bg-primary/20' : 'hover:bg-muted'
+                    "w-full h-full p-2 flex flex-col justify-center items-center text-center cursor-pointer min-h-[6rem] transition-colors rounded-md",
+                    lesson ? 'bg-primary/10 hover:bg-primary/20' : 'bg-card hover:bg-muted'
                 )}>
-                    {lesson ? (
+                    {lesson && currentTeacher ? (
                         <>
                             <p className="font-bold text-sm">{lesson.subject}</p>
-                            <p className="text-xs text-muted-foreground">{allTeachers.find(t => t.id === lesson.teacherId)?.name}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{currentTeacher?.name}</p>
                         </>
                     ) : <span className="text-muted-foreground text-xs">ריקה</span>}
                 </div>
             </PopoverTrigger>
-            <PopoverContent>
+            <PopoverContent className="w-80">
                 <div className="space-y-4">
-                    <h4 className="font-semibold">ערוך שיעור</h4>
+                    <div className='text-center'>
+                         <h4 className="font-semibold">עריכת שיבוץ</h4>
+                         <p className='text-sm text-muted-foreground'>{schoolClass.name} - {day}, {time}</p>
+                    </div>
+                    <Separator />
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">מקצוע</label>
+                        <label className="text-sm font-medium flex items-center gap-2"><Book className='w-4 h-4 text-muted-foreground'/>מקצוע</label>
                         <Select onValueChange={setSubject} value={subject}>
                             <SelectTrigger>
                                 <SelectValue placeholder="בחר מקצוע" />
@@ -109,8 +119,8 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers }: EditSlotPop
                         </Select>
                     </div>
                      <div className="space-y-2">
-                        <label className="text-sm font-medium">מורה</label>
-                        <Select onValueChange={setTeacherId} value={teacherId || ''} disabled={!subject}>
+                        <label className="text-sm font-medium flex items-center gap-2"><User className='w-4 h-4 text-muted-foreground'/>מורה</label>
+                        <Select onValueChange={(v) => setTeacherId(v)} value={teacherId || ''} disabled={!subject}>
                             <SelectTrigger>
                                 <SelectValue placeholder="בחר מורה" />
                             </SelectTrigger>
@@ -119,12 +129,13 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers }: EditSlotPop
                             </SelectContent>
                         </Select>
                     </div>
+                     <Separator />
                     <div className="flex justify-between items-center">
-                        <Button onClick={handleSave} disabled={!subject || !teacherId}>שמור</Button>
-                        <Button variant="ghost" onClick={handleClear} className="text-destructive hover:text-destructive">
-                            <X className="w-4 h-4 mr-2"/>
+                         <Button variant="ghost" size="sm" onClick={handleClear} className="text-destructive hover:text-destructive">
+                            <X className="w-4 h-4 ml-2"/>
                             נקה שיבוץ
                         </Button>
+                        <Button size="sm" onClick={handleSave} disabled={!subject || !teacherId}>שמור</Button>
                     </div>
                 </div>
             </PopoverContent>
@@ -158,7 +169,13 @@ export default function ClassTimetableDialog({
     setLocalSchedule(prev => {
         const newSchedule = { ...prev };
         if (!newSchedule[day]) newSchedule[day] = {};
-        newSchedule[day][time] = lesson;
+        
+        if(lesson === null){
+            delete newSchedule[day][time];
+        } else {
+             newSchedule[day][time] = lesson;
+        }
+
         return newSchedule;
     })
   }
@@ -187,7 +204,7 @@ export default function ClassTimetableDialog({
             <table className="w-full text-sm text-center table-fixed">
               <thead>
                 <tr className="bg-muted">
-                  <th className="sticky right-0 bg-muted p-2 w-24 z-10">שעה</th>
+                  <th className="sticky right-0 bg-muted p-2 w-28 z-10">שעה</th>
                   {daysOfWeek.map(day => (
                     <th key={day} className="p-2 min-w-[150px]">{day}</th>
                   ))}
@@ -196,7 +213,7 @@ export default function ClassTimetableDialog({
               <tbody>
                 {timeSlots.map(time => (
                   <tr key={time} className="border-t">
-                    <td className="sticky right-0 font-semibold bg-card p-2 w-24 z-10">{time}</td>
+                    <td className="sticky right-0 font-semibold bg-card p-2 w-28 z-10">{time}</td>
                     {daysOfWeek.map(day => {
                       const lesson = localSchedule?.[day]?.[time] || null;
                       const teacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
@@ -209,6 +226,7 @@ export default function ClassTimetableDialog({
                                     lesson={lesson}
                                     onSave={handleSaveSlot}
                                     allTeachers={allTeachers}
+                                    schoolClass={schoolClass}
                                 />
                             ) : (
                                 <div className="p-2 min-h-[6rem] flex flex-col justify-center items-center">

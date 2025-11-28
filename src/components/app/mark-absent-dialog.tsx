@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { recommendSubstituteTeachers, RecommendSubstituteTeachersOutput } from '@/ai/flows/recommend-substitute-teachers';
-import type { Teacher, AbsenceDay } from '@/lib/types';
+import { findSubstitute, FindSubstituteOutput } from '@/ai/flows/recommend-substitute-teachers';
+import type { Teacher, AbsenceDay, SchoolClass, AffectedLesson } from '@/lib/types';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format, eachDayOfInterval, startOfDay } from 'date-fns';
+import { format, eachDayOfInterval, startOfDay, getDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
+import { timeSlots, daysOfWeek } from '@/lib/constants';
 
 const timeRegex = /^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/;
 
@@ -61,18 +62,56 @@ interface MarkAbsentDialogProps {
   onOpenChange: (isOpen: boolean) => void;
   teacher: Teacher | null;
   allTeachers: Teacher[];
+  allClasses: SchoolClass[];
   onShowRecommendation: (
-    result: RecommendSubstituteTeachersOutput,
-    absentTeacher: Teacher,
-    absenceDays: AbsenceDay[]
+    results: AffectedLesson[],
+    absentTeacher: Teacher
   ) => void;
 }
+
+const getAffectedLessons = (
+  absentTeacher: Teacher,
+  absenceDays: AbsenceDay[],
+  allClasses: SchoolClass[]
+): AffectedLesson[] => {
+  const affected: AffectedLesson[] = [];
+  const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
+  absenceDays.forEach(day => {
+    const dayOfWeek = dayMap[getDay(day.date)];
+    const absenceStart = day.isAllDay ? 0 : parseInt(day.startTime.split(':')[0]);
+    const absenceEnd = day.isAllDay ? 24 : parseInt(day.endTime.split(':')[0]);
+
+    allClasses.forEach(schoolClass => {
+      const classDaySchedule = schoolClass.schedule[dayOfWeek];
+      if (classDaySchedule) {
+        Object.entries(classDaySchedule).forEach(([time, lesson]) => {
+          const lessonHour = parseInt(time.split(':')[0]);
+          if (lesson && lesson.teacherId === absentTeacher.id && lessonHour >= absenceStart && lessonHour < absenceEnd) {
+            affected.push({
+              classId: schoolClass.id,
+              className: schoolClass.name,
+              date: day.date,
+              time: time,
+              lesson: lesson,
+              recommendation: null, // Will be filled later
+              reasoning: null,
+            });
+          }
+        });
+      }
+    });
+  });
+
+  return affected;
+};
 
 export default function MarkAbsentDialog({
   isOpen,
   onOpenChange,
   teacher,
   allTeachers,
+  allClasses,
   onShowRecommendation,
 }: MarkAbsentDialogProps) {
   const { toast } = useToast();
@@ -125,18 +164,7 @@ export default function MarkAbsentDialog({
   const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
     try {
-      const absenceDetails = {
-        absentTeacher: teacher.name,
-        days: values.absenceDays.map(d => ({
-          date: format(d.date, 'yyyy-MM-dd'),
-          isAllDay: d.isAllDay,
-          startTime: d.isAllDay ? 'N/A' : d.startTime,
-          endTime: d.isAllDay ? 'N/A' : d.endTime,
-        })),
-        reason: values.reason,
-      };
-
-      const teacherProfiles = allTeachers
+      const substituteProfiles = allTeachers
         .filter((t) => t.id !== teacher.id)
         .map((t) => ({
           name: t.name,
@@ -145,9 +173,28 @@ export default function MarkAbsentDialog({
           preferences: t.preferences,
         }));
       
-      const result = await recommendSubstituteTeachers({ absenceDetails, teacherProfiles });
+      const affectedLessons = getAffectedLessons(teacher, values.absenceDays, allClasses);
       
-      onShowRecommendation(result, teacher, values.absenceDays);
+      const recommendationPromises = affectedLessons.map(affected => 
+        findSubstitute({
+            lessonDetails: {
+                subject: affected.lesson.subject,
+                date: format(affected.date, 'yyyy-MM-dd'),
+                time: affected.time
+            },
+            teacherProfiles: substituteProfiles,
+        })
+      );
+      
+      const recommendations = await Promise.all(recommendationPromises);
+      
+      const finalResults = affectedLessons.map((lesson, index) => ({
+        ...lesson,
+        recommendation: recommendations[index].recommendation,
+        reasoning: recommendations[index].reasoning,
+      }));
+
+      onShowRecommendation(finalResults, teacher);
       onOpenChange(false);
     } catch (error) {
       console.error('שגיאה בקבלת המלצות:', error);
@@ -295,7 +342,7 @@ export default function MarkAbsentDialog({
 
              <Alert variant="default" className="bg-secondary">
               <AlertDescription className="text-sm text-secondary-foreground">
-                המערכת תשתמש ב-AI כדי למצוא את המורים המחליפים המתאימים ביותר על סמך כישוריהם וזמינותם.
+                המערכת תשתמש ב-AI כדי למצוא את המורה המחליף המתאים ביותר לכל שיעור חסר.
               </AlertDescription>
             </Alert>
             
@@ -304,7 +351,7 @@ export default function MarkAbsentDialog({
             )}
 
             <DialogFooter>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || fields.length === 0}>
                 {isSubmitting ? (
                   <>
                     <Loader2 className="ml-2 h-4 w-4 animate-spin" />

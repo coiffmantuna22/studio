@@ -3,9 +3,9 @@
 /**
  * @fileOverview A substitute teacher recommendation AI agent.
  *
- * - recommendSubstituteTeachers - A function that handles the substitute teacher recommendation process.
- * - RecommendSubstituteTeachersInput - The input type for the recommendSubstituteTeachers function.
- * - RecommendSubstituteTeachersOutput - The return type for the recommendSubstituteTeachers function.
+ * - findSubstitute - A function that handles finding a single best substitute for a specific lesson.
+ * - FindSubstituteInput - The input type for the findSubstitute function.
+ * - FindSubstituteOutput - The return type for the findSubstitute function.
  */
 
 import {ai} from '@/ai/genkit';
@@ -26,44 +26,37 @@ const TeacherProfileSchema = z.object({
   preferences: z.string().optional().describe('Any specific preferences of the teacher.'),
 });
 
-const AbsenceDaySchema = z.object({
-    date: z.string().describe("The date of absence in yyyy-MM-dd format."),
-    isAllDay: z.boolean().describe("Whether the absence is for the entire day."),
-    startTime: z.string().describe("The start time of the absence (HH:mm format), or 'N/A' if all day."),
-    endTime: z.string().describe("The end time of the absence (HH:mm format), or 'N/A' if all day.")
+const LessonDetailsSchema = z.object({
+  subject: z.string().describe('The subject of the lesson that needs a substitute.'),
+  date: z.string().describe("The date of the lesson in yyyy-MM-dd format."),
+  time: z.string().describe("The start time of the lesson (HH:mm format)."),
 });
 
-const AbsenceDetailsSchema = z.object({
-  absentTeacher: z.string().describe('The name of the absent teacher.'),
-  days: z.array(AbsenceDaySchema).describe('The specific days and times of the absence.'),
-  reason: z.string().optional().describe('The reason for the absence.'),
-});
-
-const RecommendSubstituteTeachersInputSchema = z.object({
-  absenceDetails: AbsenceDetailsSchema.describe('Details about the teacher absence.'),
+const FindSubstituteInputSchema = z.object({
+  lessonDetails: LessonDetailsSchema.describe('Details about the specific lesson needing a substitute.'),
   teacherProfiles: z.array(TeacherProfileSchema).describe('A list of available substitute teacher profiles.'),
 });
-export type RecommendSubstituteTeachersInput = z.infer<typeof RecommendSubstituteTeachersInputSchema>;
+export type FindSubstituteInput = z.infer<typeof FindSubstituteInputSchema>;
 
-const RecommendSubstituteTeachersOutputSchema = z.object({
-  recommendations: z.array(z.string()).describe('A list of recommended substitute teacher names.'),
-  reasoning: z.string().describe('The reasoning behind the recommendations.'),
+const FindSubstituteOutputSchema = z.object({
+  recommendation: z.string().nullable().describe('The name of the single best substitute teacher for this lesson, or null if no one is suitable.'),
+  reasoning: z.string().nullable().describe('A brief reasoning for why this teacher was recommended, or why no one was found. The reasoning MUST be in Hebrew.'),
 });
-export type RecommendSubstituteTeachersOutput = z.infer<typeof RecommendSubstituteTeachersOutputSchema>;
+export type FindSubstituteOutput = z.infer<typeof FindSubstituteOutputSchema>;
 
-export async function recommendSubstituteTeachers(input: RecommendSubstituteTeachersInput): Promise<RecommendSubstituteTeachersOutput> {
-  return recommendSubstituteTeachersFlow(input);
+export async function findSubstitute(input: FindSubstituteInput): Promise<FindSubstituteOutput> {
+  return findSubstituteFlow(input);
 }
 
 const prompt = ai.definePrompt({
-  name: 'recommendSubstituteTeachersPrompt',
-  input: {schema: RecommendSubstituteTeachersInputSchema},
-  output: {schema: RecommendSubstituteTeachersOutputSchema},
-  model: 'gemini-2.5-flash',
-  prompt: `You are an expert at recommending substitute teachers based on their qualifications and availability. Your output must be in Hebrew.
+  name: 'findSubstitutePrompt',
+  input: {schema: FindSubstituteInputSchema},
+  output: {schema: FindSubstituteOutputSchema},
+  model: "gemini-2.5-flash",
+  prompt: `You are an expert at recommending a single substitute teacher for a specific lesson. Your output must be in Hebrew.
 
-  Given the following absence details:
-  Absence Details: {{{json stringify=absenceDetails}}}
+  Given the following lesson that needs coverage:
+  Lesson Details: {{{json stringify=lessonDetails}}}
 
   And the following substitute teacher profiles:
   Teacher Profiles: 
@@ -71,19 +64,22 @@ const prompt = ai.definePrompt({
   - {{{json stringify=this}}}
   {{/each}}
 
-  Recommend a list of substitute teachers who are qualified to cover the absence, and explain your reasoning in Hebrew.
-  Consider the subjects they teach and their detailed weekly availability. You must cross-reference the specific dates and times of the absence with the substitute's weekly recurring availability. For example, if the absence is on Monday 2024-10-21 from 10:00 to 14:00, you must check which substitutes are available on Mondays during those hours.
+  Recommend the single best substitute teacher who is qualified and available to cover this specific lesson.
+  1. Qualification: The teacher must be able to teach the subject of the lesson.
+  2. Availability: You must cross-reference the specific date and time of the lesson with the substitute's weekly recurring availability. For example, if the lesson is on Monday 2024-10-21 at 10:00, you must check which substitutes are available on Mondays at 10:00.
   
-  Ensure that the output only contains the names of available and qualified substitute teachers.
-  The response (recommendations and reasoning) MUST be in Hebrew.
+  Your task is to choose only ONE teacher who is the best fit. If multiple teachers are available, choose the one with more relevant subjects or preferences.
+  If no one is available or qualified, return null for the recommendation.
+
+  The reasoning MUST be in Hebrew.
   `,
 });
 
-const recommendSubstituteTeachersFlow = ai.defineFlow(
+const findSubstituteFlow = ai.defineFlow(
   {
-    name: 'recommendSubstituteTeachersFlow',
-    inputSchema: RecommendSubstituteTeachersInputSchema,
-    outputSchema: RecommendSubstituteTeachersOutputSchema,
+    name: 'findSubstituteFlow',
+    inputSchema: FindSubstituteInputSchema,
+    outputSchema: FindSubstituteOutputSchema,
   },
   async input => {
     const {output} = await prompt(input);
