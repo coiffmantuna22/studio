@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Teacher, AbsenceDay, SchoolClass, AffectedLesson } from '@/lib/types';
+import type { Teacher, SchoolClass, AffectedLesson } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import TeacherCard from './teacher-card';
@@ -77,47 +77,6 @@ export default function TeacherList({
     absentTeacher: Teacher
   ) => {
     setRecommendation({ results, absentTeacher });
-     const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-     
-     // This logic is moved here from the dialog
-     const updatedSchedules: { classId: string; schedule: any }[] = [];
-     const tempSchedules: Record<string, any> = {};
-
-     allClasses.forEach(c => {
-       tempSchedules[c.id] = JSON.parse(JSON.stringify(c.schedule));
-     });
-
-     results.forEach(res => {
-        const substituteId = getSubstituteTeacherId(res.recommendation);
-        if (substituteId) {
-            const dayOfWeek = dayMap[getDay(res.date)];
-            if(tempSchedules[res.classId]) {
-              if(!tempSchedules[res.classId][dayOfWeek]) tempSchedules[res.classId][dayOfWeek] = {};
-              tempSchedules[res.classId][dayOfWeek][res.time] = {
-                  subject: res.lesson.subject,
-                  teacherId: substituteId,
-              };
-            }
-        }
-     });
-
-     for (const classId in tempSchedules) {
-        updatedSchedules.push({ classId, schedule: tempSchedules[classId] });
-     }
-     
-     // The dialog will call this function upon confirmation
-     const handleUpdateConfirm = () => {
-        onTimetablesUpdate(updatedSchedules);
-        toast({
-            title: "מערכת השעות עודכנה",
-            description: "השיבוצים עודכנו בהצלחה עם המורים המחליפים.",
-        });
-     }
-     
-     // We need to pass this confirm handler to the dialog
-     // Let's modify the dialog props to accept it
-     // For now, let's assume the dialog will call a function passed to it.
-     // The recommendation dialog needs to be enhanced to call this.
   };
 
   const openCreateDialog = () => {
@@ -136,20 +95,28 @@ export default function TeacherList({
   };
 
   const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-  const handleFinalUpdate = () => {
+
+  const handleFinalUpdateTimetables = () => {
       if (!recommendation) return;
 
+      // Create a deep copy of the current class schedules to modify
       const tempSchedules: Record<string, any> = {};
       allClasses.forEach(c => {
           tempSchedules[c.id] = JSON.parse(JSON.stringify(c.schedule));
       });
+      
+      let lessonsUpdatedCount = 0;
 
+      // Iterate through the recommendations and update the temporary schedules
       recommendation.results.forEach(res => {
           const substituteId = getSubstituteTeacherId(res.recommendation);
           if (substituteId) {
+              lessonsUpdatedCount++;
               const dayOfWeek = dayMap[getDay(res.date)];
               if (tempSchedules[res.classId]) {
-                  if (!tempSchedules[res.classId][dayOfWeek]) tempSchedules[res.classId][dayOfWeek] = {};
+                  if (!tempSchedules[res.classId][dayOfWeek]) {
+                    tempSchedules[res.classId][dayOfWeek] = {};
+                  }
                   tempSchedules[res.classId][dayOfWeek][res.time] = {
                       subject: res.lesson.subject,
                       teacherId: substituteId,
@@ -157,13 +124,23 @@ export default function TeacherList({
               }
           }
       });
-
+      
+      // Prepare the final list of updated schedules to pass to the parent
       const updatedSchedules = Object.keys(tempSchedules).map(classId => ({
           classId,
           schedule: tempSchedules[classId]
       }));
 
+      // Call the parent handler to update the state
       onTimetablesUpdate(updatedSchedules);
+
+      // Show a confirmation toast
+      toast({
+          title: "מערכת השעות עודכנה",
+          description: `${lessonsUpdatedCount} שיעורים עודכנו עם מחליפים.`,
+      });
+
+      // Close the recommendation dialog
       setRecommendation(null);
   };
 
@@ -222,7 +199,7 @@ export default function TeacherList({
         onOpenChange={(open) => !open && setRecommendation(null)}
         recommendationResult={recommendation}
         allTeachers={initialTeachers}
-        onTimetablesUpdate={handleFinalUpdate}
+        onTimetablesUpdate={handleFinalUpdateTimetables}
       />
     </Card>
   );

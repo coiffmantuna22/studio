@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { findSubstitute, FindSubstituteOutput } from '@/ai/flows/recommend-substitute-teachers';
+import { findSubstitute } from '@/lib/substitute-finder';
 import type { Teacher, AbsenceDay, SchoolClass, AffectedLesson } from '@/lib/types';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -20,7 +20,6 @@ import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
-import { timeSlots, daysOfWeek } from '@/lib/constants';
 
 const timeRegex = /^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/;
 
@@ -164,26 +163,20 @@ export default function MarkAbsentDialog({
   const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
     try {
-      const substituteProfiles = allTeachers
-        .filter((t) => t.id !== teacher.id)
-        .map((t) => ({
-          name: t.name,
-          subjects: t.subjects,
-          availability: t.availability,
-          preferences: t.preferences,
-        }));
+      const substituteProfiles = allTeachers.filter((t) => t.id !== teacher.id);
       
       const affectedLessons = getAffectedLessons(teacher, values.absenceDays, allClasses);
       
       const recommendationPromises = affectedLessons.map(affected => 
-        findSubstitute({
-            lessonDetails: {
-                subject: affected.lesson.subject,
-                date: format(affected.date, 'yyyy-MM-dd'),
-                time: affected.time
-            },
-            teacherProfiles: substituteProfiles,
-        })
+        findSubstitute(
+          {
+            subject: affected.lesson.subject,
+            date: affected.date,
+            time: affected.time
+          },
+          substituteProfiles,
+          allClasses
+        )
       );
       
       const recommendations = await Promise.all(recommendationPromises);
@@ -339,12 +332,6 @@ export default function MarkAbsentDialog({
                 </FormItem>
               )}
             />
-
-             <Alert variant="default" className="bg-secondary">
-              <AlertDescription className="text-sm text-secondary-foreground">
-                המערכת תשתמש ב-AI כדי למצוא את המורה המחליף המתאים ביותר לכל שיעור חסר.
-              </AlertDescription>
-            </Alert>
             
             {form.formState.errors.absenceDays && (
                  <p className="text-sm font-medium text-destructive">{form.formState.errors.absenceDays.message}</p>

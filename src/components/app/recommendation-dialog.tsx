@@ -14,8 +14,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { Lightbulb, UserCheck, CalendarDays, ArrowLeftRight, Users, BookOpen } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Lightbulb, UserCheck, ArrowLeftRight, Users, BookOpen } from 'lucide-react';
 import { groupBy } from 'lodash';
 import {
   Accordion,
@@ -23,6 +22,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { Badge } from '../ui/badge';
 
 interface RecommendationDialogProps {
   isOpen: boolean;
@@ -32,7 +32,7 @@ interface RecommendationDialogProps {
     results: AffectedLesson[];
     absentTeacher: Teacher;
   } | null;
-  onTimetablesUpdate: (updatedSchedules: { classId: string; schedule: any }[]) => void;
+  onTimetablesUpdate: () => void;
 }
 
 export default function RecommendationDialog({
@@ -42,60 +42,17 @@ export default function RecommendationDialog({
   recommendationResult,
   onTimetablesUpdate,
 }: RecommendationDialogProps) {
-  const { toast } = useToast();
 
   if (!recommendationResult) return null;
 
   const { results, absentTeacher } = recommendationResult;
-  const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-
-  const getSubstituteTeacherId = (name: string | null) => {
-    if (!name) return null;
-    const teacher = allTeachers.find(t => t.name === name);
-    return teacher ? teacher.id : null;
-  }
-
-  const handleUpdateTimetables = () => {
-    const affectedClassSchedules: Record<string, any> = {};
-
-    results.forEach(res => {
-      if (!affectedClassSchedules[res.classId]) {
-        // Find the original class and deep copy its schedule
-        // This part is tricky as we don't have the full class list here.
-        // This assumes we can retrieve it or it's passed down.
-        // For now, we'll build up the changes.
-        affectedClassSchedules[res.classId] = {};
-      }
-
-      const substituteId = getSubstituteTeacherId(res.recommendation);
-      if (substituteId) {
-        const dayOfWeek = dayMap[getDay(res.date)];
-        if(!affectedClassSchedules[res.classId][dayOfWeek]){
-           affectedClassSchedules[res.classId][dayOfWeek] = {};
-        }
-        affectedClassSchedules[res.classId][dayOfWeek][res.time] = {
-          subject: res.lesson.subject,
-          teacherId: substituteId,
-        };
-      }
-    });
-
-    // We need to merge these changes with existing schedules.
-    // This logic should ideally live in the parent component.
-    // The dialog now just fires an event with the required changes.
-    
-    toast({
-        title: "מערכת השעות עודכנה",
-        description: "השיבוצים עודכנו בהצלחה עם המורים המחליפים.",
-    });
-
-    // This is a simplified update. A real implementation would need to merge schedules.
-    // The parent component (`Home`) will receive this and update the state.
-    // The logic to merge is now in `onShowRecommendation` in `teacher-list`.
-    onOpenChange(false);
-  };
   
   const lessonsByClass = groupBy(results, 'classId');
+
+  const handleConfirm = () => {
+    onTimetablesUpdate();
+    onOpenChange(false);
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -103,7 +60,7 @@ export default function RecommendationDialog({
         <DialogHeader>
           <DialogTitle>המלצות שיבוץ עבור היעדרות של {absentTeacher.name}</DialogTitle>
           <DialogDescription>
-            AI-התבסס על המלצות שנוצרו על ידי. לחץ על "עדכן מערכת" כדי להחיל את השינויים.
+            המערכת מצאה את המחליפים המתאימים ביותר. לחץ על "עדכן מערכת שעות" כדי להחיל את השינויים.
           </DialogDescription>
         </DialogHeader>
 
@@ -168,7 +125,7 @@ export default function RecommendationDialog({
               בטל
             </Button>
           </DialogClose>
-           <Button type="button" onClick={handleUpdateTimetables} disabled={results.length === 0}>
+           <Button type="button" onClick={handleConfirm} disabled={results.length === 0}>
               עדכן מערכת שעות
             </Button>
         </DialogFooter>
