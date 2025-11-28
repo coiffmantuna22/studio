@@ -22,11 +22,13 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import type { Teacher } from '@/lib/types';
 
 const formSchema = z.object({
-  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
-  subjects: z.string().min(1, { message: 'Please enter at least one subject.' }),
-  availability: z.string().min(1, { message: 'Please specify availability.' }),
+  name: z.string().min(2, { message: 'השם חייב להכיל לפחות 2 תווים.' }),
+  subjects: z.string().min(1, { message: 'אנא הזן לפחות מקצוע אחד.' }),
+  availability: z.string().min(1, { message: 'אנא ציין זמינות.' }),
+  preferences: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -34,7 +36,7 @@ type FormValues = z.infer<typeof formSchema>;
 interface CreateTeacherDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onAddTeacher: (teacher: Omit<FormValues, 'subjects'> & { subjects: string[] }) => void;
+  onAddTeacher: (teacher: Omit<Teacher, 'id' | 'avatar'>) => void;
 }
 
 export default function CreateTeacherDialog({
@@ -48,6 +50,7 @@ export default function CreateTeacherDialog({
       name: '',
       subjects: '',
       availability: '',
+      preferences: '',
     },
   });
 
@@ -57,6 +60,7 @@ export default function CreateTeacherDialog({
       name: values.name,
       subjects: subjectsArray,
       availability: values.availability,
+      preferences: values.preferences,
     });
     form.reset();
     onOpenChange(false);
@@ -66,9 +70,9 @@ export default function CreateTeacherDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create Teacher Profile</DialogTitle>
+          <DialogTitle>יצירת פרופיל מורה</DialogTitle>
           <DialogDescription>
-            Add a new teacher to the system. Click save when you're done.
+            הוסף מורה חדש למערכת. לחץ על שמירה בסיום.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -78,9 +82,9 @@ export default function CreateTeacherDialog({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Full Name</FormLabel>
+                  <FormLabel>שם מלא</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Jane Doe" {...field} />
+                    <Input placeholder="למשל, ישראלה ישראלי" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -91,9 +95,9 @@ export default function CreateTeacherDialog({
               name="subjects"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Subjects Taught</FormLabel>
+                  <FormLabel>מקצועות לימוד</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Math, Science" {...field} />
+                    <Input placeholder="למשל, מתמטיקה, מדעים" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -104,16 +108,29 @@ export default function CreateTeacherDialog({
               name="availability"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Typical Availability</FormLabel>
+                  <FormLabel>זמינות טיפוסית</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="e.g., Mon, Wed, Fri afternoons" {...field} />
+                    <Textarea placeholder="למשל, שני, רביעי, שישי אחר הצהריים" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="preferences"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>העדפות (אופציונלי)</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="למשל, מעדיף/ה כיתות קטנות" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <DialogFooter>
-              <Button type="submit">Save Profile</Button>
+              <Button type="submit">שמור פרופיל</Button>
             </DialogFooter>
           </form>
         </Form>

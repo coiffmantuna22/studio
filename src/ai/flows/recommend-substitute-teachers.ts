@@ -22,6 +22,8 @@ const AbsenceDetailsSchema = z.object({
   absentTeacher: z.string().describe('The name of the absent teacher.'),
   startDate: z.string().describe('The start date of the absence.'),
   endDate: z.string().describe('The end date of the absence.'),
+  startTime: z.string().describe('The start time of the absence (HH:mm format).'),
+  endTime: z.string().describe('The end time of the absence (HH:mm format).'),
   reason: z.string().optional().describe('The reason for the absence.'),
 });
 
@@ -45,18 +47,21 @@ const prompt = ai.definePrompt({
   name: 'recommendSubstituteTeachersPrompt',
   input: {schema: RecommendSubstituteTeachersInputSchema},
   output: {schema: RecommendSubstituteTeachersOutputSchema},
-  prompt: `You are an expert at recommending substitute teachers based on their qualifications and availability.
+  prompt: `You are an expert at recommending substitute teachers based on their qualifications and availability. Your output must be in Hebrew.
 
   Given the following absence details:
-  Absence Details: {{{absenceDetails}}}
+  Absence Details: {{{json stringify=absenceDetails}}}
 
   And the following substitute teacher profiles:
-  Teacher Profiles: {{#each teacherProfiles}}{{{this}}}
+  Teacher Profiles: 
+  {{#each teacherProfiles}}
+  - {{{json stringify=this}}}
   {{/each}}
 
-  Recommend a list of substitute teachers who are qualified to cover the absence, and explain your reasoning.
-  Consider the subjects they teach, their availability, and any teacher preferences.
+  Recommend a list of substitute teachers who are qualified to cover the absence, and explain your reasoning in Hebrew.
+  Consider the subjects they teach, their availability (days and times), and any teacher preferences.
   Ensure that the output only contains the names of available substitute teachers.
+  The response (recommendations and reasoning) MUST be in Hebrew.
   `,
 });
 

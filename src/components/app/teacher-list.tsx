@@ -21,7 +21,7 @@ export default function TeacherList({ initialTeachers }: TeacherListProps) {
   const [recommendation, setRecommendation] = useState<{
     result: RecommendSubstituteTeachersOutput;
     absentTeacher: Teacher;
-    dates: { from: Date; to: Date };
+    details: { from: Date; to: Date; startTime: string; endTime: string };
   } | null>(null);
 
   const handleAddTeacher = (newTeacher: Omit<Teacher, 'id' | 'avatar'>) => {
@@ -42,18 +42,18 @@ export default function TeacherList({ initialTeachers }: TeacherListProps) {
   const handleShowRecommendation = (
     result: RecommendSubstituteTeachersOutput,
     absentTeacher: Teacher,
-    dates: { from: Date; to: Date }
+    details: { from: Date; to: Date; startTime: string; endTime: string }
   ) => {
-    setRecommendation({ result, absentTeacher, dates });
+    setRecommendation({ result, absentTeacher, details });
   };
 
   return (
     <>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-foreground">Teacher Profiles</h2>
+        <h2 className="text-xl font-semibold text-foreground">פרופילי מורים</h2>
         <Button onClick={() => setCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Profile
+          <Plus className="ml-2 h-4 w-4" />
+          יצירת פרופיל
         </Button>
       </div>
 
@@ -69,9 +69,9 @@ export default function TeacherList({ initialTeachers }: TeacherListProps) {
         </div>
       ) : (
          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border text-center p-12 mt-6">
-            <h3 className="text-lg font-semibold text-foreground">No Teachers Found</h3>
+            <h3 className="text-lg font-semibold text-foreground">לא נמצאו מורים</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Get started by creating a new teacher profile.
+              התחל על ידי יצירת פרופיל מורה חדש.
             </p>
          </div>
       )}

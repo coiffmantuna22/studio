@@ -23,7 +23,7 @@ interface RecommendationDialogProps {
   recommendationResult: {
     result: RecommendSubstituteTeachersOutput;
     absentTeacher: Teacher;
-    dates: { from: Date; to: Date };
+    details: { from: Date; to: Date; startTime: string; endTime: string };
   } | null;
 }
 
@@ -34,17 +34,19 @@ export default function RecommendationDialog({
 }: RecommendationDialogProps) {
   if (!recommendationResult) return null;
 
-  const { result, absentTeacher, dates } = recommendationResult;
+  const { result, absentTeacher, details } = recommendationResult;
   const { recommendations, reasoning } = result;
+
+  const formatDate = (date: Date) => format(date, 'd MMM, yyyy');
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Substitute Recommendations</DialogTitle>
+          <DialogTitle>המלצות למורים מחליפים</DialogTitle>
           <DialogDescription>
-            For {absentTeacher.name}'s absence from{' '}
-            {format(dates.from, 'MMM d')} to {format(dates.to, 'MMM d, yyyy')}.
+            עבור היעדרות של {absentTeacher.name} מה-
+            {formatDate(details.from)} עד {formatDate(details.to)}, בין השעות {details.startTime}-{details.endTime}.
           </DialogDescription>
         </DialogHeader>
 
@@ -52,7 +54,7 @@ export default function RecommendationDialog({
           <div>
             <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
               <UserCheck className="h-4 w-4 text-primary" />
-              Top Recommendations
+              המלצות מובילות
             </h3>
             {recommendations.length > 0 ? (
               <ul className="space-y-2 rounded-md border bg-card p-3">
@@ -64,7 +66,7 @@ export default function RecommendationDialog({
               </ul>
             ) : (
               <p className="text-sm text-muted-foreground italic p-3 border rounded-md">
-                No suitable substitutes found based on the criteria.
+                לא נמצאו מחליפים מתאימים על פי הקריטריונים.
               </p>
             )}
           </div>
@@ -74,7 +76,7 @@ export default function RecommendationDialog({
           <div>
              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Lightbulb className="h-4 w-4 text-primary" />
-                AI Reasoning
+                נימוקי AI
             </h3>
             <div className="space-y-2 rounded-md border bg-secondary p-3">
               <p className="text-sm text-secondary-foreground">{reasoning}</p>
@@ -85,7 +87,7 @@ export default function RecommendationDialog({
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="secondary">
-              Close
+              סגור
             </Button>
           </DialogClose>
         </DialogFooter>

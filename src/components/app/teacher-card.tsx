@@ -31,7 +31,7 @@ export default function TeacherCard({ teacher, onMarkAbsent }: TeacherCardProps)
         <div className="flex items-start gap-3">
           <Book className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
           <div>
-            <h4 className="font-semibold text-sm">Subjects</h4>
+            <h4 className="font-semibold text-sm">מקצועות</h4>
             <div className="flex flex-wrap gap-1 mt-1">
               {teacher.subjects.map((subject) => (
                 <Badge key={subject} variant="secondary">
@@ -44,15 +44,15 @@ export default function TeacherCard({ teacher, onMarkAbsent }: TeacherCardProps)
         <div className="flex items-start gap-3">
           <Calendar className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
           <div>
-            <h4 className="font-semibold text-sm">Availability</h4>
+            <h4 className="font-semibold text-sm">זמינות</h4>
             <p className="text-sm text-muted-foreground">{teacher.availability}</p>
           </div>
         </div>
       </CardContent>
       <CardFooter>
         <Button variant="outline" className="w-full" onClick={onMarkAbsent}>
-          <UserX className="mr-2 h-4 w-4" />
-          Mark Absent
+          <UserX className="ml-2 h-4 w-4" />
+          סימון היעדרות
         </Button>
       </CardFooter>
     </Card>

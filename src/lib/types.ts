@@ -3,6 +3,7 @@ export interface Teacher {
   name: string;
   subjects: string[];
   availability: string;
+  preferences?: string;
   avatar: {
     fallback: string;
   };
