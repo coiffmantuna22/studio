@@ -23,6 +23,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import type { Teacher } from '@/lib/types';
+import { useEffect } from 'react';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: 'השם חייב להכיל לפחות 2 תווים.' }),
@@ -37,13 +38,19 @@ interface CreateTeacherDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onAddTeacher: (teacher: Omit<Teacher, 'id' | 'avatar'>) => void;
+  onEditTeacher: (teacher: Omit<Teacher, 'avatar'>) => void;
+  teacherToEdit: Teacher | null;
 }
 
 export default function CreateTeacherDialog({
   isOpen,
   onOpenChange,
   onAddTeacher,
+  onEditTeacher,
+  teacherToEdit,
 }: CreateTeacherDialogProps) {
+  const isEditMode = !!teacherToEdit;
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -54,15 +61,41 @@ export default function CreateTeacherDialog({
     },
   });
 
+  useEffect(() => {
+    if (isOpen) {
+      if (isEditMode) {
+        form.reset({
+          name: teacherToEdit.name,
+          subjects: teacherToEdit.subjects.join(', '),
+          availability: teacherToEdit.availability,
+          preferences: teacherToEdit.preferences || '',
+        });
+      } else {
+        form.reset({
+          name: '',
+          subjects: '',
+          availability: '',
+          preferences: '',
+        });
+      }
+    }
+  }, [isOpen, isEditMode, teacherToEdit, form]);
+
   const onSubmit = (values: FormValues) => {
     const subjectsArray = values.subjects.split(',').map((s) => s.trim()).filter(Boolean);
-    onAddTeacher({
+    const teacherData = {
       name: values.name,
       subjects: subjectsArray,
       availability: values.availability,
       preferences: values.preferences,
-    });
-    form.reset();
+    };
+
+    if (isEditMode) {
+      onEditTeacher({ ...teacherData, id: teacherToEdit.id });
+    } else {
+      onAddTeacher(teacherData);
+    }
+    
     onOpenChange(false);
   };
 
@@ -70,9 +103,9 @@ export default function CreateTeacherDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>יצירת פרופיל מורה</DialogTitle>
+          <DialogTitle>{isEditMode ? 'עריכת פרופיל מורה' : 'יצירת פרופיל מורה'}</DialogTitle>
           <DialogDescription>
-            הוסף מורה חדש למערכת. לחץ על שמירה בסיום.
+            {isEditMode ? 'עדכן את פרטי המורה. לחץ על שמירה בסיום.' : 'הוסף מורה חדש למערכת. לחץ על שמירה בסיום.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -97,7 +130,7 @@ export default function CreateTeacherDialog({
                 <FormItem>
                   <FormLabel>מקצועות לימוד</FormLabel>
                   <FormControl>
-                    <Input placeholder="למשל, מתמטיקה, מדעים" {...field} />
+                    <Input placeholder="למשל, מתמטיקה, מדעים (מופרדים בפסיק)" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -130,7 +163,7 @@ export default function CreateTeacherDialog({
               )}
             />
             <DialogFooter>
-              <Button type="submit">שמור פרופיל</Button>
+              <Button type="submit">{isEditMode ? 'שמור שינויים' : 'שמור פרופיל'}</Button>
             </DialogFooter>
           </form>
         </Form>

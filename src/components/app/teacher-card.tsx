@@ -9,14 +9,15 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Book, Calendar, UserX } from 'lucide-react';
+import { Book, Calendar, UserX, Pencil } from 'lucide-react';
 
 interface TeacherCardProps {
   teacher: Teacher;
   onMarkAbsent: () => void;
+  onEdit: () => void;
 }
 
-export default function TeacherCard({ teacher, onMarkAbsent }: TeacherCardProps) {
+export default function TeacherCard({ teacher, onMarkAbsent, onEdit }: TeacherCardProps) {
   return (
     <Card className="flex flex-col">
       <CardHeader className="flex flex-row items-center gap-4">
@@ -49,10 +50,14 @@ export default function TeacherCard({ teacher, onMarkAbsent }: TeacherCardProps)
           </div>
         </div>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="grid grid-cols-2 gap-2">
         <Button variant="outline" className="w-full" onClick={onMarkAbsent}>
           <UserX className="ml-2 h-4 w-4" />
           סימון היעדרות
+        </Button>
+        <Button variant="outline" className="w-full" onClick={onEdit}>
+          <Pencil className="ml-2 h-4 w-4" />
+          עריכה
         </Button>
       </CardFooter>
     </Card>

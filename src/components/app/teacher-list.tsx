@@ -18,6 +18,7 @@ export default function TeacherList({ initialTeachers }: TeacherListProps) {
   const [teachers, setTeachers] = useState<Teacher[]>(initialTeachers);
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [teacherToMarkAbsent, setTeacherToMarkAbsent] = useState<Teacher | null>(null);
+  const [teacherToEdit, setTeacherToEdit] = useState<Teacher | null>(null);
   const [recommendation, setRecommendation] = useState<{
     result: RecommendSubstituteTeachersOutput;
     absentTeacher: Teacher;
@@ -39,6 +40,23 @@ export default function TeacherList({ initialTeachers }: TeacherListProps) {
     setTeachers((prev) => [teacherWithId, ...prev]);
   };
 
+  const handleEditTeacher = (updatedTeacher: Omit<Teacher, 'avatar'>) => {
+    const fallback = updatedTeacher.name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase();
+
+    setTeachers((prev) =>
+      prev.map((t) =>
+        t.id === updatedTeacher.id
+          ? { ...t, ...updatedTeacher, avatar: { fallback } }
+          : t
+      )
+    );
+    setTeacherToEdit(null);
+  };
+
   const handleShowRecommendation = (
     result: RecommendSubstituteTeachersOutput,
     absentTeacher: Teacher,
@@ -47,11 +65,27 @@ export default function TeacherList({ initialTeachers }: TeacherListProps) {
     setRecommendation({ result, absentTeacher, details });
   };
 
+  const openCreateDialog = () => {
+    setTeacherToEdit(null);
+    setCreateDialogOpen(true);
+  };
+
+  const openEditDialog = (teacher: Teacher) => {
+    setTeacherToEdit(teacher);
+    setCreateDialogOpen(true);
+  };
+
+  const closeCreateDialog = () => {
+    setCreateDialogOpen(false);
+    setTeacherToEdit(null);
+  };
+
+
   return (
     <>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold text-foreground">פרופילי מורים</h2>
-        <Button onClick={() => setCreateDialogOpen(true)}>
+        <Button onClick={openCreateDialog}>
           <Plus className="ml-2 h-4 w-4" />
           יצירת פרופיל
         </Button>
@@ -64,6 +98,7 @@ export default function TeacherList({ initialTeachers }: TeacherListProps) {
               key={teacher.id}
               teacher={teacher}
               onMarkAbsent={() => setTeacherToMarkAbsent(teacher)}
+              onEdit={() => openEditDialog(teacher)}
             />
           ))}
         </div>
@@ -78,8 +113,10 @@ export default function TeacherList({ initialTeachers }: TeacherListProps) {
 
       <CreateTeacherDialog
         isOpen={isCreateDialogOpen}
-        onOpenChange={setCreateDialogOpen}
+        onOpenChange={closeCreateDialog}
         onAddTeacher={handleAddTeacher}
+        onEditTeacher={handleEditTeacher}
+        teacherToEdit={teacherToEdit}
       />
 
       <MarkAbsentDialog
