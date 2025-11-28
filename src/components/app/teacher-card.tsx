@@ -17,6 +17,19 @@ interface TeacherCardProps {
   onEdit: () => void;
 }
 
+const formatAvailability = (availability: Teacher['availability']) => {
+  const availableDays = availability
+    .filter(day => day.slots.length > 0)
+    .map(day => day.day.substring(0, 3)); 
+  if (availableDays.length === 0) {
+    return 'לא זמין/ה';
+  }
+  if (availableDays.length > 3) {
+    return `${availableDays.slice(0, 3).join(', ')}...`;
+  }
+  return availableDays.join(', ');
+}
+
 export default function TeacherCard({ teacher, onMarkAbsent, onEdit }: TeacherCardProps) {
   return (
     <Card className="flex flex-col">
@@ -46,7 +59,7 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit }: TeacherCa
           <Calendar className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
           <div>
             <h4 className="font-semibold text-sm">זמינות</h4>
-            <p className="text-sm text-muted-foreground">{teacher.availability}</p>
+            <p className="text-sm text-muted-foreground">{formatAvailability(teacher.availability)}</p>
           </div>
         </div>
       </CardContent>

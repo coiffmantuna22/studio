@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Teacher } from '@/lib/types';
+import type { Teacher, AbsenceDay } from '@/lib/types';
 import type { RecommendSubstituteTeachersOutput } from '@/ai/flows/recommend-substitute-teachers';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
@@ -22,7 +22,7 @@ export default function TeacherList({ initialTeachers }: TeacherListProps) {
   const [recommendation, setRecommendation] = useState<{
     result: RecommendSubstituteTeachersOutput;
     absentTeacher: Teacher;
-    details: { from: Date; to: Date; startTime: string; endTime: string };
+    absenceDays: AbsenceDay[];
   } | null>(null);
 
   const handleAddTeacher = (newTeacher: Omit<Teacher, 'id' | 'avatar'>) => {
@@ -60,9 +60,9 @@ export default function TeacherList({ initialTeachers }: TeacherListProps) {
   const handleShowRecommendation = (
     result: RecommendSubstituteTeachersOutput,
     absentTeacher: Teacher,
-    details: { from: Date; to: Date; startTime: string; endTime: string }
+    absenceDays: AbsenceDay[]
   ) => {
-    setRecommendation({ result, absentTeacher, details });
+    setRecommendation({ result, absentTeacher, absenceDays });
   };
 
   const openCreateDialog = () => {

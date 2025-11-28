@@ -22,13 +22,23 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { Teacher } from '@/lib/types';
+import type { Teacher, DayAvailability } from '@/lib/types';
 import { useEffect } from 'react';
+import WeeklyScheduleSelector from './weekly-schedule-selector';
+import SubjectInput from './subject-input';
+
+const dayAvailabilitySchema = z.object({
+  day: z.string(),
+  slots: z.array(z.object({
+    start: z.string(),
+    end: z.string(),
+  })),
+});
 
 const formSchema = z.object({
   name: z.string().min(2, { message: 'השם חייב להכיל לפחות 2 תווים.' }),
-  subjects: z.string().min(1, { message: 'אנא הזן לפחות מקצוע אחד.' }),
-  availability: z.string().min(1, { message: 'אנא ציין זמינות.' }),
+  subjects: z.array(z.string()).min(1, { message: 'אנא הזן לפחות מקצוע אחד.' }),
+  availability: z.array(dayAvailabilitySchema).min(1, { message: 'אנא ציין זמינות.' }),
   preferences: z.string().optional(),
 });
 
@@ -41,6 +51,15 @@ interface CreateTeacherDialogProps {
   onEditTeacher: (teacher: Omit<Teacher, 'avatar'>) => void;
   teacherToEdit: Teacher | null;
 }
+
+const defaultAvailability = [
+  { day: 'ראשון', slots: [] },
+  { day: 'שני', slots: [] },
+  { day: 'שלישי', slots: [] },
+  { day: 'רביעי', slots: [] },
+  { day: 'חמישי', slots: [] },
+  { day: 'שישי', slots: [] },
+];
 
 export default function CreateTeacherDialog({
   isOpen,
@@ -55,26 +74,26 @@ export default function CreateTeacherDialog({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
-      subjects: '',
-      availability: '',
+      subjects: [],
+      availability: defaultAvailability,
       preferences: '',
     },
   });
 
   useEffect(() => {
     if (isOpen) {
-      if (isEditMode) {
+      if (isEditMode && teacherToEdit) {
         form.reset({
           name: teacherToEdit.name,
-          subjects: teacherToEdit.subjects.join(', '),
-          availability: teacherToEdit.availability,
+          subjects: teacherToEdit.subjects,
+          availability: teacherToEdit.availability.length > 0 ? teacherToEdit.availability : defaultAvailability,
           preferences: teacherToEdit.preferences || '',
         });
       } else {
         form.reset({
           name: '',
-          subjects: '',
-          availability: '',
+          subjects: [],
+          availability: defaultAvailability,
           preferences: '',
         });
       }
@@ -82,15 +101,14 @@ export default function CreateTeacherDialog({
   }, [isOpen, isEditMode, teacherToEdit, form]);
 
   const onSubmit = (values: FormValues) => {
-    const subjectsArray = values.subjects.split(',').map((s) => s.trim()).filter(Boolean);
     const teacherData = {
       name: values.name,
-      subjects: subjectsArray,
+      subjects: values.subjects,
       availability: values.availability,
       preferences: values.preferences,
     };
 
-    if (isEditMode) {
+    if (isEditMode && teacherToEdit) {
       onEditTeacher({ ...teacherData, id: teacherToEdit.id });
     } else {
       onAddTeacher(teacherData);
@@ -101,7 +119,7 @@ export default function CreateTeacherDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{isEditMode ? 'עריכת פרופיל מורה' : 'יצירת פרופיל מורה'}</DialogTitle>
           <DialogDescription>
@@ -130,7 +148,7 @@ export default function CreateTeacherDialog({
                 <FormItem>
                   <FormLabel>מקצועות לימוד</FormLabel>
                   <FormControl>
-                    <Input placeholder="למשל, מתמטיקה, מדעים (מופרדים בפסיק)" {...field} />
+                    <SubjectInput {...field} placeholder="הקש 'Enter' להוספת מקצוע..." />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -141,9 +159,10 @@ export default function CreateTeacherDialog({
               name="availability"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>זמינות טיפוסית</FormLabel>
+                  <FormLabel>זמינות שבועית</FormLabel>
+                   <p className="text-sm text-muted-foreground">לחץ על משבצות זמן כדי לסמן זמינות.</p>
                   <FormControl>
-                    <Textarea placeholder="למשל, שני, רביעי, שישי אחר הצהריים" {...field} />
+                    <WeeklyScheduleSelector {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
