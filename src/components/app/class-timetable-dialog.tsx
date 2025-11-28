@@ -24,7 +24,7 @@ import {
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { X, Book, User } from 'lucide-react';
+import { X, Book, User, BookOpen } from 'lucide-react';
 import { Separator } from '../ui/separator';
 
 interface ClassTimetableDialogProps {
@@ -229,16 +229,22 @@ export default function ClassTimetableDialog({
                                     schoolClass={schoolClass}
                                 />
                             ) : (
-                                <div className="p-2 min-h-[6rem] flex flex-col justify-center items-center">
+                                <div className="p-1.5 h-full">
                                 {lesson && teacher ? (
-                                    <>
-                                    <p className="font-semibold">{lesson.subject}</p>
-                                    <Badge variant="secondary" className="mt-1">
-                                        {teacher.name}
-                                    </Badge>
-                                    </>
+                                    <div className="bg-secondary/50 rounded-md p-2 text-right h-full flex flex-col justify-center">
+                                      <div className="flex items-center gap-2">
+                                        <BookOpen className="h-4 w-4 text-primary" />
+                                        <p className="font-semibold text-primary">{lesson.subject}</p>
+                                      </div>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <User className="h-4 w-4 text-muted-foreground" />
+                                        <p className="text-sm text-muted-foreground">{teacher.name}</p>
+                                      </div>
+                                    </div>
                                 ) : (
-                                    <span className="text-muted-foreground text-xs">--</span>
+                                    <div className="flex items-center justify-center h-full min-h-[6rem]">
+                                        <span className="text-muted-foreground text-xs">--</span>
+                                    </div>
                                 )}
                                 </div>
                             )}
