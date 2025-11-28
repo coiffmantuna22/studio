@@ -57,37 +57,35 @@ export default function ClassList({ initialClasses, allTeachers, onClassesUpdate
 
 
   return (
-    <Card className="mt-6">
-      <div className="flex items-center justify-between p-6">
+    <Card className="mt-6 shadow-none border-0 sm:border sm:shadow-sm">
+      <CardHeader className="flex-row items-center justify-between">
         <div>
-            <h2 className="text-xl font-semibold text-foreground">כיתות לימוד</h2>
-            <p className="text-sm text-muted-foreground">ניהול מערכת השעות הכיתתית.</p>
+            <CardTitle className="text-xl">כיתות לימוד</CardTitle>
+            <CardDescription>ניהול מערכת השעות הכיתתית.</CardDescription>
         </div>
         <Button onClick={() => setCreateClassOpen(true)}>
           <Plus className="ml-2 h-4 w-4" />
           הוסף כיתה
         </Button>
-      </div>
+      </CardHeader>
 
-      <div className="p-6 pt-0">
+      <CardContent>
         {initialClasses.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {initialClasses.map((schoolClass) => (
-              <Card key={schoolClass.id}>
+              <Card key={schoolClass.id} className="transition-all hover:shadow-md">
                 <CardHeader>
                   <CardTitle>{schoolClass.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
                   <CardDescription>
                     לחץ לצפייה או עריכת מערכת השעות.
                   </CardDescription>
-                </CardContent>
+                </CardHeader>
                 <CardFooter className="grid grid-cols-3 gap-2">
                   <Button variant="outline" size="sm" onClick={() => setClassToView(schoolClass)}>
                     <Eye className="ml-1 h-4 w-4" />
                     צפה
                   </Button>
-                   <Button variant="outline" size="sm" onClick={() => setClassToEditSchedule(schoolClass)}>
+                   <Button variant="secondary" size="sm" onClick={() => setClassToEditSchedule(schoolClass)}>
                     <Edit className="ml-1 h-4 w-4" />
                     ערוך
                   </Button>
@@ -125,7 +123,7 @@ export default function ClassList({ initialClasses, allTeachers, onClassesUpdate
             </p>
           </div>
         )}
-      </div>
+      </CardContent>
 
       <CreateClassDialog
         isOpen={isCreateClassOpen}

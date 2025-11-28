@@ -17,8 +17,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['Assistant', 'sans-serif'],
-        headline: ['Assistant', 'sans-serif'],
+        body: ['Rubik', 'sans-serif'],
+        headline: ['Rubik', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {

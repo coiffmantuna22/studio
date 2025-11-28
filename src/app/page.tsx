@@ -39,11 +39,13 @@ export default function Home() {
       <Header />
       <main className="flex-1 p-4 sm:p-6 md:p-8">
         <Tabs defaultValue="teachers" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 max-w-xl mx-auto">
-            <TabsTrigger value="teachers">פרופילי מורים</TabsTrigger>
-            <TabsTrigger value="classes">כיתות לימוד</TabsTrigger>
-            <TabsTrigger value="timetable">זמינות מחליפים</TabsTrigger>
-          </TabsList>
+          <div className='flex justify-center'>
+            <TabsList className="grid w-full grid-cols-3 max-w-xl">
+              <TabsTrigger value="teachers">פרופילי מורים</TabsTrigger>
+              <TabsTrigger value="classes">כיתות לימוד</TabsTrigger>
+              <TabsTrigger value="timetable">זמינות מחליפים</TabsTrigger>
+            </TabsList>
+          </div>
           <TabsContent value="teachers">
             <TeacherList 
               initialTeachers={teachers} 

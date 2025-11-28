@@ -32,13 +32,13 @@ const formatAvailability = (availability: Teacher['availability']) => {
 
 export default function TeacherCard({ teacher, onMarkAbsent, onEdit }: TeacherCardProps) {
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col transition-all hover:shadow-md">
       <CardHeader className="flex flex-row items-center gap-4">
         <Avatar className="h-12 w-12">
           <AvatarFallback>{teacher.avatar.fallback}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          <CardTitle className="text-lg">{teacher.name}</CardTitle>
+          <CardTitle>{teacher.name}</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="flex-grow space-y-4">
@@ -68,7 +68,7 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit }: TeacherCa
           <UserX className="ml-2 h-4 w-4" />
           סימון היעדרות
         </Button>
-        <Button variant="outline" className="w-full" onClick={onEdit}>
+        <Button variant="secondary" className="w-full" onClick={onEdit}>
           <Pencil className="ml-2 h-4 w-4" />
           עריכה
         </Button>

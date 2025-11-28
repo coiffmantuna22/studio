@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import type { Teacher } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { timeSlots, daysOfWeek } from '@/lib/constants';
@@ -45,22 +45,22 @@ export default function Timetable({ allTeachers }: TimetableProps) {
   }, [allTeachers]);
 
   return (
-    <Card className="mt-6">
+    <Card className="mt-6 shadow-none border-0 sm:border sm:shadow-sm">
       <CardHeader>
-        <CardTitle>זמינות כלל המורים המחליפים</CardTitle>
-        <p className="text-muted-foreground text-sm">
+        <CardTitle className="text-xl">זמינות כלל המורים המחליפים</CardTitle>
+        <CardDescription>
           הצגת זמינות המורים המחליפים לפי שעה.
-        </p>
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <ScrollArea className="w-full whitespace-nowrap rounded-md border">
             <div className="relative">
-                <table className="w-full text-sm text-center">
-                    <thead>
-                        <tr className="bg-muted">
-                        <th className="sticky right-0 bg-muted p-2 w-24 z-10">שעה</th>
+                <table className="w-full text-sm text-center table-fixed">
+                    <thead className='bg-muted/50'>
+                        <tr>
+                        <th className="sticky right-0 bg-muted/50 p-2 w-24 z-10 font-semibold">שעה</th>
                         {daysOfWeek.map(day => (
-                            <th key={day} className="p-2 min-w-[150px]">{day}</th>
+                            <th key={day} className="p-2 min-w-[150px] font-semibold">{day}</th>
                         ))}
                         </tr>
                     </thead>
@@ -69,16 +69,16 @@ export default function Timetable({ allTeachers }: TimetableProps) {
                         <tr key={time} className="border-t">
                             <td className="sticky right-0 font-semibold bg-card p-2 w-24 z-10">{time}</td>
                             {daysOfWeek.map(day => (
-                            <td key={`${day}-${time}`} className="p-2 align-top h-24">
-                                <div className="flex flex-wrap gap-1 justify-center">
+                            <td key={`${day}-${time}`} className="p-2 align-top h-24 border-l">
+                                <div className="flex flex-wrap gap-1.5 justify-center">
                                     {timetableData[day]?.[time]?.length > 0 ? (
                                         timetableData[day][time].map(teacherName => (
-                                        <Badge key={teacherName} variant="secondary" className="text-xs">
+                                        <Badge key={teacherName} variant="secondary" className="font-normal">
                                             {teacherName}
                                         </Badge>
                                         ))
                                     ) : (
-                                        <span className="text-muted-foreground text-xs">--</span>
+                                        <span className="text-muted-foreground text-xs opacity-70">--</span>
                                     )}
                                 </div>
                             </td>
