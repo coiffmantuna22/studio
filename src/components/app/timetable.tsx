@@ -45,9 +45,10 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
       
       const teacherSchedule = teacher.schedule || {};
 
-      teacher.availability.forEach(availDay => {
-        if (daysOfWeek.includes(availDay.day)) {
-          availDay.slots.forEach(timeRange => {
+      daysOfWeek.forEach(day => {
+        const availabilityForDay = teacher.availability.find(a => a.day === day);
+        if (availabilityForDay) {
+          availabilityForDay.slots.forEach(timeRange => {
             const startNum = parseTimeToNumber(timeRange.start);
             const endNum = parseTimeToNumber(timeRange.end);
             
@@ -56,22 +57,22 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
                     const slotStartNum = parseTimeToNumber(slot.start);
                     if (slotStartNum >= startNum && slotStartNum < endNum) {
                         
-                        const isTeaching = teacherSchedule[availDay.day]?.[slot.start];
+                        const isTeaching = teacherSchedule[day]?.[slot.start];
 
                         if (!isTeaching) {
-                            if (data[availDay.day]?.[slot.start]) {
-                            let isAbsent = false;
-                            if(availDay.day === currentDayOfWeek && todaysAbsences.length > 0) {
-                                const lessonStart = parseTimeToNumber(slot.start);
-                                isAbsent = todaysAbsences.some(absence => {
-                                    if (absence.isAllDay) return true;
-                                    const absenceStart = parseTimeToNumber(absence.startTime);
-                                    const absenceEnd = parseTimeToNumber(absence.endTime);
-                                    return lessonStart >= absenceStart && lessonStart < absenceEnd;
-                                });
-                            }
+                            if (data[day]?.[slot.start]) {
+                              let isAbsent = false;
+                              if(day === currentDayOfWeek && todaysAbsences.length > 0) {
+                                  const lessonStart = parseTimeToNumber(slot.start);
+                                  isAbsent = todaysAbsences.some(absence => {
+                                      if (absence.isAllDay) return true;
+                                      const absenceStart = parseTimeToNumber(absence.startTime);
+                                      const absenceEnd = parseTimeToNumber(absence.endTime);
+                                      return lessonStart >= absenceStart && lessonStart < absenceEnd;
+                                  });
+                              }
 
-                            data[availDay.day][slot.start].push({ name: teacher.name, isAbsent });
+                              data[day][slot.start].push({ name: teacher.name, isAbsent });
                             }
                         }
                     }
