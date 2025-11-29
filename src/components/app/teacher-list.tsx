@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import type { Teacher, SchoolClass, AffectedLesson } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import TeacherCard from './teacher-card';
 import CreateTeacherDialog from './create-teacher-dialog';
 import MarkAbsentDialog from './mark-absent-dialog';
 import RecommendationDialog from './recommendation-dialog';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { getDay } from 'date-fns';
 
@@ -33,6 +34,7 @@ export default function TeacherList({
     results: AffectedLesson[];
     absentTeacher: Teacher;
   } | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const getSubstituteTeacherId = (name: string | null): string | null => {
     if (!name) return null;
@@ -144,32 +146,59 @@ export default function TeacherList({
       setRecommendation(null);
   };
 
+  const filteredTeachers = initialTeachers.filter(teacher =>
+    teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
 
   return (
     <Card className="mt-6 shadow-none border-0 sm:border sm:shadow-sm">
-      <CardHeader className="flex-row items-center justify-between">
-        <div>
-          <CardTitle className="text-xl">פרופילי מורים</CardTitle>
-          <CardDescription>ניהול מורים מחליפים וסימון היעדרויות.</CardDescription>
+      <CardHeader>
+        <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
+            <div>
+                <CardTitle className="text-xl">פרופילי מורים</CardTitle>
+                <CardDescription>ניהול מורים מחליפים וסימון היעדרויות.</CardDescription>
+            </div>
+            <div className="flex gap-2">
+                <div className="relative flex-grow">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="search"
+                        placeholder="חיפוש מורה..."
+                        className="pl-9 w-full"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                <Button onClick={openCreateDialog} className='shrink-0'>
+                    <Plus className="ml-2 h-4 w-4" />
+                    יצירת פרופיל
+                </Button>
+            </div>
         </div>
-        <Button onClick={openCreateDialog}>
-          <Plus className="ml-2 h-4 w-4" />
-          יצירת פרופיל
-        </Button>
       </CardHeader>
 
       <CardContent>
         {initialTeachers.length > 0 ? (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {initialTeachers.map((teacher) => (
-              <TeacherCard
-                key={teacher.id}
-                teacher={teacher}
-                onMarkAbsent={() => setTeacherToMarkAbsent(teacher)}
-                onEdit={() => openEditDialog(teacher)}
-              />
-            ))}
-          </div>
+            filteredTeachers.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {filteredTeachers.map((teacher) => (
+                    <TeacherCard
+                        key={teacher.id}
+                        teacher={teacher}
+                        onMarkAbsent={() => setTeacherToMarkAbsent(teacher)}
+                        onEdit={() => openEditDialog(teacher)}
+                    />
+                    ))}
+                </div>
+            ) : (
+                 <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border text-center p-12">
+                    <h3 className="text-lg font-semibold text-foreground">לא נמצאו מורים תואמים</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                        נסה מונח חיפוש אחר.
+                    </p>
+                </div>
+            )
         ) : (
           <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border text-center p-12">
               <h3 className="text-lg font-semibold text-foreground">לא נמצאו מורים</h3>

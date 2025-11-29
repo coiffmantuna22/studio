@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { X, Book, User, BookOpen } from 'lucide-react';
 import { Separator } from '../ui/separator';
+import { Combobox } from '../ui/combobox';
 
 interface ClassTimetableDialogProps {
   isOpen: boolean;
@@ -65,7 +66,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, schoolClass }
     const allSubjects = useMemo(() => {
         const subjects = new Set<string>();
         allTeachers.forEach(t => t.subjects.forEach(s => subjects.add(s)));
-        return Array.from(subjects).sort();
+        return Array.from(subjects).sort().map(s => ({label: s, value: s}));
     }, [allTeachers]);
 
 
@@ -109,14 +110,14 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, schoolClass }
                     <Separator />
                     <div className="space-y-2">
                         <label className="text-sm font-medium flex items-center gap-2"><Book className='w-4 h-4 text-muted-foreground'/>מקצוע</label>
-                        <Select onValueChange={setSubject} value={subject}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="בחר מקצוע" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {allSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
+                        <Combobox
+                            items={allSubjects}
+                            value={subject}
+                            onChange={setSubject}
+                            placeholder="בחר או צור מקצוע..."
+                            searchPlaceholder="חיפוש מקצוע..."
+                            noItemsMessage="לא נמצאו מקצועות."
+                        />
                     </div>
                      <div className="space-y-2">
                         <label className="text-sm font-medium flex items-center gap-2"><User className='w-4 h-4 text-muted-foreground'/>מורה</label>
