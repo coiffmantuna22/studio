@@ -133,7 +133,7 @@ export default function Home() {
 
         return { teacher, absences: todaysTeacherAbsences, affectedLessons };
       })
-      .filter(item => item !== null && item.affectedLessons.length > 0);
+      .filter(item => item !== null);
   }, [teachers, allClasses, allSubstitutions]);
 
 
@@ -320,7 +320,7 @@ export default function Home() {
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-6">
           {todaysAbsences && todaysAbsences.length > 0 && (
             <Card className="border-l-4 border-l-destructive shadow-md">
                 <CardHeader className="pb-3">
