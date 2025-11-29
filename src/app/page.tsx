@@ -8,23 +8,63 @@ import Timetable from '@/components/app/timetable';
 import ClassList from '@/components/app/class-list';
 import SettingsTab from '@/components/app/settings-tab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus } from '@/lib/types';
+import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson } from '@/lib/types';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, doc, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { Loader2, UserX, AlertTriangle } from 'lucide-react';
+import { Loader2, UserX, AlertTriangle, ListChecks } from 'lucide-react';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
 import { Button } from '@/components/ui/button';
 import { daysOfWeek } from '@/lib/constants';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { isSameDay, startOfDay } from 'date-fns';
-import { getTeacherAvailabilityStatus } from '@/lib/substitute-finder';
+import { isSameDay, startOfDay, getDay } from 'date-fns';
+import { getTeacherAvailabilityStatus, findSubstitute, isTeacherAvailable } from '@/lib/substitute-finder';
 import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
 import RecommendationDialog from '@/components/app/recommendation-dialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
+const getAffectedLessons = (
+  absentTeacher: Teacher,
+  absenceDays: {date: Date, isAllDay: boolean, startTime: string, endTime: string}[],
+  allClasses: SchoolClass[],
+  timeSlots: TimeSlot[]
+): Omit<AffectedLesson, 'recommendation' | 'recommendationId' | 'reasoning' | 'substituteOptions'>[] => {
+  const affected: Omit<AffectedLesson, 'recommendation' | 'recommendationId' | 'reasoning' | 'substituteOptions'>[] = [];
+  const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
+  absenceDays.forEach(day => {
+    const dayOfWeek = dayMap[getDay(day.date)];
+    const absenceStart = day.isAllDay ? 0 : parseInt(day.startTime.split(':')[0], 10);
+    const absenceEnd = day.isAllDay ? 24 : parseInt(day.endTime.split(':')[0], 10);
+
+    (allClasses || []).forEach(schoolClass => {
+      const classDaySchedule = schoolClass.schedule?.[dayOfWeek];
+      if (classDaySchedule) {
+        Object.entries(classDaySchedule).forEach(([time, lesson]) => {
+          const lessonSlot = timeSlots.find(s => s.start === time);
+          if (!lessonSlot || lessonSlot.type === 'break') return;
+
+          const lessonStartHour = parseInt(lessonSlot.start.split(':')[0], 10);
+          const lessonEndHour = parseInt(lessonSlot.end.split(':')[0], 10);
+          
+          if (lesson && lesson.teacherId === absentTeacher.id && Math.max(lessonStartHour, absenceStart) < Math.min(lessonEndHour, absenceEnd)) {
+            affected.push({
+              classId: schoolClass.id,
+              className: schoolClass.name,
+              date: day.date,
+              time: time,
+              lesson: lesson,
+            });
+          }
+        });
+      }
+    });
+  });
+
+  return affected;
+};
 
 export default function Home() {
   const { user, isUserLoading } = useUser();
@@ -81,7 +121,6 @@ export default function Home() {
       const teacherDocs = (await getDocs(query(collection(firestore, 'teachers'), where('userId', '==', user.uid)))).docs;
       const classDocs = (await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)))).docs;
       
-      // If data already exists, don't seed.
       if (teacherDocs.length > 0 || classDocs.length > 0) return;
 
       const teacherIdMap: { [key: string]: string } = {};
@@ -286,13 +325,11 @@ const handleScheduleUpdate = async (
                         const oldLesson = oldSchedule[day]?.[time];
                         const newLesson = newSchedule[day]?.[time];
 
-                        // Case 1: Lesson was removed for this teacher in this slot
                         if (oldLesson?.classId === classId && (!newLesson || newLesson.classId !== classId)) {
                             if (updatedClassSchedule[day]?.[time]?.teacherId === entityId) {
                                 (updatedClassSchedule[day] as any)[time] = null;
                             }
                         }
-                        // Case 2: Lesson was added for this teacher in this slot
                         if (newLesson?.classId === classId) {
                             updatedClassSchedule[day] = updatedClassSchedule[day] || {};
                             updatedClassSchedule[day][time] = { ...(newLesson as Lesson), teacherId: entityId };
@@ -302,7 +339,7 @@ const handleScheduleUpdate = async (
                 batch.update(classRef, { schedule: updatedClassSchedule });
             }
 
-        } else { // entityType === 'class'
+        } else { 
             const classRef = doc(firestore, 'classes', entityId);
             const classSnap = await getDoc(classRef);
             if (!classSnap.exists()) return;
@@ -333,13 +370,11 @@ const handleScheduleUpdate = async (
                         const oldLesson = oldSchedule[day]?.[time];
                         const newLesson = newSchedule[day]?.[time];
 
-                        // Case 1: Lesson was removed for this class for this teacher
                         if (oldLesson?.teacherId === teacherId && (!newLesson || newLesson.teacherId !== teacherId)) {
                              if (updatedTeacherSchedule[day]?.[time]?.classId === entityId) {
                                 (updatedTeacherSchedule[day] as any)[time] = null;
                             }
                         }
-                        // Case 2: Lesson was added for this class for this teacher
                         if (newLesson?.teacherId === teacherId) {
                             updatedTeacherSchedule[day] = updatedTeacherSchedule[day] || {};
                             updatedTeacherSchedule[day][time] = { ...(newLesson as Lesson), classId: entityId };
@@ -373,7 +408,7 @@ const handleScheduleUpdate = async (
   const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
       
-      const isInitialSetup = timeSlots.length === 0 && (teachers?.length ?? 0) === 0 && (schoolClasses?.length ?? 0) === 0;
+      const isInitialSetup = timeSlots.length === 0 && (teachers?.length === 0) && (schoolClasses?.length === 0);
 
       const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
       const timetableData = { slots: newTimeSlots, userId: user.uid };
@@ -396,35 +431,32 @@ const handleScheduleUpdate = async (
     
     const batch = writeBatch(firestore);
 
-    // 1. Mark teacher as absent
     const teacherRef = doc(firestore, 'teachers', absentTeacher.id);
     const existingAbsences = absentTeacher.absences || [];
     const absenceData = absenceDays.map(d => ({...d, date: d.date.toISOString()}));
     batch.update(teacherRef, { absences: [...existingAbsences, ...absenceData] });
 
     const allClassSchedulesToUpdate = new Map<string, ClassSchedule>();
-    const allTeacherSchedulesToUpdate = new Map<string, ClassSchedule>();
-    
-    // Prime the maps with current schedules
     (schoolClasses || []).forEach(c => allClassSchedulesToUpdate.set(c.id, JSON.parse(JSON.stringify(c.schedule))));
+    
+    const allTeacherSchedulesToUpdate = new Map<string, ClassSchedule>();
     (teachers || []).forEach(t => allTeacherSchedulesToUpdate.set(t.id, JSON.parse(JSON.stringify(t.schedule || {}))));
-
 
     for (const assignment of assignments) {
       const { classId, day, time, newTeacherId, originalLesson } = assignment;
       
-      // Update Class Schedule
       const classSchedule = allClassSchedulesToUpdate.get(classId);
       if (classSchedule) {
           if (!classSchedule[day]) classSchedule[day] = {};
-          if (newTeacherId) { 
-              classSchedule[day][time] = { ...originalLesson, teacherId: newTeacherId };
-          } else { 
-              classSchedule[day][time] = null;
-          }
+          classSchedule[day][time] = newTeacherId ? { ...originalLesson, teacherId: newTeacherId } : null;
       }
 
-      // Update new Teacher's schedule
+      const originalTeacherSchedule = allTeacherSchedulesToUpdate.get(absentTeacher.id);
+      if (originalTeacherSchedule) {
+        if (!originalTeacherSchedule[day]) originalTeacherSchedule[day] = {};
+        originalTeacherSchedule[day][time] = null;
+      }
+
       if (newTeacherId) {
         const subTeacherSchedule = allTeacherSchedulesToUpdate.get(newTeacherId);
         if(subTeacherSchedule) {
@@ -434,7 +466,6 @@ const handleScheduleUpdate = async (
       }
     }
     
-    // Apply all schedule updates to the batch
     for (const [classId, schedule] of allClassSchedulesToUpdate.entries()) {
         const classRef = doc(firestore, 'classes', classId);
         batch.update(classRef, { schedule });
@@ -452,7 +483,6 @@ const handleScheduleUpdate = async (
     const today = startOfDay(new Date());
     return (teachers || []).filter(teacher => 
         teacher.absences?.some(absence => {
-            // Ensure absence.date is a valid date string before parsing
             if (typeof absence.date !== 'string') return false;
             try {
                 return isSameDay(new Date(absence.date), today);
@@ -462,6 +492,45 @@ const handleScheduleUpdate = async (
         })
     );
   }, [teachers]);
+
+  const handleShowAffectedLessons = async (teacher: Teacher) => {
+    const today = startOfDay(new Date());
+    const absenceForToday = teacher.absences?.find(a => isSameDay(new Date(a.date), today));
+    
+    if (!absenceForToday || !schoolClasses) return;
+
+    const absenceDay = {
+        date: today,
+        isAllDay: absenceForToday.isAllDay,
+        startTime: absenceForToday.startTime,
+        endTime: absenceForToday.endTime,
+    };
+
+    const affectedLessons = getAffectedLessons(teacher, [absenceDay], schoolClasses, timeSlots);
+
+    const substitutePool = (teachers || []).filter(t => t.id !== teacher.id);
+    const recommendationPromises = affectedLessons.map(affected => 
+      findSubstitute(
+        { subject: affected.lesson.subject, date: affected.date, time: affected.time },
+        substitutePool,
+        schoolClasses,
+        timeSlots
+      )
+    );
+      
+    const recommendations = await Promise.all(recommendationPromises);
+    
+    const finalResults = affectedLessons.map((lesson, index) => ({
+      ...lesson,
+      recommendation: recommendations[index].recommendation,
+      recommendationId: recommendations[index].recommendationId,
+      reasoning: recommendations[index].reasoning,
+      substituteOptions: recommendations[index].substituteOptions,
+    }));
+    
+    setRecommendation({ results: finalResults, absentTeacher: teacher, absenceDays: [absenceDay] });
+  };
+
 
   const isDataLoading = isUserLoading || teachersLoading || classesLoading || settingsLoading;
 
@@ -508,9 +577,9 @@ const handleScheduleUpdate = async (
                     {todaysAbsences.map(teacher => (
                         <div key={teacher.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
                             <span className="font-semibold">{teacher.name}</span>
-                            <Button size="sm" variant="destructive" onClick={() => setTeacherToMarkAbsent(teacher)}>
-                                <UserX className="ml-2 h-4 w-4" />
-                                מצא מחליף
+                            <Button size="sm" variant="secondary" onClick={() => handleShowAffectedLessons(teacher)}>
+                                <ListChecks className="ml-2 h-4 w-4" />
+                                הצג שיעורים מושפעים
                             </Button>
                         </div>
                     ))}
@@ -573,6 +642,7 @@ const handleScheduleUpdate = async (
         allTeachers={teachers}
         allClasses={schoolClasses}
         timeSlots={timeSlots}
+        getAffectedLessons={getAffectedLessons}
         onShowRecommendation={(results, absentTeacher, absenceDays) => {
             setRecommendation({ results, absentTeacher, absenceDays });
         }}

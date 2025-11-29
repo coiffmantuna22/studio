@@ -7,7 +7,7 @@ import type { Teacher, AbsenceDay, SchoolClass, AffectedLesson, TimeSlot } from 
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format, eachDayOfInterval, startOfDay, getDay, addDays } from 'date-fns';
+import { format, eachDayOfInterval, startOfDay, getDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -63,6 +63,12 @@ interface MarkAbsentDialogProps {
   allTeachers: Teacher[];
   allClasses: SchoolClass[];
   timeSlots: TimeSlot[];
+  getAffectedLessons: (
+    absentTeacher: Teacher,
+    absenceDays: { date: Date; isAllDay: boolean; startTime: string; endTime: string }[],
+    allClasses: SchoolClass[],
+    timeSlots: TimeSlot[]
+  ) => Omit<AffectedLesson, 'recommendation' | 'recommendationId' | 'reasoning' | 'substituteOptions'>[];
   onShowRecommendation: (
     results: AffectedLesson[],
     absentTeacher: Teacher,
@@ -70,47 +76,6 @@ interface MarkAbsentDialogProps {
   ) => void;
 }
 
-const getAffectedLessons = (
-  absentTeacher: Teacher,
-  absenceDays: AbsenceDay[],
-  allClasses: SchoolClass[],
-  timeSlots: TimeSlot[]
-): AffectedLesson[] => {
-  const affected: Omit<AffectedLesson, 'recommendation' | 'recommendationId' | 'reasoning' | 'substituteOptions'>[] = [];
-  const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-
-  absenceDays.forEach(day => {
-    const dayOfWeek = dayMap[getDay(day.date)];
-    const absenceStart = day.isAllDay ? 0 : parseInt(day.startTime.split(':')[0]);
-    const absenceEnd = day.isAllDay ? 24 : parseInt(day.endTime.split(':')[0]);
-
-    (allClasses || []).forEach(schoolClass => {
-      const classDaySchedule = schoolClass.schedule[dayOfWeek];
-      if (classDaySchedule) {
-        Object.entries(classDaySchedule).forEach(([time, lesson]) => {
-          const lessonSlot = timeSlots.find(s => s.start === time);
-          if (!lessonSlot || lessonSlot.type === 'break') return;
-
-          const lessonStartHour = parseInt(lessonSlot.start.split(':')[0]);
-          const lessonEndHour = parseInt(lessonSlot.end.split(':')[0]);
-          
-          if (lesson && lesson.teacherId === absentTeacher.id && Math.max(lessonStartHour, absenceStart) < Math.min(lessonEndHour, absenceEnd)) {
-            affected.push({
-              classId: schoolClass.id,
-              className: schoolClass.name,
-              date: day.date,
-              time: time,
-              lesson: lesson,
-            });
-          }
-        });
-      }
-    });
-  });
-
-  // @ts-ignore
-  return affected;
-};
 
 export default function MarkAbsentDialog({
   isOpen,
@@ -120,6 +85,7 @@ export default function MarkAbsentDialog({
   allClasses,
   timeSlots,
   onShowRecommendation,
+  getAffectedLessons,
 }: MarkAbsentDialogProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
