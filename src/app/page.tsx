@@ -9,15 +9,14 @@ import SettingsTab from '@/components/app/settings-tab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { initialTeachers, initialClasses as defaultClasses, initialTimeSlots } from '@/lib/data';
 import type { SchoolClass, Teacher, TimeSlot } from '@/lib/types';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { collection, doc, writeBatch } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const { user, loading: userLoading } = useUser();
+  const { user, isUserLoading } = useUser();
   const router = useRouter();
   const firestore = useFirestore();
 
@@ -38,10 +37,10 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (!userLoading && !user) {
+    if (!isUserLoading && !user) {
       router.push('/login');
     }
-  }, [user, userLoading, router]);
+  }, [user, isUserLoading, router]);
 
   useEffect(() => {
     if (teachersCollection) {
@@ -171,7 +170,7 @@ export default function Home() {
   }
 
 
-  if (userLoading || (!user) || teachersLoading || classesLoading || settingsLoading) {
+  if (isUserLoading || (!user) || teachersLoading || classesLoading || settingsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
