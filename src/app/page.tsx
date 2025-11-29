@@ -23,7 +23,7 @@ const StatisticsTab = dynamic(() => import('@/components/app/statistics-tab'), {
 });
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { collection, doc, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch, query, where, getDocs, getDoc, orderBy, limit } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Loader2, AlertTriangle, ListChecks } from 'lucide-react';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
@@ -592,11 +592,11 @@ const handleScheduleUpdate = async (
         isOpen={!!teacherToMarkAbsent}
         onOpenChange={(open) => !open && setTeacherToMarkAbsent(null)}
         teacher={teacherToMarkAbsent}
-        onConfirm={handleMarkAbsent}
         getAffectedLessons={getAffectedLessons}
         onShowRecommendation={(results, absentTeacher, absenceDays) => {
             setRecommendation({ results, absentTeacher, absenceDays });
         }}
+        onConfirm={handleMarkAbsent}
       />
 
        <RecommendationDialog
