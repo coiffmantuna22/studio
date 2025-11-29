@@ -37,19 +37,19 @@ service cloud.firestore {
     match /teachers/{teacherId} {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && isCreatingOwnResource(request.auth.uid);
-      allow update, delete: if isSignedIn() && isOwner(teacherId);
+      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
     }
     
     match /classes/{classId} {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && isCreatingOwnResource(request.auth.uid);
-      allow update, delete: if isSignedIn() && isOwner(classId);
+      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
     }
     
     match /settings/{settingId} {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && isCreatingOwnResource(request.auth.uid);
-      allow update: if isSignedIn() && isOwner(settingId);
+      allow update: if isSignedIn() && request.auth.uid == resource.data.userId;
     }
   }
 }
