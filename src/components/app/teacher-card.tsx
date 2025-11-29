@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Teacher } from '@/lib/types';
@@ -11,7 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Book, Calendar, UserX, Pencil, Trash2 } from 'lucide-react';
+import { Book, Calendar, UserX, Pencil, Trash2, CalendarClock } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,7 @@ interface TeacherCardProps {
   onMarkAbsent: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onViewSchedule: () => void;
 }
 
 const formatAvailability = (availability: Teacher['availability']) => {
@@ -41,7 +43,7 @@ const formatAvailability = (availability: Teacher['availability']) => {
   return availableDays.join(', ');
 }
 
-export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete }: TeacherCardProps) {
+export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, onViewSchedule }: TeacherCardProps) {
   return (
     <Card className="flex flex-col transition-all hover:shadow-md">
       <CardHeader className="flex flex-row items-start gap-4">
@@ -61,7 +63,7 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete }:
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={onEdit}>
               <Pencil className="ml-2 h-4 w-4" />
-              עריכה
+              עריכת פרופיל
             </DropdownMenuItem>
              <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
@@ -88,15 +90,19 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete }:
         <div className="flex items-start gap-3">
           <Calendar className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
           <div>
-            <h4 className="font-semibold text-sm">זמינות</h4>
+            <h4 className="font-semibold text-sm">זמינות להחלפה</h4>
             <p className="text-sm text-muted-foreground">{formatAvailability(teacher.availability)}</p>
           </div>
         </div>
       </CardContent>
-      <CardFooter className="grid grid-cols-1 gap-2">
+      <CardFooter className="grid grid-cols-2 gap-2">
+         <Button variant="outline" className="w-full" onClick={onViewSchedule}>
+          <CalendarClock className="ml-2 h-4 w-4" />
+          צפה במערכת
+        </Button>
         <Button variant="destructive" className="w-full" onClick={onMarkAbsent}>
           <UserX className="ml-2 h-4 w-4" />
-          סימון היעדרות
+          סמן היעדרות
         </Button>
       </CardFooter>
     </Card>

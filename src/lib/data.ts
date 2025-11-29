@@ -1,3 +1,4 @@
+
 import type { Teacher, SchoolClass, TimeSlot } from './types';
 import { daysOfWeek } from './constants';
 
@@ -12,6 +13,14 @@ export const initialTimeSlots: TimeSlot[] = [
   { id: "8", start: '12:45', end: '13:30', type: 'lesson' },
 ];
 
+const generateEmptySchedule = () => {
+    const schedule: SchoolClass['schedule'] = {};
+    daysOfWeek.forEach(day => {
+        schedule[day] = {};
+    });
+    return schedule;
+};
+
 
 export const initialTeachers: Teacher[] = [
   {
@@ -19,13 +28,26 @@ export const initialTeachers: Teacher[] = [
     name: 'מריה גרסיה',
     subjects: ['מתמטיקה', 'פיזיקה'],
     availability: [
-      { day: 'ראשון', slots: [{ start: '08:00', end: '13:30' }] },
-      { day: 'שני', slots: [{ start: '08:00', end: '13:30' }] },
-      { day: 'שלישי', slots: [{ start: '08:00', end: '13:30' }] },
-      { day: 'רביעי', slots: [{ start: '08:00', end: '13:30' }] },
-      { day: 'חמישי', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'ראשון', slots: [] },
+      { day: 'שני', slots: [{ start: '08:00', end: '10:00' }] },
+      { day: 'שלישי', slots: [] },
+      { day: 'רביעי', slots: [] },
+      { day: 'חמישי', slots: [] },
       { day: 'שישי', slots: [] },
     ],
+    schedule: {
+      'ראשון': {
+        '08:45': { subject: 'מתמטיקה', classId: 'c1' },
+        '10:00': { subject: 'מתמטיקה', classId: 'c1' },
+      },
+      'שני': {
+        '08:45': { subject: 'מתמטיקה', classId: 'c1' },
+      },
+       'חמישי': {
+        '10:00': { subject: 'פיזיקה', classId: 'c1' },
+        '10:45': { subject: 'פיזיקה', classId: 'c1' },
+      }
+    },
     avatar: { fallback: 'מג' },
     preferences: 'מעדיפה כיתות בוגרות',
   },
@@ -34,13 +56,24 @@ export const initialTeachers: Teacher[] = [
     name: 'דוד סמית',
     subjects: ['אנגלית', 'היסטוריה'],
     availability: [
-      { day: 'ראשון', slots: [{ start: '10:00', end: '13:30' }] },
+      { day: 'ראשון', slots: [] },
       { day: 'שני', slots: [{ start: '12:00', end: '13:30' }] },
-      { day: 'שלישי', slots: [{ start: '10:00', end: '13:30' }] },
-      { day: 'רביעי', slots: [{ start: '10:00', end: '13:30' }] },
-      { day: 'חמישי', slots: [{ start: '10:00', end: '13:30' }] },
+      { day: 'שלישי', slots: [] },
+      { day: 'רביעי', slots: [] },
+      { day: 'חמישי', slots: [] },
       { day: 'שישי', slots: [{ start: '08:45', end: '12:45' }] },
     ],
+     schedule: {
+      'ראשון': { '10:45': { subject: 'אנגלית', classId: 'c1' }},
+      'שלישי': {
+        '10:00': { subject: 'אנגלית', classId: 'c1' },
+        '10:45': { subject: 'אנגלית', classId: 'c1' },
+      },
+       'חמישי': {
+        '10:00': { subject: 'אנגלית', classId: 'c4' },
+        '10:45': { subject: 'אנגלית', classId: 'c4' },
+      }
+    },
     avatar: { fallback: 'דס' },
     preferences: 'זמין להחלפות של יום שלם',
   },
@@ -50,12 +83,24 @@ export const initialTeachers: Teacher[] = [
     subjects: ['כימיה', 'ביולוגיה'],
     availability: [
       { day: 'ראשון', slots: [] },
-      { day: 'שני', slots: [{ start: '08:45', end: '13:30' }] },
-      { day: 'שלישי', slots: [{ start: '08:45', end: '13:30' }] },
-      { day: 'רביעי', slots: [{ start: '08:45', end: '13:30' }] },
+      { day: 'שני', slots: [] },
+      { day: 'שלישי', slots: [] },
+      { day: 'רביעי', slots: [] },
       { day: 'חמישי', slots: [{ start: '08:45', end: '13:30' }] },
       { day: 'שישי', slots: [] },
     ],
+    schedule: {
+      'שני': {
+        '10:00': { subject: 'כימיה', classId: 'c1' },
+        '10:45': { subject: 'כימיה', classId: 'c1' },
+      },
+      'שלישי': { '12:00': { subject: 'כימיה', classId: 'c1' }},
+      'רביעי': {
+        '08:45': { subject: 'ביולוגיה', classId: 'c4' },
+        '10:00': { subject: 'ביולוגיה', classId: 'c4' },
+        '10:45': { subject: 'כימיה', classId: 'c1' },
+      },
+    },
     avatar: { fallback: 'חו' },
     preferences: 'בעל ניסיון עם חינוך מיוחד',
   },
@@ -67,10 +112,16 @@ export const initialTeachers: Teacher[] = [
        { day: 'ראשון', slots: [] },
        { day: 'שני', slots: [] },
        { day: 'שלישי', slots: [] },
-       { day: 'רביעי', slots: [{ start: '12:00', end: '13:30' }] },
+       { day: 'רביעי', slots: [] },
        { day: 'חמישי', slots: [] },
        { day: 'שישי', slots: [{ start: '08:45', end: '12:45' }] },
     ],
+    schedule: {
+        'רביעי': {
+            '12:00': { subject: 'אמנות', classId: 'c1' },
+            '10:45': { subject: 'מוזיקה', classId: 'c4' },
+        },
+    },
     avatar: { fallback: 'פא' },
     preferences: '',
   },
@@ -79,13 +130,18 @@ export const initialTeachers: Teacher[] = [
     name: 'מיכאל ג\'ונסון',
     subjects: ['חינוך גופני'],
     availability: [
-      { day: 'ראשון', slots: [{ start: '08:00', end: '13:30' }] },
-      { day: 'שני', slots: [{ start: '08:00', end: '13:30' }] },
-      { day: 'שלישי', slots: [{ start: '08:00', end: '13:30' }] },
-      { day: 'רביעי', slots: [{ start: '08:00', end: '13:30' }] },
-      { day: 'חמישי', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'ראשון', slots: [] },
+      { day: 'שני', slots: [] },
+      { day: 'שלישי', slots: [] },
+      { day: 'רביעי', slots: [] },
+      { day: 'חמישי', slots: [] },
       { day: 'שישי', slots: [{ start: '08:00', end: '12:00' }] },
     ],
+    schedule: {
+      'שני': { '12:45': { subject: 'חינוך גופני', classId: 'c1' }},
+      'רביעי': { '12:45': { subject: 'חינוך גופני', classId: 'c1' }},
+      'חמישי': { '12:00': { subject: 'חינוך גופני', classId: 'c1' }},
+    },
     avatar: { fallback: 'מג' },
     preferences: 'יכול לאמן גם קבוצות ספורט',
   },
@@ -94,13 +150,21 @@ export const initialTeachers: Teacher[] = [
     name: 'שרה כהן',
     subjects: ['ספרות', 'לשון'],
     availability: [
-      { day: 'ראשון', slots: [{ start: '08:00', end: '11:30' }] },
+      { day: 'ראשון', slots: [] },
       { day: 'שני', slots: [] },
-      { day: 'שלישי', slots: [{ start: '08:00', end: '11:30' }] },
+      { day: 'שלישי', slots: [] },
       { day: 'רביעי', slots: [] },
-      { day: 'חמישי', slots: [{ start: '08:00', end: '11:30' }] },
+      { day: 'חמישי', slots: [] },
       { day: 'שישי', slots: [] },
     ],
+    schedule: {
+        'ראשון': {'08:00': { subject: 'ספרות', classId: 'c1' }},
+        'שלישי': {
+            '08:00': { subject: 'ספרות', classId: 'c1' },
+            '08:45': { subject: 'לשון', classId: 'c1' },
+        },
+        'חמישי': {'08:00': { subject: 'ספרות', classId: 'c1' }},
+    },
     avatar: { fallback: 'שכ' },
     preferences: '',
   },
@@ -109,13 +173,22 @@ export const initialTeachers: Teacher[] = [
     name: 'יוסף לוי',
     subjects: ['היסטוריה', 'אזרחות'],
     availability: [
-      { day: 'ראשון', slots: [{ start: '12:00', end: '13:30' }] },
-      { day: 'שני', slots: [{ start: '12:00', end: '13:30' }] },
+      { day: 'ראשון', slots: [] },
+      { day: 'שני', slots: [] },
       { day: 'שלישי', slots: [] },
-      { day: 'רביעי', slots: [{ start: '10:00', end: '12:45' }] },
+      { day: 'רביעי', slots: [] },
       { day: 'חמישי', slots: [] },
       { day: 'שישי', slots: [] },
     ],
+    schedule: {
+        'ראשון': {
+            '12:00': { subject: 'היסטוריה', classId: 'c1' },
+            '12:45': { subject: 'היסטוריה', classId: 'c1' },
+        },
+        'שני': {'12:00': { subject: 'היסטוריה', classId: 'c1' }},
+        'רביעי': {'10:00': { subject: 'אזרחות', classId: 'c1' }},
+        'חמישי': { '12:00': { subject: 'אזרחות', classId: 'c4' }},
+    },
     avatar: { fallback: 'יל' },
     preferences: 'מתמחה בהיסטוריה של המזרח התיכון',
   },
@@ -124,13 +197,23 @@ export const initialTeachers: Teacher[] = [
     name: 'נועה מזרחי',
     subjects: ['מתמטיקה', 'מדעי המחשב'],
     availability: [
-      { day: 'ראשון', slots: [{ start: '08:45', end: '12:45' }] },
-      { day: 'שני', slots: [{ start: '08:45', end: '12:45' }] },
-      { day: 'שלישי', slots: [{ start: '08:45', end: '12:45' }] },
-      { day: 'רביעי', slots: [{ start: '08:45', end: '12:45' }] },
-      { day: 'חמישי', slots: [{ start: '08:45', end: '12:45' }] },
+      { day: 'ראשון', slots: [] },
+      { day: 'שני', slots: [] },
+      { day: 'שלישי', slots: [] },
+      { day: 'רביעי', slots: [] },
+      { day: 'חמישי', slots: [] },
       { day: 'שישי', slots: [] },
     ],
+    schedule: {
+      'ראשון': {
+        '08:45': { subject: 'מתמטיקה', classId: 'c3' },
+        '10:00': { subject: 'מתמטיקה', classId: 'c3' },
+      },
+      'שני': {
+        '08:45': { subject: 'מדעי המחשב', classId: 'c3' },
+        '10:00': { subject: 'מדעי המחשב', classId: 'c3' },
+      },
+    },
     avatar: { fallback: 'נמ' },
     preferences: 'ראש צוות פיתוח לשעבר',
   },
@@ -139,13 +222,23 @@ export const initialTeachers: Teacher[] = [
     name: 'אביגיל ביטון',
     subjects: ['תנ"ך', 'מחשבת ישראל'],
     availability: [
-      { day: 'ראשון', slots: [{ start: '08:00', end: '11:30' }] },
-      { day: 'שלישי', slots: [{ start: '08:00', end: '11:30' }] },
-      { day: 'חמישי', slots: [{ start: '08:00', end: '11:30' }] },
+      { day: 'ראשון', slots: [] },
+      { day: 'שלישי', slots: [] },
+      { day: 'חמישי', slots: [] },
       { day: 'שני', slots: [] },
       { day: 'רביעי', slots: [] },
       { day: 'שישי', slots: [] },
     ],
+    schedule: {
+      'ראשון': {
+        '08:00': { subject: 'תנ"ך', classId: 'c3' },
+        '10:45': { subject: 'תנ"ך', classId: 'c3' },
+      },
+      'שלישי': {
+        '08:00': { subject: 'תנ"ך', classId: 'c3'},
+        '08:45': { subject: 'תנ"ך', classId: 'c3'},
+      },
+    },
     avatar: { fallback: 'אב' },
     preferences: 'מעדיפה כיתות קטנות',
   },
@@ -154,13 +247,19 @@ export const initialTeachers: Teacher[] = [
     name: 'איתן ישראלי',
     subjects: ['גיאוגרפיה', 'של"ח'],
     availability: [
-      { day: 'שני', slots: [{ start: '08:00', end: '13:30' }] },
-      { day: 'רביעי', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'שני', slots: [] },
+      { day: 'רביעי', slots: [] },
       { day: 'ראשון', slots: [] },
       { day: 'שלישי', slots: [] },
       { day: 'חמישי', slots: [] },
       { day: 'שישי', slots: [] },
     ],
+    schedule: {
+       'שני': {
+        '08:00': { subject: 'גיאוגרפיה', classId: 'c6' },
+        '08:45': { subject: 'גיאוגרפיה', classId: 'c6' },
+      },
+    },
     avatar: { fallback: 'אי' },
     preferences: 'אוהב לצאת לסיורים',
   },
@@ -169,25 +268,24 @@ export const initialTeachers: Teacher[] = [
     name: 'רותם חדד',
     subjects: ['לשון', 'ערבית'],
     availability: [
-      { day: 'שלישי', slots: [{ start: '10:00', end: '13:30' }] },
-      { day: 'חמישי', slots: [{ start: '10:00', end: '13:30' }] },
+      { day: 'שלישי', slots: [] },
+      { day: 'חמישי', slots: [] },
       { day: 'ראשון', slots: [] },
       { day: 'שני', slots: [] },
       { day: 'רביעי', slots: [] },
       { day: 'שישי', slots: [] },
     ],
+    schedule: {
+        'חמישי': {'08:45': { subject: 'לשון', classId: 'c1' }},
+        'שלישי': {
+            '10:00': { subject: 'ערבית', classId: 'c6' },
+            '10:45': { subject: 'ערבית', classId: 'c6' },
+        },
+    },
     avatar: { fallback: 'רח' },
     preferences: '',
   },
 ];
-
-const generateEmptySchedule = () => {
-    const schedule: SchoolClass['schedule'] = {};
-    daysOfWeek.forEach(day => {
-        schedule[day] = {};
-    });
-    return schedule;
-};
 
 
 export const initialClasses: SchoolClass[] = [
@@ -267,12 +365,12 @@ export const initialClasses: SchoolClass[] = [
              'רביעי': {
                 '08:45': { subject: 'ביולוגיה', teacherId: '3' },
                 '10:00': { subject: 'ביולוגיה', teacherId: '3' },
-                '10:45': { subject: 'מוזיקה', teacherId: '4' }, // Fatima is not available
+                '10:45': { subject: 'מוזיקה', teacherId: '4' },
             },
             'חמישי': {
                 '10:00': { subject: 'אנגלית', teacherId: '2' },
                 '10:45': { subject: 'אנגלית', teacherId: '2' },
-                '12:00': { subject: 'אזרחות', teacherId: '7' }, // Yosef is not available
+                '12:00': { subject: 'אזרחות', teacherId: '7' },
             },
             'ראשון': {}, 'שני': {}, 'שלישי': {},'שישי': {},
         }

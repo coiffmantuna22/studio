@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useState } from 'react';
-import type { Teacher, SchoolClass, AffectedLesson, TimeSlot, AbsenceDay } from '@/lib/types';
+import type { Teacher, SchoolClass, AffectedLesson, TimeSlot, AbsenceDay, ClassSchedule } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Plus, Search } from 'lucide-react';
 import TeacherCard from './teacher-card';
@@ -22,16 +23,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import TeacherScheduleDialog from './teacher-schedule-dialog';
 
 interface TeacherListProps {
   teachers: Teacher[];
   allClasses: SchoolClass[];
   timeSlots: TimeSlot[];
   onAddTeacher: (teacher: Omit<Teacher, 'id' | 'userId' | 'avatar'>) => void;
-  onEditTeacher: (teacher: Omit<Teacher, 'userId' | 'avatar'>) => void;
+  onEditTeacher: (teacher: Omit<Teacher, 'userId' | 'avatar' | 'schedule'>) => void;
   onDeleteTeacher: (teacherId: string) => void;
   onClassesUpdate: (collectionName: 'teachers' | 'classes', classes: SchoolClass[]) => void;
   onMarkAbsent: (teacherId: string, absenceDays: AbsenceDay[]) => void;
+  onUpdateTeacherSchedule: (teacherId: string, schedule: ClassSchedule) => void;
 }
 
 export default function TeacherList({ 
@@ -42,13 +45,15 @@ export default function TeacherList({
   onEditTeacher,
   onDeleteTeacher,
   onClassesUpdate,
-  onMarkAbsent
+  onMarkAbsent,
+  onUpdateTeacherSchedule
 }: TeacherListProps) {
   const { toast } = useToast();
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [teacherToMarkAbsent, setTeacherToMarkAbsent] = useState<Teacher | null>(null);
   const [teacherToEdit, setTeacherToEdit] = useState<Teacher | null>(null);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
+  const [teacherToViewSchedule, setTeacherToViewSchedule] = useState<Teacher | null>(null);
   const [recommendation, setRecommendation] = useState<{
     results: AffectedLesson[];
     absentTeacher: Teacher;
@@ -69,7 +74,7 @@ export default function TeacherList({
     });
   };
 
-  const handleUpdateTeacher = (updatedTeacherData: Omit<Teacher, 'avatar' | 'userId'>) => {
+  const handleUpdateTeacher = (updatedTeacherData: Omit<Teacher, 'avatar' | 'userId' | 'schedule'>) => {
     onEditTeacher(updatedTeacherData);
     setTeacherToEdit(null);
      toast({
@@ -201,6 +206,7 @@ export default function TeacherList({
                         onMarkAbsent={() => setTeacherToMarkAbsent(teacher)}
                         onEdit={() => openEditDialog(teacher)}
                         onDelete={() => setTeacherToDelete(teacher)}
+                        onViewSchedule={() => setTeacherToViewSchedule(teacher)}
                     />
                     ))}
                 </div>
@@ -246,6 +252,16 @@ export default function TeacherList({
         onOpenChange={(open) => !open && setRecommendation(null)}
         recommendationResult={recommendation}
         onTimetablesUpdate={handleFinalUpdateTimetables}
+      />
+
+       <TeacherScheduleDialog
+        isOpen={!!teacherToViewSchedule}
+        onOpenChange={(open) => !open && setTeacherToViewSchedule(null)}
+        teacher={teacherToViewSchedule}
+        allClasses={allClasses}
+        timeSlots={timeSlots}
+        onUpdateSchedule={onUpdateTeacherSchedule}
+        allTeachers={teachers}
       />
 
        <AlertDialog open={!!teacherToDelete} onOpenChange={(open) => !open && setTeacherToDelete(null)}>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,10 +9,10 @@ import ClassList from '@/components/app/class-list';
 import SettingsTab from '@/components/app/settings-tab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { initialTeachers, initialClasses as defaultClasses, initialTimeSlots } from '@/lib/data';
-import type { SchoolClass, Teacher, TimeSlot } from '@/lib/types';
+import type { SchoolClass, Teacher, TimeSlot, ClassSchedule } from '@/lib/types';
 import { useUser, useFirestore } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { collection, doc, writeBatch, query, where } from 'firebase/firestore';
+import { collection, doc, writeBatch, query, where, getDocs, runTransaction } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { Loader2 } from 'lucide-react';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
@@ -118,7 +119,7 @@ export default function Home() {
     await commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: newTeacher, firestore });
   };
 
-  const handleEditTeacher = async (updatedTeacher: Omit<Teacher, 'avatar' | 'userId'>) => {
+  const handleEditTeacher = async (updatedTeacher: Omit<Teacher, 'avatar' | 'userId' | 'schedule'>) => {
     if (!firestore || !user) return;
     const teacherRef = doc(firestore, 'teachers', updatedTeacher.id);
     const batch = writeBatch(firestore);
@@ -128,35 +129,39 @@ export default function Home() {
 
   const handleDeleteTeacher = async (teacherId: string) => {
     if (!firestore || !user) return;
-    const batch = writeBatch(firestore);
     
-    // 1. Delete the teacher doc
-    const teacherRef = doc(firestore, 'teachers', teacherId);
-    batch.delete(teacherRef);
+    await runTransaction(firestore, async (transaction) => {
+      // 1. Get all classes
+      const classesQuerySnapshot = await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)));
+      
+      // 2. For each class, remove the teacher from its schedule
+      classesQuerySnapshot.forEach(classDoc => {
+        const schoolClass = { id: classDoc.id, ...classDoc.data() } as SchoolClass;
+        let classWasModified = false;
+        const newSchedule = { ...schoolClass.schedule };
 
-    // 2. Remove teacher from all class schedules
-    const updatedClasses = JSON.parse(JSON.stringify(schoolClasses)) as SchoolClass[];
-    updatedClasses.forEach((schoolClass) => {
-      let classWasModified = false;
-      Object.keys(schoolClass.schedule).forEach(day => {
-        if (schoolClass.schedule[day]) {
-          Object.keys(schoolClass.schedule[day]).forEach(time => {
-            const lesson = schoolClass.schedule[day][time];
-            if (lesson && lesson.teacherId === teacherId) {
-              delete schoolClass.schedule[day][time];
-              classWasModified = true;
-            }
-          });
+        Object.keys(newSchedule).forEach(day => {
+          if (newSchedule[day]) {
+            Object.keys(newSchedule[day]).forEach(time => {
+              const lesson = newSchedule[day]?.[time];
+              if (lesson && lesson.teacherId === teacherId) {
+                newSchedule[day][time] = null; // Unassign teacher
+                classWasModified = true;
+              }
+            });
+          }
+        });
+
+        if (classWasModified) {
+          const classRef = doc(firestore, 'classes', schoolClass.id);
+          transaction.update(classRef, { schedule: newSchedule });
         }
       });
-      if (classWasModified) {
-        const classRef = doc(firestore, 'classes', schoolClass.id);
-        const {id, ...classData} = schoolClass;
-        batch.set(classRef, classData);
-      }
-    });
 
-    await commitBatchWithContext(batch, { operation: 'delete', path: teacherRef.path, firestore });
+      // 3. Delete the teacher doc
+      const teacherRef = doc(firestore, 'teachers', teacherId);
+      transaction.delete(teacherRef);
+    });
   }
 
   const handleAddClass = async (className: string) => {
@@ -186,6 +191,14 @@ export default function Home() {
     const batch = writeBatch(firestore);
     batch.update(classRef, { schedule: newSchedule });
     await commitBatchWithContext(batch, { operation: 'update', path: classRef.path, data: { schedule: newSchedule }, firestore });
+  };
+
+   const handleUpdateTeacherSchedule = async (teacherId: string, newSchedule: ClassSchedule) => {
+    if (!firestore || !user) return;
+    const teacherRef = doc(firestore, 'teachers', teacherId);
+    const batch = writeBatch(firestore);
+    batch.update(teacherRef, { schedule: newSchedule });
+    await commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: { schedule: newSchedule }, firestore });
   };
   
   const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
@@ -272,6 +285,7 @@ export default function Home() {
               onDeleteTeacher={handleDeleteTeacher}
               onClassesUpdate={handleUpdate}
               onMarkAbsent={handleMarkAbsent}
+              onUpdateTeacherSchedule={handleUpdateTeacherSchedule}
             />
           </TabsContent>
            <TabsContent value="classes">

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { z } from 'zod';
@@ -48,7 +49,7 @@ interface CreateTeacherDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onAddTeacher: (teacher: Omit<Teacher, 'id' | 'userId' | 'avatar'>) => void;
-  onEditTeacher: (teacher: Omit<Teacher, 'userId' | 'avatar'>) => void;
+  onEditTeacher: (teacher: Omit<Teacher, 'userId' | 'avatar' | 'schedule'>) => void;
   teacherToEdit: Teacher | null;
   timeSlots: TimeSlot[];
 }
@@ -161,8 +162,8 @@ export default function CreateTeacherDialog({
               name="availability"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>זמינות שבועית</FormLabel>
-                   <p className="text-sm text-muted-foreground">לחץ על משבצות זמן כדי לסמן זמינות.</p>
+                  <FormLabel>זמינות שבועית (להחלפות)</FormLabel>
+                   <p className="text-sm text-muted-foreground">סמן את השעות בהן המורה פנוי/ה לשמש כמחליפ/ה.</p>
                   <FormControl>
                     <WeeklyScheduleSelector {...field} timeSlots={timeSlots} />
                   </FormControl>
