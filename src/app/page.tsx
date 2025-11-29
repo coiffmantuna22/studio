@@ -103,6 +103,7 @@ export default function Home() {
             const absenceDate = typeof absence.date === 'string' ? new Date(absence.date) : absence.date;
             return isSameDay(startOfDay(absenceDate), today);
           } catch (e) {
+            console.error("Error parsing absence date:", absence.date);
             return false;
           }
         });
@@ -285,15 +286,23 @@ export default function Home() {
     const batch = writeBatch(firestore);
     const teacherRef = doc(firestore, 'teachers', absentTeacher.id);
 
-    // Filter out old absences for the same days and add the new ones.
-    const newAbsenceDates = absenceDays.map(d => startOfDay(new Date(d.date)).getTime());
+    // Get the dates of the new/edited absences
+    const newAbsenceDates = new Set(
+        absenceDays.map(d => startOfDay(new Date(d.date)).getTime())
+    );
     
     // Absences that are being edited (and thus should be removed/replaced)
     const absencesBeingEdited = teacherToMarkAbsent?.existingAbsences || [];
 
     const updatedAbsences = (absentTeacher.absences || []).filter(
       (existing) => {
-         const existingDate = typeof existing.date === 'string' ? new Date(existing.date) : existing.date;
+         let existingDate: Date;
+         try {
+            existingDate = typeof existing.date === 'string' ? new Date(existing.date) : existing.date;
+            if (isNaN(existingDate.getTime())) return true;
+         } catch (e) {
+            return true;
+         }
          
          // Check if this is one of the absences we are editing (by value comparison)
          const isBeingEdited = absencesBeingEdited.some(edited => {
@@ -306,12 +315,8 @@ export default function Home() {
 
          if (isBeingEdited) return false;
 
-         // Also overwrite any existing absences on the new dates
-         try {
-            return !newAbsenceDates.includes(startOfDay(existingDate).getTime())
-         } catch(e) {
-            return true;
-         }
+         // Check if it conflicts with new dates
+         return !newAbsenceDates.has(startOfDay(existingDate).getTime());
       }
     );
 
@@ -325,7 +330,7 @@ export default function Home() {
     await commitBatchWithContext(batch, {
         operation: 'update',
         path: teacherRef.path,
-        data: { absences: '...' }
+        data: { absences: '...' } // Don't log full absence array
     });
 
      const schoolClasses = allClasses || [];
