@@ -123,16 +123,16 @@ export default function CreateTeacherDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl flex flex-col max-h-[90vh]">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{isEditMode ? 'עריכת פרופיל מורה' : 'יצירת פרופיל מורה'}</DialogTitle>
           <DialogDescription>
             {isEditMode ? 'עדכן את פרטי המורה. לחץ על שמירה בסיום.' : 'הוסף מורה חדש למערכת. לחץ על שמירה בסיום.'}
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="flex-grow pr-6 -mr-6">
+        <ScrollArea className="max-h-[70vh] pr-6 -mr-6">
             <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 pr-1">
                 <FormField
                 control={form.control}
                 name="name"
