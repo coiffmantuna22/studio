@@ -11,22 +11,11 @@ import { initialTeachers, initialClasses as defaultClasses, initialTimeSlots } f
 import type { SchoolClass, Teacher, TimeSlot } from '@/lib/types';
 import { useUser, useFirestore } from '@/firebase';
 import { useRouter } from 'next/navigation';
+import { collection, doc, writeBatch, query, where } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
-import { collection, doc, writeBatch, WriteBatch } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
-import { errorEmitter, FirestorePermissionError } from '@/firebase';
+import { commitBatchWithContext } from '@/lib/firestore-utils';
 import { Button } from '@/components/ui/button';
-
-function commitBatchWithContext(batch: WriteBatch, context: { operation: 'create' | 'update' | 'delete', path: string, data?: any }) {
-  batch.commit().catch(error => {
-    const permissionError = new FirestorePermissionError({
-      operation: context.operation,
-      path: context.path,
-      requestResourceData: context.data,
-    });
-    errorEmitter.emit('permission-error', permissionError);
-  });
-}
 
 export default function Home() {
   const { user, isUserLoading } = useUser();
@@ -36,18 +25,14 @@ export default function Home() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [schoolClasses, setSchoolClasses] = useState<SchoolClass[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-
-  const [teachersCollection, teachersLoading] = useCollection(
-    user ? collection(firestore, 'users', user.uid, 'teachers') : null
-  );
-
-  const [classesCollection, classesLoading] = useCollection(
-    user ? collection(firestore, 'users', user.uid, 'classes') : null
-  );
-
-  const [settingsCollection, settingsLoading] = useCollection(
-    user ? collection(firestore, 'users', user.uid, 'settings') : null
-  );
+  
+  const teachersQuery = user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null;
+  const classesQuery = user ? query(collection(firestore, 'classes'), where('userId', '==', user.uid)) : null;
+  const settingsQuery = user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null;
+  
+  const [teachersCollection, teachersLoading] = useCollection(teachersQuery);
+  const [classesCollection, classesLoading] = useCollection(classesQuery);
+  const [settingsCollection, settingsLoading] = useCollection(settingsQuery);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -71,136 +56,153 @@ export default function Home() {
 
   useEffect(() => {
     if (settingsCollection) {
-      const settingsDoc = settingsCollection.docs.find(d => d.id === 'timetable');
+      const settingsDoc = settingsCollection.docs.find(d => d.id === `timetable_${user?.uid}`);
       if (settingsDoc?.exists()) {
         setTimeSlots(settingsDoc.data().slots);
+      } else {
+        setTimeSlots([]);
       }
     }
-  }, [settingsCollection]);
+  }, [settingsCollection, user]);
 
-  // Seed data for new user
-  const seedData = () => {
+  const seedData = async () => {
     if (!firestore || !user) return;
     const batch = writeBatch(firestore);
     
     initialTeachers.forEach(teacher => {
-      const teacherRef = doc(collection(firestore, 'users', user.uid, 'teachers'));
-      batch.set(teacherRef, { ...teacher, id: teacherRef.id });
+      const teacherRef = doc(collection(firestore, 'teachers'));
+      batch.set(teacherRef, { ...teacher, id: teacherRef.id, userId: user.uid });
     });
 
     defaultClasses.forEach(sClass => {
-        const classRef = doc(collection(firestore, 'users', user.uid, 'classes'));
-        batch.set(classRef, { ...sClass, id: classRef.id });
+        const classRef = doc(collection(firestore, 'classes'));
+        batch.set(classRef, { ...sClass, id: classRef.id, userId: user.uid });
     });
     
-    const settingsRef = doc(firestore, 'users', user.uid, 'settings', 'timetable');
-    const timetableData = { slots: initialTimeSlots };
+    const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
+    const timetableData = { slots: initialTimeSlots, userId: user.uid };
     batch.set(settingsRef, timetableData);
     
-    commitBatchWithContext(batch, {
+    await commitBatchWithContext(batch, {
       operation: 'create',
-      path: `users/${user.uid}/settings/timetable`,
-      data: timetableData
+      path: `settings/timetable_${user.uid}`,
+      data: timetableData,
+      firestore
     });
   };
-
-  useEffect(() => {
-    if (user && !teachersLoading && !classesLoading && !settingsLoading && teachersCollection?.empty && classesCollection?.empty && settingsCollection?.empty) {
-      // Data is not seeded yet for this new user.
-      // The UI will show the settings page.
-    }
-  }, [user, firestore, teachersLoading, classesLoading, settingsLoading, teachersCollection, classesCollection, settingsCollection]);
-
-  const handleUpdate = async (collectionName: 'teachers' | 'classes', items: (Teacher | SchoolClass)[]) => {
+  
+   const handleUpdate = async (collectionName: 'teachers' | 'classes', items: (Teacher | SchoolClass)[]) => {
      if (!firestore || !user) return;
     const batch = writeBatch(firestore);
     let firstPath = '';
     items.forEach(item => {
       const { id, ...data } = item;
-      const itemRef = doc(firestore, 'users', user.uid, collectionName, id);
+      const itemRef = doc(firestore, collectionName, id);
       if (!firstPath) firstPath = itemRef.path;
       batch.set(itemRef, data);
     });
-    commitBatchWithContext(batch, { operation: 'update', path: firstPath, data: items });
-  }
-  
-  const handleClassesUpdate = (updatedClasses: SchoolClass[]) => {
-    handleUpdate('classes', updatedClasses);
-  };
-  
-  const handleTeachersUpdate = (updatedTeachers: Teacher[]) => {
-    handleUpdate('teachers', updatedTeachers);
+    await commitBatchWithContext(batch, { operation: 'update', path: firstPath, data: items, firestore });
   }
 
-  const handleAddTeacher = (newTeacherData: Omit<Teacher, 'id'>) => {
+  const handleAddTeacher = async (newTeacherData: Omit<Teacher, 'id' | 'userId' | 'avatar'>) => {
     if (!firestore || !user) return;
-    const newDocRef = doc(collection(firestore, 'users', user.uid, 'teachers'));
-    const newTeacher = { ...newTeacherData, id: newDocRef.id };
+    const newDocRef = doc(collection(firestore, 'teachers'));
+    const fallback = newTeacherData.name.split(' ').map((n) => n[0]).join('').toUpperCase();
+    const newTeacher = { ...newTeacherData, id: newDocRef.id, userId: user.uid, avatar: { fallback } };
     const batch = writeBatch(firestore);
     batch.set(newDocRef, newTeacher);
-    commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: newTeacher });
+    await commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: newTeacher, firestore });
   };
 
-  const handleEditTeacher = (updatedTeacher: Omit<Teacher, 'avatar'>) => {
+  const handleEditTeacher = async (updatedTeacher: Omit<Teacher, 'avatar' | 'userId'>) => {
     if (!firestore || !user) return;
-    const teacherRef = doc(firestore, 'users', user.uid, 'teachers', updatedTeacher.id);
+    const teacherRef = doc(firestore, 'teachers', updatedTeacher.id);
     const batch = writeBatch(firestore);
     batch.update(teacherRef, updatedTeacher as any);
-    commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: updatedTeacher });
+    await commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: updatedTeacher, firestore });
   }
 
-  const handleDeleteTeacher = (teacherId: string) => {
+  const handleDeleteTeacher = async (teacherId: string) => {
     if (!firestore || !user) return;
     const batch = writeBatch(firestore);
-    const teacherRef = doc(firestore, 'users', user.uid, 'teachers', teacherId);
+    
+    // 1. Delete the teacher doc
+    const teacherRef = doc(firestore, 'teachers', teacherId);
     batch.delete(teacherRef);
-    commitBatchWithContext(batch, { operation: 'delete', path: teacherRef.path });
+
+    // 2. Remove teacher from all class schedules
+    const updatedClasses = JSON.parse(JSON.stringify(schoolClasses)) as SchoolClass[];
+    updatedClasses.forEach((schoolClass) => {
+      let classWasModified = false;
+      Object.keys(schoolClass.schedule).forEach(day => {
+        if (schoolClass.schedule[day]) {
+          Object.keys(schoolClass.schedule[day]).forEach(time => {
+            const lesson = schoolClass.schedule[day][time];
+            if (lesson && lesson.teacherId === teacherId) {
+              delete schoolClass.schedule[day][time];
+              classWasModified = true;
+            }
+          });
+        }
+      });
+      if (classWasModified) {
+        const classRef = doc(firestore, 'classes', schoolClass.id);
+        const {id, ...classData} = schoolClass;
+        batch.set(classRef, classData);
+      }
+    });
+
+    await commitBatchWithContext(batch, { operation: 'delete', path: teacherRef.path, firestore });
   }
 
-  const handleAddClass = (className: string) => {
+  const handleAddClass = async (className: string) => {
     if (!firestore || !user) return;
-    const newDocRef = doc(collection(firestore, 'users', user.uid, 'classes'));
+    const newDocRef = doc(collection(firestore, 'classes'));
     const newClass: Omit<SchoolClass, 'id'> = {
       name: className,
       schedule: {},
+      userId: user.uid,
     };
     const batch = writeBatch(firestore);
     batch.set(newDocRef, newClass);
-    commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: newClass });
+    await commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: newClass, firestore });
   };
 
-  const handleDeleteClass = (classId: string) => {
+  const handleDeleteClass = async (classId: string) => {
     if (!firestore || !user) return;
-    const classRef = doc(firestore, 'users', user.uid, 'classes', classId);
+    const classRef = doc(firestore, 'classes', classId);
     const batch = writeBatch(firestore);
     batch.delete(classRef);
-    commitBatchWithContext(batch, { operation: 'delete', path: classRef.path });
+    await commitBatchWithContext(batch, { operation: 'delete', path: classRef.path, firestore });
   };
 
-  const handleUpdateSchedule = (classId: string, newSchedule: any) => {
+  const handleUpdateSchedule = async (classId: string, newSchedule: any) => {
     if (!firestore || !user) return;
-    const classRef = doc(firestore, 'users', user.uid, 'classes', classId);
+    const classRef = doc(firestore, 'classes', classId);
     const batch = writeBatch(firestore);
     batch.update(classRef, { schedule: newSchedule });
-    commitBatchWithContext(batch, { operation: 'update', path: classRef.path, data: { schedule: newSchedule } });
+    await commitBatchWithContext(batch, { operation: 'update', path: classRef.path, data: { schedule: newSchedule }, firestore });
   };
   
-  const handleTimetableSettingsUpdate = (newTimeSlots: TimeSlot[]) => {
+  const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
       
-      // If this is the first time setting the slots, seed the rest of the data.
-      if (timeSlots.length === 0) {
-        seedData();
-      }
+      const isInitialSetup = timeSlots.length === 0 && teachers.length === 0 && schoolClasses.length === 0;
 
-      const settingsRef = doc(firestore, 'users', user.uid, 'settings', 'timetable');
+      const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
       const batch = writeBatch(firestore);
-      batch.set(settingsRef, { slots: newTimeSlots });
-      commitBatchWithContext(batch, { operation: 'update', path: settingsRef.path, data: { slots: newTimeSlots } });
+      const timetableData = { slots: newTimeSlots, userId: user.uid };
+      batch.set(settingsRef, timetableData, { merge: true });
+      await commitBatchWithContext(batch, { operation: 'update', path: settingsRef.path, data: timetableData, firestore });
+
+      if (isInitialSetup) {
+        await seedData();
+      }
   }
 
+  const isDataLoading = isUserLoading || teachersLoading || classesLoading || settingsLoading;
 
-  if (isUserLoading || (!user) || teachersLoading || classesLoading || settingsLoading) {
+  if (isDataLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -208,13 +210,15 @@ export default function Home() {
     );
   }
   
-  if (timeSlots.length === 0 && !teachersLoading && !classesLoading && !settingsLoading && teachersCollection?.empty && classesCollection?.empty && settingsCollection?.empty) {
+  const isNewUser = !isDataLoading && user && teachers.length === 0 && schoolClasses.length === 0 && timeSlots.length === 0;
+
+  if (isNewUser) {
       return (
          <div className="flex flex-col min-h-screen bg-background">
             <Header />
             <main className="flex-1 p-4 sm:p-6 md:p-8">
                <SettingsTab
-                  timeSlots={timeSlots}
+                  timeSlots={[]}
                   onUpdate={handleTimetableSettingsUpdate}
                >
                  <div className='flex justify-start pt-6'>
@@ -243,14 +247,13 @@ export default function Home() {
           </div>
           <TabsContent value="teachers">
             <TeacherList
-              initialTeachers={teachers}
+              teachers={teachers}
               allClasses={schoolClasses}
               timeSlots={timeSlots}
               onAddTeacher={handleAddTeacher}
               onEditTeacher={handleEditTeacher}
               onDeleteTeacher={handleDeleteTeacher}
-              onClassesUpdate={handleClassesUpdate}
-              onTeachersUpdate={handleTeachersUpdate}
+              onClassesUpdate={handleUpdate}
             />
           </TabsContent>
            <TabsContent value="classes">

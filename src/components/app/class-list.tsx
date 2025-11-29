@@ -58,22 +58,22 @@ export default function ClassList({ initialClasses, allTeachers, timeSlots, onAd
   return (
     <Card className="mt-6 border-border/80 rounded-2xl">
       <CardHeader>
-        <div className='flex flex-col sm:flex-row-reverse sm:items-center sm:justify-between gap-4'>
+        <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
           <div className='flex-1'>
               <CardTitle className="text-xl">כיתות לימוד</CardTitle>
               <CardDescription>ניהול מערכת השעות הכיתתית.</CardDescription>
           </div>
-          <div className="flex flex-col sm:flex-row-reverse gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <Button onClick={() => setCreateClassOpen(true)} className='shrink-0'>
-                <Plus className="ml-2 h-4 w-4" />
+                <Plus className="mr-2 h-4 w-4" />
                 הוסף כיתה
               </Button>
               <div className="relative flex-grow">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                       type="search"
                       placeholder="חיפוש כיתה..."
-                      className="w-full pl-9"
+                      className="w-full pr-9"
                       value={searchTerm}
                       onChange={e => setSearchTerm(e.target.value)}
                   />
@@ -96,17 +96,17 @@ export default function ClassList({ initialClasses, allTeachers, timeSlots, onAd
                   </CardHeader>
                   <CardFooter className="grid grid-cols-3 gap-2">
                     <Button variant="outline" size="sm" onClick={() => setClassToView(schoolClass)}>
-                      <Eye className="ml-1 h-4 w-4" />
+                      <Eye className="mr-1 h-4 w-4" />
                       צפה
                     </Button>
                     <Button variant="secondary" size="sm" onClick={() => setClassToEditSchedule(schoolClass)}>
-                      <Edit className="ml-1 h-4 w-4" />
+                      <Edit className="mr-1 h-4 w-4" />
                       ערוך
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="destructive" size="sm">
-                          <Trash2 className="ml-1 h-4 w-4" />
+                          <Trash2 className="mr-1 h-4 w-4" />
                           מחק
                         </Button>
                       </AlertDialogTrigger>

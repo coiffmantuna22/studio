@@ -5,6 +5,7 @@ export interface DayAvailability {
 
 export interface Teacher {
   id: string;
+  userId: string; // New field
   name: string;
   subjects: string[];
   availability: DayAvailability[];
@@ -34,6 +35,7 @@ export type ClassSchedule = {
 
 export interface SchoolClass {
   id: string;
+  userId: string; // New field
   name: string;
   schedule: ClassSchedule;
 }
@@ -53,4 +55,5 @@ export interface TimeSlot {
   start: string;
   end: string;
   type: 'lesson' | 'break';
+  userId?: string; // New optional field
 }

@@ -22,28 +22,30 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    /**
+     * Checks if the incoming resource data contains the correct owner userId.
+     */
+    function isResourceOwner(userId) {
+      return request.resource.data.userId == userId;
+    }
+
     // -------------------------------------------------------------------------
     // Collection Rules
     // -------------------------------------------------------------------------
 
-    /**
-     * @description Main rule for user-specific data. A user can only access
-     * documents within their own data tree.
-     * @path /users/{userId}
-     */
-    match /users/{userId} {
-      // A user can read/write their own top-level document if needed.
-      // This is often used for user profile information.
-      allow read, write: if isOwner(userId);
-
-      /**
-       * @description A user can manage all collections (teachers, classes, settings)
-       * that belong to them. This single rule covers all subcollections.
-       * @path /users/{userId}/{collection}/{docId}
-       */
-      match /{collection}/{docId} {
-        allow read, write, create, delete, list: if isOwner(userId);
-      }
+    match /teachers/{teacherId} {
+      allow read, create, update, delete: if isSignedIn() && isOwner(request.auth.uid) && isResourceOwner(request.auth.uid);
+      allow list: if isSignedIn();
+    }
+    
+    match /classes/{classId} {
+      allow read, create, update, delete: if isSignedIn() && isOwner(request.auth.uid) && isResourceOwner(request.auth.uid);
+      allow list: if isSignedIn();
+    }
+    
+    match /settings/{settingId} {
+      allow read, create, update, delete: if isSignedIn() && isOwner(request.auth.uid) && isResourceOwner(request.auth.uid);
+      allow list: if isSignedIn();
     }
   }
 }

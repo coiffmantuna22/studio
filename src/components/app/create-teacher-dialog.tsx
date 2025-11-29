@@ -47,8 +47,8 @@ type FormValues = z.infer<typeof formSchema>;
 interface CreateTeacherDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onAddTeacher: (teacher: Omit<Teacher, 'id' | 'avatar'>) => void;
-  onEditTeacher: (teacher: Omit<Teacher, 'avatar'>) => void;
+  onAddTeacher: (teacher: Omit<Teacher, 'id' | 'userId' | 'avatar'>) => void;
+  onEditTeacher: (teacher: Omit<Teacher, 'userId' | 'avatar'>) => void;
   teacherToEdit: Teacher | null;
   timeSlots: TimeSlot[];
 }
@@ -103,12 +103,6 @@ export default function CreateTeacherDialog({
   }, [isOpen, isEditMode, teacherToEdit, form]);
 
   const onSubmit = (values: FormValues) => {
-    const fallback = values.name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase();
-
     const teacherData = {
       name: values.name,
       subjects: values.subjects,
@@ -119,7 +113,7 @@ export default function CreateTeacherDialog({
     if (isEditMode && teacherToEdit) {
       onEditTeacher({ ...teacherData, id: teacherToEdit.id });
     } else {
-      onAddTeacher({...teacherData, avatar: {fallback}});
+      onAddTeacher(teacherData);
     }
     
     onOpenChange(false);

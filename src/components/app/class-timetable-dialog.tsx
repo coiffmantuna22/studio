@@ -161,7 +161,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
                      <Separator />
                     <div className="flex justify-between items-center">
                          <Button variant="ghost" size="sm" onClick={handleClear} className="text-destructive hover:text-destructive">
-                            <X className="w-4 h-4 ml-2"/>
+                            <X className="w-4 h-4 mr-2"/>
                             נקה שיבוץ
                         </Button>
                         <Button size="sm" onClick={handleSave} disabled={!(subject && teacherId)}>שמור</Button>

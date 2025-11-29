@@ -24,25 +24,23 @@ import {
 } from "@/components/ui/alert-dialog"
 
 interface TeacherListProps {
-  initialTeachers: Teacher[];
+  teachers: Teacher[];
   allClasses: SchoolClass[];
   timeSlots: TimeSlot[];
-  onAddTeacher: (teacher: Omit<Teacher, 'id'|'avatar'>) => void;
-  onEditTeacher: (teacher: Omit<Teacher, 'avatar'>) => void;
+  onAddTeacher: (teacher: Omit<Teacher, 'id' | 'userId' | 'avatar'>) => void;
+  onEditTeacher: (teacher: Omit<Teacher, 'userId' | 'avatar'>) => void;
   onDeleteTeacher: (teacherId: string) => void;
-  onClassesUpdate: (classes: SchoolClass[]) => void;
-  onTeachersUpdate: (teachers: Teacher[]) => void;
+  onClassesUpdate: (collectionName: 'teachers' | 'classes', classes: SchoolClass[]) => void;
 }
 
 export default function TeacherList({ 
-  initialTeachers, 
+  teachers, 
   allClasses,
   timeSlots,
   onAddTeacher,
   onEditTeacher,
   onDeleteTeacher,
   onClassesUpdate,
-  onTeachersUpdate,
 }: TeacherListProps) {
   const { toast } = useToast();
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
@@ -57,11 +55,11 @@ export default function TeacherList({
 
   const getSubstituteTeacherId = (name: string | null): string | null => {
     if (!name) return null;
-    const teacher = initialTeachers.find(t => t.name === name);
+    const teacher = teachers.find(t => t.name === name);
     return teacher ? teacher.id : null;
   }
 
- const handleCreateTeacher = (newTeacherData: Omit<Teacher, 'id' | 'avatar'>) => {
+ const handleCreateTeacher = (newTeacherData: Omit<Teacher, 'id' | 'userId' | 'avatar'>) => {
     onAddTeacher(newTeacherData);
      toast({
       title: "פרופיל מורה נוצר",
@@ -69,7 +67,7 @@ export default function TeacherList({
     });
   };
 
-  const handleUpdateTeacher = (updatedTeacherData: Omit<Teacher, 'avatar'>) => {
+  const handleUpdateTeacher = (updatedTeacherData: Omit<Teacher, 'avatar' | 'userId'>) => {
     onEditTeacher(updatedTeacherData);
     setTeacherToEdit(null);
      toast({
@@ -81,22 +79,6 @@ export default function TeacherList({
   const handleDeleteTeacher = () => {
     if (!teacherToDelete) return;
     
-    const updatedClasses = JSON.parse(JSON.stringify(allClasses)) as SchoolClass[];
-    
-    updatedClasses.forEach((schoolClass) => {
-      Object.keys(schoolClass.schedule).forEach(day => {
-        if(schoolClass.schedule[day]) {
-            Object.keys(schoolClass.schedule[day]).forEach(time => {
-                const lesson = schoolClass.schedule[day][time];
-                if (lesson && lesson.teacherId === teacherToDelete.id) {
-                    delete schoolClass.schedule[day][time];
-                }
-            });
-        }
-      });
-    });
-    
-    onClassesUpdate(updatedClasses);
     onDeleteTeacher(teacherToDelete.id);
 
     toast({
@@ -135,7 +117,7 @@ export default function TeacherList({
  const handleFinalUpdateTimetables = () => {
     if (!recommendation) return;
 
-    const updatedClasses = JSON.parse(JSON.stringify(allClasses));
+    const updatedClasses = JSON.parse(JSON.stringify(allClasses)) as SchoolClass[];
     let lessonsUpdatedCount = 0;
 
     recommendation.results.forEach(res => {
@@ -156,7 +138,7 @@ export default function TeacherList({
     });
     
     if (lessonsUpdatedCount > 0) {
-      onClassesUpdate(updatedClasses);
+      onClassesUpdate('classes', updatedClasses);
       toast({
         title: "מערכת השעות עודכנה",
         description: `${lessonsUpdatedCount} שיעורים עודכנו עם מחליפים.`,
@@ -172,7 +154,7 @@ export default function TeacherList({
     setRecommendation(null);
   };
 
-  const filteredTeachers = initialTeachers.filter(teacher =>
+  const filteredTeachers = teachers.filter(teacher =>
     teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -180,22 +162,22 @@ export default function TeacherList({
   return (
     <Card className="mt-6 border-border/80 rounded-2xl">
       <CardHeader>
-        <div className='flex flex-col sm:flex-row-reverse sm:items-center sm:justify-between gap-4'>
+        <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
             <div className='flex-1'>
                 <CardTitle className="text-xl">פרופילי מורים</CardTitle>
                 <CardDescription>ניהול מורים מחליפים וסימון היעדרויות.</CardDescription>
             </div>
-            <div className="flex flex-col sm:flex-row-reverse gap-2 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button onClick={openCreateDialog} className='shrink-0'>
-                    <Plus className="ml-2 h-4 w-4" />
+                    <Plus className="mr-2 h-4 w-4" />
                     יצירת פרופיל
                 </Button>
                 <div className="relative flex-grow">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         type="search"
                         placeholder="חיפוש מורה..."
-                        className="w-full pl-9"
+                        className="w-full pr-9"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
@@ -205,7 +187,7 @@ export default function TeacherList({
       </CardHeader>
 
       <CardContent>
-        {initialTeachers.length > 0 ? (
+        {teachers.length > 0 ? (
             filteredTeachers.length > 0 ? (
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {filteredTeachers.map((teacher) => (
@@ -249,7 +231,7 @@ export default function TeacherList({
         isOpen={!!teacherToMarkAbsent}
         onOpenChange={(open) => !open && setTeacherToMarkAbsent(null)}
         teacher={teacherToMarkAbsent}
-        allTeachers={initialTeachers}
+        allTeachers={teachers}
         allClasses={allClasses}
         timeSlots={timeSlots}
         onShowRecommendation={handleShowRecommendation}
