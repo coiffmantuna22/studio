@@ -11,7 +11,7 @@ import SettingsTab from '@/components/app/settings-tab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { initialTeachers, initialClasses as defaultClasses, initialTimeSlots } from '@/lib/data';
 import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson } from '@/lib/types';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, doc, writeBatch, query, where, getDocs, runTransaction, DocumentReference } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
