@@ -101,22 +101,16 @@ export default function WeeklyScheduleSelector({ value, onChange }: WeeklySchedu
 
   return (
     <div className="flex flex-col gap-2" dir="rtl">
-      <div className="grid grid-cols-[auto_1fr] gap-x-2">
-        <div className="w-24"></div> {/* Spacer for alignment */}
+      <div className="grid grid-cols-[1fr_auto] gap-x-2">
         <div className="grid grid-cols-12 text-center text-xs text-muted-foreground">
           {timeSlots.map(time => (
             <div key={time}>{time}</div>
           ))}
         </div>
+        <div className="w-24"></div> {/* Spacer for alignment */}
       </div>
       {daysOfWeek.map(day => (
-        <div key={day} className="grid grid-cols-[auto_1fr] items-center gap-x-2">
-          <div className="flex items-center justify-end gap-2 w-24">
-            <span className="font-semibold text-sm">{day}</span>
-             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => clearDay(day)}>
-                <Trash2 className="h-3.5 w-3.5 text-muted-foreground"/>
-             </Button>
-          </div>
+        <div key={day} className="grid grid-cols-[1fr_auto] items-center gap-x-2">
           <div className="grid grid-cols-12 gap-px bg-border rounded-md overflow-hidden" dir="ltr">
             {timeSlots.map((time, index) => {
               const hour = index + 7;
@@ -132,6 +126,12 @@ export default function WeeklyScheduleSelector({ value, onChange }: WeeklySchedu
                 />
               );
             })}
+          </div>
+          <div className="flex items-center justify-start gap-2 w-24">
+            <span className="font-semibold text-sm">{day}</span>
+             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => clearDay(day)}>
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground"/>
+             </Button>
           </div>
         </div>
       ))}

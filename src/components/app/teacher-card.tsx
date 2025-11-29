@@ -60,12 +60,12 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete }:
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={onEdit}>
-              <Pencil className="mr-2 h-4 w-4" />
+              <Pencil className="ml-2 h-4 w-4" />
               עריכה
             </DropdownMenuItem>
              <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
-              <Trash2 className="mr-2 h-4 w-4" />
+              <Trash2 className="ml-2 h-4 w-4" />
               מחק
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -95,7 +95,7 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete }:
       </CardContent>
       <CardFooter className="grid grid-cols-1 gap-2">
         <Button className="w-full" onClick={onMarkAbsent}>
-          <UserX className="mr-2 h-4 w-4" />
+          <UserX className="ml-2 h-4 w-4" />
           סימון היעדרות
         </Button>
       </CardFooter>

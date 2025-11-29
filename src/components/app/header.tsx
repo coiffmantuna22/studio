@@ -16,12 +16,12 @@ export default function Header() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <ModeToggle />
             {auth.currentUser && (
               <Button variant="ghost" size="icon" onClick={() => auth.signOut()}>
                 <LogOut className="h-5 w-5" />
               </Button>
             )}
+            <ModeToggle />
           </div>
         </div>
       </div>

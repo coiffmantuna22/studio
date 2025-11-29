@@ -174,24 +174,24 @@ export default function TeacherList({
   return (
     <Card className="mt-6 border-border/80 rounded-2xl">
       <CardHeader>
-        <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
+        <div className='flex flex-col sm:flex-row-reverse sm:items-center sm:justify-between gap-4'>
             <div className='flex-1'>
                 <CardTitle className="text-xl">פרופילי מורים</CardTitle>
                 <CardDescription>ניהול מורים מחליפים וסימון היעדרויות.</CardDescription>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row-reverse gap-2 w-full sm:w-auto">
                 <div className="relative flex-grow">
-                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         type="search"
                         placeholder="חיפוש מורה..."
-                        className="pr-9 w-full"
+                        className="pl-9 w-full"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
                 </div>
                 <Button onClick={openCreateDialog} className='shrink-0'>
-                    <Plus className="mr-2 h-4 w-4" />
+                    <Plus className="ml-2 h-4 w-4" />
                     יצירת פרופיל
                 </Button>
             </div>

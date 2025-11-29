@@ -62,7 +62,7 @@ export default function RecommendationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-2 max-h-[60vh] overflow-y-auto pr-2">
+        <div className="py-2 max-h-[60vh] overflow-y-auto pl-2">
           <Accordion type="single" collapsible className="w-full" defaultValue='item-0'>
             {Object.entries(lessonsByClass).map(([classId, lessons], index) => (
               <AccordionItem value={`item-${index}`} key={classId}>
@@ -79,7 +79,7 @@ export default function RecommendationDialog({
                         <div key={resIndex} className="p-3 border rounded-lg bg-card">
                             <div className="font-semibold flex flex-col sm:flex-row items-start sm:items-center justify-between">
                                 <div className='flex items-center gap-2'>
-                                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                                    <BookOpen className="ml-2 h-4 w-4 text-muted-foreground" />
                                     <span>{res.lesson.subject}</span>
                                 </div>
                                 <span className='text-sm text-muted-foreground font-normal mt-1 sm:mt-0'>{format(res.date, "EEEE, d MMM", {locale: he})} בשעה {res.time}</span>
@@ -89,7 +89,7 @@ export default function RecommendationDialog({
                                 <div className='flex flex-col items-center'>
                                     <span className="text-sm text-muted-foreground">מחליף מוצע</span>
                                     <p className="font-bold text-primary flex items-center gap-2 mt-1">
-                                        <UserCheck className="h-4 w-4" />
+                                        <UserCheck className="ml-2 h-4 w-4" />
                                         {res.recommendation || 'לא נמצא'}
                                     </p>
                                 </div>
@@ -104,7 +104,7 @@ export default function RecommendationDialog({
 
                              {res.reasoning && (
                                 <div className="mt-3 p-2 rounded-md bg-secondary/50 text-secondary-foreground text-xs flex items-start gap-2 text-right">
-                                     <Lightbulb className="h-4 w-4 shrink-0 mt-0.5" />
+                                     <Lightbulb className="h-4 w-4 shrink-0 mt-0.5 ml-1" />
                                      <span>{res.reasoning}</span>
                                 </div>
                              )}

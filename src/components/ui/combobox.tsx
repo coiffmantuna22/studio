@@ -80,7 +80,7 @@ export function Combobox({ items, value, onChange, placeholder, searchPlaceholde
           {value
             ? items.find((item) => item.value === value)?.label
             : placeholder}
-          <ChevronsUpDown className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
@@ -101,7 +101,7 @@ export function Combobox({ items, value, onChange, placeholder, searchPlaceholde
                 >
                   <Check
                     className={cn(
-                      "ml-2 h-4 w-4",
+                      "mr-2 h-4 w-4",
                       value === item.value ? "opacity-100" : "opacity-0"
                     )}
                   />

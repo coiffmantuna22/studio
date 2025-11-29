@@ -166,7 +166,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
                      <Separator />
                     <div className="flex justify-between items-center">
                          <Button variant="ghost" size="sm" onClick={handleClear} className="text-destructive hover:text-destructive">
-                            <X className="w-4 h-4 mr-2"/>
+                            <X className="w-4 h-4 ml-2"/>
                             נקה שיבוץ
                         </Button>
                         <Button size="sm" onClick={handleSave} disabled={!(subject && teacherId)}>שמור</Button>
@@ -242,7 +242,7 @@ export default function ClassTimetableDialog({
             <table className="w-full text-sm text-center table-fixed">
               <thead>
                 <tr className="bg-muted/40">
-                  <th className="sticky left-0 top-0 bg-muted/40 p-2 w-24 z-20">שעה</th>
+                  <th className="sticky right-0 top-0 bg-muted/40 p-2 w-24 z-20">שעה</th>
                   {daysOfWeek.map(day => (
                     <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">{day}</th>
                   ))}
@@ -251,12 +251,12 @@ export default function ClassTimetableDialog({
               <tbody>
                 {timeSlots.map(time => (
                   <tr key={time} className="border-t">
-                    <td className="sticky left-0 font-semibold bg-card p-2 w-24 z-10">{time}</td>
+                    <td className="sticky right-0 font-semibold bg-card p-2 w-24 z-10">{time}</td>
                     {daysOfWeek.map(day => {
                       const lesson = localSchedule?.[day]?.[time] || null;
                       const teacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
                       return (
-                        <td key={`${day}-${time}`} className="p-0 align-top border-r">
+                        <td key={`${day}-${time}`} className="p-0 align-top border-l">
                             {isEditing ? (
                                 <EditSlotPopover 
                                     day={day} 
