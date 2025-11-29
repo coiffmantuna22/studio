@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -10,7 +9,7 @@ import ClassList from '@/components/app/class-list';
 import SettingsTab from '@/components/app/settings-tab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus } from '@/lib/types';
-import { useUser, useFirestore, FirestorePermissionError, errorEmitter } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, doc, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -23,15 +22,14 @@ import { isSameDay, startOfDay } from 'date-fns';
 import { getTeacherAvailabilityStatus } from '@/lib/substitute-finder';
 import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
 import RecommendationDialog from '@/components/app/recommendation-dialog';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 export default function Home() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const firestore = useFirestore();
 
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [schoolClasses, setSchoolClasses] = useState<SchoolClass[]>([]);
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [teacherToMarkAbsent, setTeacherToMarkAbsent] = useState<Teacher | null>(null);
   const [recommendation, setRecommendation] = useState<{
     results: any[];
@@ -40,13 +38,23 @@ export default function Home() {
   } | null>(null);
 
 
-  const teachersQuery = user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null;
-  const classesQuery = user ? query(collection(firestore, 'classes'), where('userId', '==', user.uid)) : null;
-  const settingsQuery = user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null;
+  const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
+  const classesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'classes'), where('userId', '==', user.uid)) : null, [user, firestore]);
+  const settingsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null, [user, firestore]);
 
-  const [teachersCollection, teachersLoading] = useCollection(teachersQuery);
-  const [classesCollection, classesLoading] = useCollection(classesQuery);
-  const [settingsCollection, settingsLoading] = useCollection(settingsQuery);
+  const { data: teachers = [], isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
+  const { data: schoolClasses = [], isLoading: classesLoading } = useCollection<SchoolClass>(classesQuery);
+  const { data: settingsCollection, isLoading: settingsLoading } = useCollection(settingsQuery);
+
+  const timeSlots: TimeSlot[] = useMemo(() => {
+    if (settingsCollection) {
+      const settingsDoc = settingsCollection.find(d => d.id === `timetable_${user?.uid}`);
+      if (settingsDoc) {
+        return settingsDoc.slots || [];
+      }
+    }
+    return [];
+  }, [settingsCollection, user]);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -54,35 +62,10 @@ export default function Home() {
     }
   }, [user, isUserLoading, router]);
 
-  useEffect(() => {
-    if (teachersCollection) {
-      const teachersData = teachersCollection.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teacher));
-      setTeachers(teachersData);
-    }
-  }, [teachersCollection]);
-
-  useEffect(() => {
-    if (classesCollection) {
-      const classesData = classesCollection.docs.map(doc => ({ id: doc.id, ...doc.data() } as SchoolClass));
-      setSchoolClasses(classesData);
-    }
-  }, [classesCollection]);
-
-  useEffect(() => {
-    if (settingsCollection) {
-      const settingsDoc = settingsCollection.docs.find(d => d.id === `timetable_${user?.uid}`);
-      if (settingsDoc?.exists()) {
-        setTimeSlots(settingsDoc.data().slots);
-      } else {
-        setTimeSlots([]);
-      }
-    }
-  }, [settingsCollection, user]);
-
   const teacherAvailabilityNow = useMemo(() => {
     const availabilityMap = new Map<string, TeacherAvailabilityStatus>();
     const now = new Date();
-    teachers.forEach(teacher => {
+    (teachers || []).forEach(teacher => {
         availabilityMap.set(teacher.id, getTeacherAvailabilityStatus(teacher, now, timeSlots));
     });
     return availabilityMap;
@@ -286,7 +269,7 @@ export default function Home() {
                 Object.keys(newSchedule).forEach(day => {
                     Object.keys(newSchedule[day] || {}).forEach(time => {
                         if (newSchedule[day][time]?.classId === classId) {
-                            newSchedule[day][time] = null;
+                            delete newSchedule[day][time];
                         }
                     });
                 });
@@ -469,7 +452,7 @@ const handleScheduleUpdate = async (
 
   const todaysAbsences = useMemo(() => {
     const today = startOfDay(new Date());
-    return teachers.filter(teacher => 
+    return (teachers || []).filter(teacher => 
         teacher.absences?.some(absence => isSameDay(new Date(absence.date), today))
     );
   }, [teachers]);
@@ -618,4 +601,9 @@ const handleScheduleUpdate = async (
 
     </div>
   );
-}
+
+    
+
+    
+
+    

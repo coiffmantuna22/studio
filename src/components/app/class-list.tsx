@@ -52,7 +52,7 @@ export default function ClassList({ initialClasses, allTeachers, timeSlots, onAd
     setClassToEditSchedule(null);
   };
 
-  const filteredClasses = initialClasses.filter(schoolClass =>
+  const filteredClasses = (initialClasses || []).filter(schoolClass =>
     schoolClass.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -84,7 +84,7 @@ export default function ClassList({ initialClasses, allTeachers, timeSlots, onAd
       </CardHeader>
 
       <CardContent>
-        {initialClasses.length > 0 ? (
+        {initialClasses && initialClasses.length > 0 ? (
           filteredClasses.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredClasses.map((schoolClass) => (
@@ -178,3 +178,5 @@ export default function ClassList({ initialClasses, allTeachers, timeSlots, onAd
     </Card>
   );
 }
+
+    

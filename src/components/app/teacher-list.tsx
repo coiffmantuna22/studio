@@ -98,7 +98,7 @@ export default function TeacherList({
     setTeacherToEdit(null);
   };
 
-  const filteredTeachers = teachers.filter(teacher =>
+  const filteredTeachers = (teachers || []).filter(teacher =>
     teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -135,7 +135,7 @@ export default function TeacherList({
           <AlertDialogHeader>
             <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
             <AlertDialogDescription>
-              פעולה זו תמחק את הפרופיל של {teacherToDelete?.name} לצמיתות ותסיר אותו/ה מכל מערכות השעות. לא ניתן לבטל את הפעולה.
+              פעולה זו תמחק את הפרופיל של ${teacherToDelete?.name} לצמיתות ותסיר אותו/ה מכל מערכות השעות. לא ניתן לבטל את הפעולה.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -145,7 +145,7 @@ export default function TeacherList({
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-        {teachers.length > 0 ? (
+        {teachers && teachers.length > 0 ? (
             filteredTeachers.length > 0 ? (
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {filteredTeachers.map((teacher) => (
@@ -200,3 +200,5 @@ export default function TeacherList({
     </Card>
   );
 }
+
+    
