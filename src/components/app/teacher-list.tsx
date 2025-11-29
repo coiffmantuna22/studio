@@ -29,6 +29,8 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { getTeacherAvailabilityStatus } from '@/lib/substitute-finder';
 import { Loader2 } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Label } from '../ui/label';
 
 interface TeacherListProps {
   onMarkAbsent: (teacher: Teacher) => void;
@@ -46,6 +48,8 @@ export default function TeacherList({
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const [teacherToViewSchedule, setTeacherToViewSchedule] = useState<Teacher | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [availabilityFilter, setAvailabilityFilter] = useState('all');
+
 
   const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
   const { data: teachers = [], isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
@@ -263,9 +267,19 @@ export default function TeacherList({
     setTeacherToEdit(null);
   };
 
-  const filteredTeachers = (teachers || []).filter(teacher =>
-    teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTeachers = useMemo(() => {
+    return (teachers || [])
+      .filter(teacher => {
+        const matchesSearch = teacher.name.toLowerCase().includes(searchTerm.toLowerCase());
+        if (!matchesSearch) return false;
+
+        if (availabilityFilter === 'available') {
+          return teacherAvailabilityNow.get(teacher.id) === 'available';
+        }
+        
+        return true;
+      });
+  }, [teachers, searchTerm, availabilityFilter, teacherAvailabilityNow]);
 
   if (teachersLoading) {
       return <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -279,12 +293,12 @@ export default function TeacherList({
                 <CardTitle className="text-xl font-bold">פרופילי מורים</CardTitle>
                 <CardDescription>ניהול מורים מחליפים וסימון היעדרויות.</CardDescription>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
                 <Button onClick={openCreateDialog} className='shrink-0'>
                     <Plus className="me-2 h-4 w-4" />
                     יצירת פרופיל
                 </Button>
-                <div className="relative flex-grow">
+                <div className="relative flex-grow w-full sm:w-auto">
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         type="search"
@@ -295,6 +309,24 @@ export default function TeacherList({
                     />
                 </div>
             </div>
+        </div>
+        <div className="mt-4 pt-4 border-t">
+          <RadioGroup 
+              defaultValue="all" 
+              className="flex items-center gap-4"
+              onValueChange={setAvailabilityFilter}
+              value={availabilityFilter}
+            >
+              <Label className="font-normal text-sm">סנן לפי:</Label>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                  <RadioGroupItem value="all" id="filter-all" />
+                  <Label htmlFor="filter-all" className="font-normal">כל המורים</Label>
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                  <RadioGroupItem value="available" id="filter-available" />
+                  <Label htmlFor="filter-available" className="font-normal">פנויים כעת</Label>
+              </div>
+          </RadioGroup>
         </div>
       </CardHeader>
 
@@ -334,7 +366,7 @@ export default function TeacherList({
                  <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-12 text-center">
                     <h3 className="text-lg font-semibold text-foreground">לא נמצאו מורים תואמים</h3>
                     <p className="mt-2 text-sm text-muted-foreground">
-                        נסה מונח חיפוש אחר.
+                        נסה מונח חיפוש אחר או שנה את אפשרויות הסינון.
                     </p>
                 </div>
             )
@@ -369,3 +401,4 @@ export default function TeacherList({
     </Card>
   );
 }
+
