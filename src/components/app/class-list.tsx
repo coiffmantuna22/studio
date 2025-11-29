@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -114,7 +115,7 @@ export default function ClassList({ initialClasses, allTeachers, timeSlots, onAd
                         <AlertDialogHeader>
                           <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            פעולה זו תמחק את הכיתה לצמיתות. לא ניתן לבטל את הפעולה.
+                            פעולה זו תמחק את הכיתה ואת כל השיבוצים המשוייכים אליה ממערכות המורים לצמיתות. לא ניתן לבטל את הפעולה.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

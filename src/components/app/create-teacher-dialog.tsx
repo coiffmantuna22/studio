@@ -48,7 +48,7 @@ type FormValues = z.infer<typeof formSchema>;
 interface CreateTeacherDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onAddTeacher: (teacher: Omit<Teacher, 'id' | 'userId' | 'avatar'>) => void;
+  onAddTeacher: (teacher: Omit<Teacher, 'id' | 'userId' | 'avatar' | 'schedule'>) => void;
   onEditTeacher: (teacher: Omit<Teacher, 'userId' | 'avatar' | 'schedule'>) => void;
   teacherToEdit: Teacher | null;
   timeSlots: TimeSlot[];

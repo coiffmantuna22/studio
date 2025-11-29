@@ -1,4 +1,5 @@
 
+
 export interface DayAvailability {
   day: string;
   slots: { start: string; end: string }[];
@@ -27,8 +28,8 @@ export interface AbsenceDay {
 
 export interface Lesson {
   subject: string;
-  teacherId: string | null;
-  classId?: string | null;
+  teacherId: string;
+  classId: string;
 }
 
 export type ClassSchedule = {

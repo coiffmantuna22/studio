@@ -29,10 +29,9 @@ interface TeacherListProps {
   teachers: Teacher[];
   allClasses: SchoolClass[];
   timeSlots: TimeSlot[];
-  onAddTeacher: (teacher: Omit<Teacher, 'id' | 'userId' | 'avatar'>) => void;
+  onAddTeacher: (teacher: Omit<Teacher, 'id' | 'userId' | 'avatar' | 'schedule'>) => void;
   onEditTeacher: (teacher: Omit<Teacher, 'userId' | 'avatar' | 'schedule'>) => void;
   onDeleteTeacher: (teacherId: string) => void;
-  onClassesUpdate: (collectionName: 'teachers' | 'classes', classes: SchoolClass[]) => void;
   onMarkAbsent: (teacherId: string, absenceDays: AbsenceDay[]) => void;
   onUpdateTeacherSchedule: (teacherId: string, schedule: ClassSchedule) => void;
 }
@@ -44,7 +43,6 @@ export default function TeacherList({
   onAddTeacher,
   onEditTeacher,
   onDeleteTeacher,
-  onClassesUpdate,
   onMarkAbsent,
   onUpdateTeacherSchedule
 }: TeacherListProps) {
@@ -57,6 +55,7 @@ export default function TeacherList({
   const [recommendation, setRecommendation] = useState<{
     results: AffectedLesson[];
     absentTeacher: Teacher;
+    newClassSchedules: SchoolClass[];
   } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -66,7 +65,7 @@ export default function TeacherList({
     return teacher ? teacher.id : null;
   }
 
- const handleCreateTeacher = (newTeacherData: Omit<Teacher, 'id' | 'userId' | 'avatar'>) => {
+ const handleCreateTeacher = (newTeacherData: Omit<Teacher, 'id' | 'userId' | 'avatar' | 'schedule'>) => {
     onAddTeacher(newTeacherData);
      toast({
       title: "פרופיל מורה נוצר",
@@ -102,8 +101,26 @@ export default function TeacherList({
     absentTeacher: Teacher,
     absenceDays: AbsenceDay[]
   ) => {
+    const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+    const updatedClasses = JSON.parse(JSON.stringify(allClasses)) as SchoolClass[];
+    let lessonsUpdatedCount = 0;
+
+    results.forEach(res => {
+      const substituteId = getSubstituteTeacherId(res.recommendation);
+      if (substituteId) {
+        const classToUpdate = updatedClasses.find((c: SchoolClass) => c.id === res.classId);
+        if (classToUpdate) {
+          const dayOfWeek = dayMap[getDay(res.date)];
+          if (classToUpdate.schedule[dayOfWeek]?.[res.time]) {
+             lessonsUpdatedCount++;
+            classToUpdate.schedule[dayOfWeek][res.time]!.teacherId = substituteId;
+          }
+        }
+      }
+    });
+
     onMarkAbsent(absentTeacher.id, absenceDays);
-    setRecommendation({ results, absentTeacher });
+    setRecommendation({ results, absentTeacher, newClassSchedules: updatedClasses });
   };
 
   const openCreateDialog = () => {
@@ -123,31 +140,44 @@ export default function TeacherList({
 
   const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
- const handleFinalUpdateTimetables = () => {
+ const handleFinalUpdateTimetables = async () => {
     if (!recommendation) return;
 
-    const updatedClasses = JSON.parse(JSON.stringify(allClasses)) as SchoolClass[];
     let lessonsUpdatedCount = 0;
+    
+    // We can't update teachers directly, we need to do it via a transaction in the parent
+    // But we can calculate the changes here
+    const teacherScheduleUpdates = new Map<string, ClassSchedule>();
 
     recommendation.results.forEach(res => {
-      const substituteId = getSubstituteTeacherId(res.recommendation);
-      if (substituteId) {
-        const classToUpdate = updatedClasses.find((c: SchoolClass) => c.id === res.classId);
-        if (classToUpdate) {
-          const dayOfWeek = dayMap[getDay(res.date)];
-          if (classToUpdate.schedule[dayOfWeek]?.[res.time]) {
-             lessonsUpdatedCount++;
-            classToUpdate.schedule[dayOfWeek][res.time] = {
-              subject: res.lesson.subject,
-              teacherId: substituteId,
-            };
-          }
+        const subId = getSubstituteTeacherId(res.recommendation);
+        if(!subId) return;
+
+        lessonsUpdatedCount++;
+
+        const day = dayMap[getDay(res.date)];
+        const time = res.time;
+
+        // Add to new teacher's schedule
+        const subSchedule = teacherScheduleUpdates.get(subId) || (teachers.find(t=>t.id === subId)?.schedule ? JSON.parse(JSON.stringify(teachers.find(t=>t.id === subId)!.schedule)) : {});
+        subSchedule[day] = subSchedule[day] || {};
+        subSchedule[day][time] = {subject: res.lesson.subject, teacherId: subId, classId: res.classId};
+        teacherScheduleUpdates.set(subId, subSchedule);
+
+        // Remove from absent teacher's schedule
+        const absentTeacherId = recommendation.absentTeacher.id;
+        const absentTeacherSchedule = teacherScheduleUpdates.get(absentTeacherId) || (recommendation.absentTeacher.schedule ? JSON.parse(JSON.stringify(recommendation.absentTeacher.schedule)) : {});
+        if (absentTeacherSchedule[day]?.[time]) {
+            absentTeacherSchedule[day][time] = null;
         }
-      }
+        teacherScheduleUpdates.set(absentTeacherId, absentTeacherSchedule);
     });
+
+    for(const [teacherId, schedule] of teacherScheduleUpdates.entries()) {
+        await onUpdateTeacherSchedule(teacherId, schedule);
+    }
     
     if (lessonsUpdatedCount > 0) {
-      onClassesUpdate('classes', updatedClasses);
       toast({
         title: "מערכת השעות עודכנה",
         description: `${lessonsUpdatedCount} שיעורים עודכנו עם מחליפים.`,
