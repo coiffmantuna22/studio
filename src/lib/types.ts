@@ -1,6 +1,7 @@
 
 
 
+
 export interface DayAvailability {
   day: string;
   slots: { start: string; end: string }[];
@@ -52,6 +53,8 @@ export interface AffectedLesson {
     date: Date;
     time: string;
     lesson: Lesson;
+    isCovered?: boolean;
+    absentTeacherName?: string;
     recommendation: string | null;
     recommendationId: string | null;
     reasoning: string | null;

@@ -7,7 +7,7 @@ import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { Loader2, AlertTriangle, CheckCircle, UserX } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, UserX, School } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { format, isSameDay, startOfDay } from 'date-fns';
@@ -18,6 +18,7 @@ import RecommendationDialog from '@/components/app/recommendation-dialog';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
 import { findSubstitute } from '@/lib/substitute-finder';
 import { daysOfWeek } from '@/lib/constants';
+import { groupBy } from 'lodash';
 
 const TeacherList = dynamic(() => import('@/components/app/teacher-list'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
@@ -31,6 +32,9 @@ const ClassList = dynamic(() => import('@/components/app/class-list'), {
 const SettingsTab = dynamic(() => import('@/components/app/settings-tab'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
 });
+const ClassTimetableDialog = dynamic(() => import('@/components/app/class-timetable-dialog'), {
+    loading: () => null
+});
 
 
 export default function Home() {
@@ -40,6 +44,7 @@ export default function Home() {
 
   const [activeTab, setActiveTab] = useState("teachers");
   const [teacherToMarkAbsent, setTeacherToMarkAbsent] = useState<Teacher | null>(null);
+  const [classToView, setClassToView] = useState<SchoolClass | null>(null);
   const [recommendation, setRecommendation] = useState<{
     results: any[];
     absentTeacher: Teacher;
@@ -119,7 +124,7 @@ export default function Home() {
                   sub.time === time &&
                   sub.classId === lesson.classId
                 );
-                affectedLessons.push({ ...lesson, time, className: schoolClass.name, isCovered });
+                affectedLessons.push({ ...lesson, time, className: schoolClass.name, isCovered, absentTeacherName: teacher.name });
               }
             }
           }
@@ -127,8 +132,28 @@ export default function Home() {
 
         return { teacher, absences: todaysTeacherAbsences, affectedLessons };
       })
-      .filter(item => item !== null && item.absences.length > 0);
+      .filter(item => item !== null && item.affectedLessons.length > 0);
   }, [teachers, allClasses, allSubstitutions]);
+
+
+  const uncoveredClasses = useMemo(() => {
+    if (!todaysAbsences) return [];
+    
+    const allAffectedLessons = todaysAbsences.flatMap(absence => absence.affectedLessons);
+    const uncoveredLessons = allAffectedLessons.filter(lesson => !lesson.isCovered);
+    
+    const lessonsByClass = groupBy(uncoveredLessons, 'classId');
+
+    return Object.entries(lessonsByClass).map(([classId, lessons]) => {
+      const schoolClass = allClasses.find(c => c.id === classId);
+      return {
+        classId,
+        className: schoolClass?.name || 'Unknown Class',
+        lessons: lessons.map(l => ({ subject: l.subject, time: l.time, absentTeacherName: l.absentTeacherName })),
+      };
+    });
+  }, [todaysAbsences, allClasses]);
+
 
   const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
@@ -286,60 +311,104 @@ export default function Home() {
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
-        {todaysAbsences && todaysAbsences.length > 0 && (
-          <Card className="border-l-4 border-l-destructive shadow-md">
-            <CardHeader className="pb-3">
-                <CardTitle className="text-xl flex items-center gap-2">
-                  <AlertTriangle className="text-destructive h-5 w-5" />
-                  מורים חסרים היום
-                </CardTitle>
-                <CardDescription>סקירה מהירה של ההיעדרויות והשיעורים המושפעים להיום.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {todaysAbsences.map((item) => {
-                      if (!item) return null;
-                      const { teacher, absences, affectedLessons } = item;
-                      const absenceTime = absences.map(a => a.isAllDay ? `יום שלם` : `${a.startTime}-${a.endTime}`).join('; ');
-                      
-                      return (
-                          <div key={teacher.id} className="flex flex-col justify-between p-4 bg-secondary/30 rounded-xl border">
-                              <div className="flex justify-between items-start">
-                                <span className="font-semibold text-lg block">{teacher.name}</span>
-                                <div className="text-xs text-center text-destructive-foreground bg-destructive/80 rounded-md px-2 py-1 font-medium">
-                                  {absenceTime}
+        <div className="grid gap-6 md:grid-cols-2">
+            {todaysAbsences && todaysAbsences.length > 0 && (
+            <Card className="border-l-4 border-l-destructive shadow-md">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-xl flex items-center gap-2">
+                    <AlertTriangle className="text-destructive h-5 w-5" />
+                    מורים חסרים היום
+                    </CardTitle>
+                    <CardDescription>סקירה מהירה של ההיעדרויות והשיעורים המושפעים להיום.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
+                    {todaysAbsences.map((item) => {
+                        if (!item) return null;
+                        const { teacher, absences, affectedLessons } = item;
+                        const absenceTime = absences.map(a => a.isAllDay ? `יום שלם` : `${a.startTime}-${a.endTime}`).join('; ');
+                        
+                        return (
+                            <div key={teacher.id} className="flex flex-col justify-between p-4 bg-secondary/30 rounded-xl border">
+                                <div className="flex justify-between items-start">
+                                    <span className="font-semibold text-lg block">{teacher.name}</span>
+                                    <div className="text-xs text-center text-destructive-foreground bg-destructive/80 rounded-md px-2 py-1 font-medium">
+                                    {absenceTime}
+                                    </div>
                                 </div>
-                              </div>
-                              {affectedLessons.length > 0 && (
-                                <div className="mt-3 space-y-2 text-sm">
-                                  <h4 className="font-medium text-muted-foreground">שיעורים מושפעים:</h4>
-                                  <ul className="space-y-1">
-                                    {affectedLessons.map((lesson, index) => (
-                                      <li key={index} className="flex items-center justify-between">
-                                        <span>{lesson.className} - {lesson.subject} ({lesson.time})</span>
-                                        {lesson.isCovered ? (
-                                          <span className="flex items-center text-green-600 dark:text-green-400">
-                                            <CheckCircle className="ml-1 h-4 w-4" />
-                                            מכוסה
-                                          </span>
-                                        ) : (
-                                          <span className="flex items-center text-destructive">
-                                            <UserX className="ml-1 h-4 w-4" />
-                                            דרוש מחליף
-                                          </span>
-                                        )}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-                          </div>
-                      );
-                  })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                                {affectedLessons.length > 0 && (
+                                    <div className="mt-3 space-y-2 text-sm">
+                                    <h4 className="font-medium text-muted-foreground">שיעורים מושפעים:</h4>
+                                    <ul className="space-y-1">
+                                        {affectedLessons.map((lesson, index) => (
+                                        <li key={index} className="flex items-center justify-between">
+                                            <span>{lesson.className} - {lesson.subject} ({lesson.time})</span>
+                                            {lesson.isCovered ? (
+                                            <span className="flex items-center text-green-600 dark:text-green-400">
+                                                <CheckCircle className="ml-1 h-4 w-4" />
+                                                מכוסה
+                                            </span>
+                                            ) : (
+                                            <span className="flex items-center text-destructive">
+                                                <UserX className="ml-1 h-4 w-4" />
+                                                דרוש מחליף
+                                            </span>
+                                            )}
+                                        </li>
+                                        ))}
+                                    </ul>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+                </CardContent>
+            </Card>
+            )}
+
+            {uncoveredClasses.length > 0 && (
+                <Card className="border-l-4 border-l-amber-500 shadow-md">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-xl flex items-center gap-2">
+                    <School className="text-amber-500 h-5 w-5" />
+                    כיתות דורשות שיבוץ
+                    </CardTitle>
+                    <CardDescription>כיתות עם שיעורים לא מכוסים להיום. לחץ על כיתה לצפייה במערכת.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
+                    {uncoveredClasses.map(({ classId, className, lessons }) => {
+                        const schoolClass = allClasses.find(c => c.id === classId);
+                        return (
+                        <div 
+                            key={classId} 
+                            className="flex flex-col justify-between p-4 bg-secondary/30 rounded-xl border transition-colors hover:bg-secondary/50 cursor-pointer"
+                            onClick={() => schoolClass && setClassToView(schoolClass)}
+                        >
+                            <span className="font-semibold text-lg block">{className}</span>
+                            <div className="mt-3 space-y-2 text-sm">
+                            <h4 className="font-medium text-muted-foreground">שיעורים לא מכוסים:</h4>
+                            <ul className="space-y-1">
+                                {lessons.map((lesson, index) => (
+                                <li key={index} className="flex items-center justify-between">
+                                    <span>{lesson.subject} ({lesson.time})</span>
+                                    <span className="text-xs text-muted-foreground">
+                                    עם {lesson.absentTeacherName}
+                                    </span>
+                                </li>
+                                ))}
+                            </ul>
+                            </div>
+                        </div>
+                        )
+                    })}
+                    </div>
+                </CardContent>
+                </Card>
+            )}
+        </div>
+
 
         <div className="space-y-6">
              <div className="w-full">
@@ -394,6 +463,16 @@ export default function Home() {
             setRecommendation(null);
             setActiveTab('timetable');
         }}
+      />
+
+      <ClassTimetableDialog
+        isOpen={!!classToView}
+        onOpenChange={(isOpen) => !isOpen && setClassToView(null)}
+        schoolClass={classToView}
+        allTeachers={teachers}
+        isEditing={false}
+        allClasses={allClasses}
+        timeSlots={timeSlots}
       />
 
     </div>
