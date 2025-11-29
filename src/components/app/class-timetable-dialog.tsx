@@ -27,7 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { X, Book, User, BookOpen, Coffee } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Combobox } from '../ui/combobox';
-import { isTeacherAvailable, isTeacherAlreadyScheduled } from '@/lib/substitute-finder';
+import { isTeacherAlreadyScheduled } from '@/lib/substitute-finder';
 import { startOfDay, addDays, getDay, format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Badge } from '../ui/badge';
@@ -85,12 +85,11 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
         const date = addDays(startOfWeek, dayIndex);
         
         return allTeachers.filter(t => {
-            const isGenerallyAvailable = isTeacherAvailable(t, date, time, timeSlots);
             const isScheduledElsewhere = isTeacherAlreadyScheduled(t.id, date, time, allClasses, schoolClass.id);
             const isCurrentTeacher = t.id === lesson?.teacherId;
-            return (isGenerallyAvailable && !isScheduledElsewhere) || isCurrentTeacher;
+            return !isScheduledElsewhere || isCurrentTeacher;
         });
-    }, [day, time, allTeachers, allClasses, schoolClass.id, lesson?.teacherId, timeSlots]);
+    }, [day, time, allTeachers, allClasses, schoolClass.id, lesson?.teacherId]);
 
 
     const qualifiedTeachersForSlot = useMemo(() => {
@@ -120,6 +119,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
     };
     
     const currentTeacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
+    const canSave = (subject && teacherId) || (!subject && !classId);
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -178,7 +178,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
                             <X className="w-4 h-4 ml-2"/>
                             נקה שיבוץ
                         </Button>
-                        <Button size="sm" onClick={handleSave} disabled={!(subject && teacherId)}>שמור</Button>
+                        <Button size="sm" onClick={handleSave} disabled={!canSave}>שמור</Button>
                     </div>
                 </div>
             </PopoverContent>
