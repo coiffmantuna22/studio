@@ -36,14 +36,14 @@ interface RecommendationDialogProps {
     absentTeacher: Teacher;
     absenceDays: any[];
   } | null;
-  onConfirmAssignments: (absentTeacher: Teacher, absenceDays: any[], assignments: any[]) => void;
+  onConfirm: () => void;
 }
 
 export default function RecommendationDialog({
   isOpen,
   onOpenChange,
   recommendationResult,
-  onConfirmAssignments,
+  onConfirm,
 }: RecommendationDialogProps) {
 
   if (!recommendationResult) return null;
@@ -53,32 +53,13 @@ export default function RecommendationDialog({
   const lessonsByDay = groupBy(results, (res) => daysOfWeek[getDay(res.date)]);
   const orderedDays = daysOfWeek.filter(day => lessonsByDay[day]);
 
-  const handleConfirm = () => {
-    const finalAssignments = results.map(res => {
-      // Automatically use the recommended teacher
-      const recommendation = res.substituteOptions?.find(sub => sub.id === res.recommendationId);
-      const newTeacherId = res.recommendationId;
-      return {
-        classId: res.classId,
-        className: res.className,
-        day: daysOfWeek[getDay(res.date)],
-        time: res.time,
-        newTeacherId: newTeacherId,
-        newTeacherName: recommendation?.name,
-        originalLesson: res.lesson
-      }
-    });
-    
-    onConfirmAssignments(absentTeacher, absenceDays, finalAssignments);
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg md:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>המלצות שיבוץ עבור {absentTeacher.name}</DialogTitle>
+          <DialogTitle>שיעורים מושפעים עבור {absentTeacher.name}</DialogTitle>
           <DialogDescription>
-            להלן השיעורים המושפעים והמחליפים המומלצים. לחץ על "אישור" כדי לעדכן את המערכת.
+            להלן השיעורים המושפעים מההיעדרות. לחץ על "אישור" כדי לעבור לטבלת הזמינות ולשבץ מחליפים.
           </DialogDescription>
         </DialogHeader>
 
@@ -152,7 +133,7 @@ export default function RecommendationDialog({
               ביטול
             </Button>
           </DialogClose>
-           <Button type="button" onClick={handleConfirm}>
+           <Button type="button" onClick={onConfirm}>
               אישור
             </Button>
         </DialogFooter>
@@ -160,4 +141,5 @@ export default function RecommendationDialog({
     </Dialog>
   );
 }
+
 

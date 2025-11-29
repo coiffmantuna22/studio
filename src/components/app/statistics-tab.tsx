@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, Query } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,23 +11,11 @@ import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import type { SubstitutionRecord } from '@/lib/types';
 
-export default function StatisticsTab() {
-  const { user } = useUser();
-  const firestore = useFirestore();
+interface StatisticsTabProps {
+    substitutions: Query | null;
+}
 
-  // Query for substitutions in the last 30 days
-  // Note: We'll filter by date client-side for simplicity if complex querying is an issue, 
-  // but ideally we'd use a compound query. For now, let's just get the recent ones.
-  const substitutionsQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(
-      collection(firestore, 'substitutions'),
-      where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc'),
-      limit(100) // Limit to last 100 for performance
-    );
-  }, [user, firestore]);
-
+export default function StatisticsTab({ substitutions: substitutionsQuery }: StatisticsTabProps) {
   const { data: substitutions = [], isLoading } = useCollection<SubstitutionRecord>(substitutionsQuery);
 
   const filteredSubstitutions = useMemo(() => {

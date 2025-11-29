@@ -2,7 +2,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { findSubstitute } from '@/lib/substitute-finder';
 import type { Teacher, AbsenceDay, SchoolClass, AffectedLesson, TimeSlot } from '@/lib/types';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -56,9 +55,6 @@ interface MarkAbsentDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   teacher: Teacher | null;
-  allTeachers: Teacher[];
-  allClasses: SchoolClass[];
-  timeSlots: TimeSlot[];
   getAffectedLessons: (
     absentTeacher: Teacher,
     absenceDays: AbsenceDay[],
@@ -70,6 +66,7 @@ interface MarkAbsentDialogProps {
     absentTeacher: Teacher,
     absenceDays: AbsenceDay[]
   ) => void;
+  onConfirm: (teacher: Teacher, absenceDays: AbsenceDay[]) => void;
 }
 
 
@@ -77,11 +74,9 @@ export default function MarkAbsentDialog({
   isOpen,
   onOpenChange,
   teacher,
-  allTeachers,
-  allClasses,
-  timeSlots,
   onShowRecommendation,
   getAffectedLessons,
+  onConfirm,
 }: MarkAbsentDialogProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -119,41 +114,18 @@ export default function MarkAbsentDialog({
   const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
     try {
-      const substituteProfiles = allTeachers.filter((t) => t.id !== teacher.id);
-      
-      const affectedLessons = getAffectedLessons(teacher, values.absencePeriods, allClasses, timeSlots);
-
-      const recommendationPromises = affectedLessons.map(affected => 
-        findSubstitute(
-          {
-            subject: affected.lesson.subject,
-            date: affected.date,
-            time: affected.time
-          },
-          substituteProfiles,
-          allClasses,
-          timeSlots
-        )
-      );
-      
-      const recommendations = await Promise.all(recommendationPromises);
-      
-      const finalResults = affectedLessons.map((lesson, index) => ({
-        ...lesson,
-        recommendation: recommendations[index].recommendation,
-        recommendationId: recommendations[index].recommendationId,
-        reasoning: recommendations[index].reasoning,
-        substituteOptions: recommendations[index].substituteOptions,
-      }));
-
-      onShowRecommendation(finalResults, teacher, values.absencePeriods);
+      onConfirm(teacher, values.absencePeriods);
+      toast({
+        title: 'היעדרות נרשמה',
+        description: `ההיעדרות של ${teacher.name} עודכנה במערכת.`,
+      });
       onOpenChange(false);
     } catch (error) {
-      console.error('שגיאה בקבלת המלצות:', error);
+      console.error('שגיאה ברישום היעדרות:', error);
       toast({
         variant: 'destructive',
         title: 'שגיאה',
-        description: 'לא ניתן היה להפיק המלצות למחליפים. אנא נסה שוב.',
+        description: 'לא ניתן היה לרשום את ההיעדרות. אנא נסה שוב.',
       });
     } finally {
       setIsSubmitting(false);
@@ -175,7 +147,7 @@ export default function MarkAbsentDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>סימון היעדרות עבור {teacher.name}</DialogTitle>
-          <DialogDescription>בחר את תאריכי ושעות ההיעדרות כדי למצוא מחליף. המערכת תציג את כל השיעורים המושפעים.</DialogDescription>
+          <DialogDescription>בחר את תאריכי ושעות ההיעדרות. לאחר אישור, תוכל לראות את השיעורים המושפעים ולשבץ מחליפים.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
@@ -305,7 +277,7 @@ export default function MarkAbsentDialog({
             />
             
             {form.formState.errors.absencePeriods && (
-                 <p className="text-sm font-medium text-destructive">{form.formState.errors.absencePeriods.message}</p>
+                 <p className="text-sm font-medium text-destructive">{form.formState.errors.absencePeriods.message || form.formState.errors.absencePeriods?.root?.message}</p>
             )}
 
             <DialogFooter>
@@ -313,10 +285,10 @@ export default function MarkAbsentDialog({
                 {isSubmitting ? (
                   <>
                     <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                    מחפש המלצות...
+                    רושם היעדרות...
                   </>
                 ) : (
-                  'הצג שיעורים מושפעים'
+                  'אישור ורישום היעדרות'
                 )}
               </Button>
             </DialogFooter>
