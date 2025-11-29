@@ -79,17 +79,12 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
     }, [lesson, isOpen]);
 
     const availableTeachersForSlot = useMemo(() => {
-        const dayIndex = daysOfWeek.indexOf(day);
-        const today = startOfDay(new Date());
-        const startOfWeek = getStartOfWeek(today);
-        const date = addDays(startOfWeek, dayIndex);
-        
         return allTeachers.filter(t => {
-            const isScheduledElsewhere = isTeacherAlreadyScheduled(t.id, date, time, allClasses, schoolClass.id);
+            const isScheduledElsewhere = isTeacherAlreadyScheduled(t.id, new Date(), time, allClasses, schoolClass.id);
             const isCurrentTeacher = t.id === lesson?.teacherId;
             return !isScheduledElsewhere || isCurrentTeacher;
         });
-    }, [day, time, allTeachers, allClasses, schoolClass.id, lesson?.teacherId]);
+    }, [time, allTeachers, allClasses, schoolClass.id, lesson?.teacherId]);
 
 
     const qualifiedTeachersForSlot = useMemo(() => {
@@ -119,7 +114,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
     };
     
     const currentTeacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
-    const canSave = (subject && teacherId) || (!subject && !classId);
+    const canSave = (subject && teacherId) || (!subject && !teacherId);
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
