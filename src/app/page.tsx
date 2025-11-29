@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Header from '@/components/app/header';
-import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay, SubstitutionRecord } from '@/lib/types';
+import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay } from '@/lib/types';
 import { startOfDay, getDay, format, isSameDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 
@@ -44,6 +44,7 @@ const getAffectedLessons = (
   const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
   const getMinutes = (time: string) => {
+    if (!time || !time.includes(':')) return 0;
     const [h, m] = time.split(':').map(Number);
     return h * 60 + m;
   };
@@ -153,7 +154,6 @@ export default function Home() {
 
   const handleDeleteTeacher = async (teacherId: string) => {
     if (!firestore || !user) return;
-
     const batch = writeBatch(firestore);
     try {
         const teacherRef = doc(firestore, 'teachers', teacherId);
@@ -224,7 +224,6 @@ export default function Home() {
 
   const handleDeleteClass = async (classId: string) => {
     if (!firestore || !user) return;
-
     const batch = writeBatch(firestore);
      try {
         const classRef = doc(firestore, "classes", classId);
@@ -435,7 +434,12 @@ const handleScheduleUpdate = async (
         data: { absences: '...' }
     });
 
-    setRecommendation(null);
+    const affected = getAffectedLessons(absentTeacher, newAbsenceData, schoolClasses, timeSlots);
+    if(affected.length > 0) {
+       setAbsenceToReview({teacher: absentTeacher, absences: newAbsenceData})
+    } else {
+        setRecommendation(null);
+    }
   };
 
   const todaysAbsences = useMemo(() => {

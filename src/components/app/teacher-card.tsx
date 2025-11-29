@@ -22,6 +22,7 @@ import {
 } from '../ui/dropdown-menu';
 import { MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 interface TeacherCardProps {
@@ -62,8 +63,10 @@ const AvailabilityBadge = ({ status }: { status: TeacherAvailabilityStatus }) =>
 }
 
 export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, onViewSchedule, availabilityStatus }: TeacherCardProps) {
+  const isMobile = useIsMobile();
+  
   return (
-    <Card className="flex flex-col transition-all hover:shadow-lg hover:scale-105 duration-300 ease-in-out">
+    <Card className="flex flex-col transition-all hover:shadow-lg">
       <CardHeader className="flex flex-row items-start gap-4">
         <Avatar className="h-12 w-12 border-2 border-primary/20">
           <AvatarFallback className='bg-primary/10 text-primary font-bold'>{teacher.avatar.fallback}</AvatarFallback>
@@ -82,6 +85,15 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onViewSchedule}>
+              <CalendarClock className="ml-2 h-4 w-4" />
+              צפה במערכת
+            </DropdownMenuItem>
+             <DropdownMenuItem onClick={onMarkAbsent}>
+              <UserX className="ml-2 h-4 w-4" />
+              סמן היעדרות
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onEdit}>
               <Pencil className="ml-2 h-4 w-4" />
               עריכת פרופיל
@@ -119,16 +131,18 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
           </div>
         </div>
       </CardContent>
-      <CardFooter className="grid grid-cols-2 gap-2">
-         <Button variant="outline" className="w-full" onClick={onViewSchedule}>
-          <CalendarClock className="ml-2 h-4 w-4" />
-          צפה במערכת
-        </Button>
-        <Button variant="destructive" className="w-full" onClick={onMarkAbsent}>
-          <UserX className="ml-2 h-4 w-4" />
-          סמן היעדרות
-        </Button>
-      </CardFooter>
+      {!isMobile && (
+        <CardFooter className="grid grid-cols-2 gap-2">
+          <Button variant="outline" className="w-full" onClick={onViewSchedule}>
+            <CalendarClock className="ml-2 h-4 w-4" />
+            צפה במערכת
+          </Button>
+          <Button variant="destructive" className="w-full" onClick={onMarkAbsent}>
+            <UserX className="ml-2 h-4 w-4" />
+            סמן היעדרות
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   );
 }
