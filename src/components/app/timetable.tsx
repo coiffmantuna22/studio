@@ -86,7 +86,7 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="w-full whitespace-nowrap rounded-md border" viewportClassName="relative">
+        <ScrollArea className="w-full whitespace-nowrap rounded-md border">
             <table className="w-full text-sm text-center table-fixed">
                 <thead>
                     <tr className="bg-muted/40">

@@ -301,7 +301,7 @@ export default function ClassTimetableDialog({
             </div>
             
             <TabsContent value="all">
-                <ScrollArea className="w-full whitespace-nowrap rounded-md border mt-4" viewportClassName="relative">
+                <ScrollArea className="w-full whitespace-nowrap rounded-md border mt-4">
                   <table className="w-full text-sm text-center table-fixed">
                     <thead className='bg-muted/40'>
                       <tr className='bg-muted/40'>
@@ -369,7 +369,7 @@ export default function ClassTimetableDialog({
             </TabsContent>
             {daysOfWeek.map(day => (
               <TabsContent key={day} value={day}>
-                <ScrollArea className="w-full whitespace-nowrap rounded-md border mt-4" viewportClassName="relative">
+                <ScrollArea className="w-full whitespace-nowrap rounded-md border mt-4">
                   <DayView day={day} />
                   <ScrollBar orientation="horizontal" />
                 </ScrollArea>
@@ -389,5 +389,3 @@ export default function ClassTimetableDialog({
     </Dialog>
   );
 }
-
-    
