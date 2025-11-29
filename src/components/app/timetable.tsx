@@ -85,13 +85,13 @@ const AssignSubstituteDialog = ({
                 </DialogHeader>
                 {lessonsToCover.length > 0 && (
                   <div className="py-4">
-                      <RadioGroup onValueChange={setSelectedLessonId}>
+                      <RadioGroup onValueChange={setSelectedLessonId} dir='rtl'>
                           {lessonsToCover.map((l, index) => {
                               const id = `${l.schoolClass.id}-${l.lesson.subject}-${l.time}`;
                               return (
                                   <div key={`${id}-${index}`} className="flex items-center space-x-2 space-x-reverse">
                                       <RadioGroupItem value={id} id={id} />
-                                      <Label htmlFor={id} className="flex flex-col">
+                                      <Label htmlFor={id} className="flex flex-col cursor-pointer">
                                           <span>{l.schoolClass.name} - {l.lesson.subject} ({l.time})</span>
                                           <span className='text-xs text-muted-foreground'>מורה חסר: {l.absentTeacher.name}</span>
                                       </Label>
@@ -369,19 +369,22 @@ export default function Timetable({}: TimetableProps) {
         </CardDescription>
         <div className="mt-4 pt-4 border-t">
           <RadioGroup 
+              dir='rtl'
               defaultValue="in_school" 
-              className="flex items-center gap-4"
+              className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6"
               onValueChange={setAvailabilityFilter}
               value={availabilityFilter}
             >
-              <Label className="font-normal text-sm">הצג:</Label>
-              <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="in_school" id="filter-in_school" />
-                  <Label htmlFor="filter-in_school" className="font-normal">פנויים בביה"ס</Label>
-              </div>
-              <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="all_not_teaching" id="filter-all_not_teaching" />
-                  <Label htmlFor="filter-all_not_teaching" className="font-normal">כלל הלא-מלמדים</Label>
+              <Label className="font-semibold text-sm shrink-0">הצג:</Label>
+              <div className='flex items-center gap-4'>
+                <div className="flex items-center space-x-2 space-x-reverse">
+                    <RadioGroupItem value="in_school" id="filter-in_school" />
+                    <Label htmlFor="filter-in_school" className="font-normal cursor-pointer">פנויים בביה"ס</Label>
+                </div>
+                <div className="flex items-center space-x-2 space-x-reverse">
+                    <RadioGroupItem value="all_not_teaching" id="filter-all_not_teaching" />
+                    <Label htmlFor="filter-all_not_teaching" className="font-normal cursor-pointer">כלל הלא-מלמדים</Label>
+                </div>
               </div>
           </RadioGroup>
         </div>
@@ -472,7 +475,3 @@ export default function Timetable({}: TimetableProps) {
     </>
   );
 }
-
-    
-
-    
