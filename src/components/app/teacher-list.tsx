@@ -30,8 +30,6 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { getTeacherAvailabilityStatus } from '@/lib/substitute-finder';
 import { Loader2 } from 'lucide-react';
 import type { ClassSchedule } from '@/lib/types';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Label } from '../ui/label';
 
 
 interface TeacherListProps {
@@ -50,8 +48,6 @@ export default function TeacherList({
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const [teacherToViewSchedule, setTeacherToViewSchedule] = useState<Teacher | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [availabilityFilter, setAvailabilityFilter] = useState('all'); // 'all' or 'available'
-
 
   const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
   const { data: teachers = [], isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
@@ -269,19 +265,9 @@ export default function TeacherList({
     setTeacherToEdit(null);
   };
 
-  const filteredTeachers = useMemo(() => {
-    return (teachers || [])
-      .filter(teacher => 
-        teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      .filter(teacher => {
-        if (availabilityFilter === 'all') return true;
-        if (availabilityFilter === 'available') {
-            return teacherAvailabilityNow.get(teacher.id) === 'available';
-        }
-        return true;
-      });
-  }, [teachers, searchTerm, availabilityFilter, teacherAvailabilityNow]);
+  const filteredTeachers = (teachers || []).filter(teacher =>
+    teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (teachersLoading) {
       return <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -311,25 +297,6 @@ export default function TeacherList({
                     />
                 </div>
             </div>
-        </div>
-        <div className="mt-4 pt-4 border-t">
-          <RadioGroup 
-              dir='rtl'
-              defaultValue="all" 
-              className="flex items-center gap-4"
-              onValueChange={setAvailabilityFilter}
-              value={availabilityFilter}
-            >
-              <Label className="font-semibold text-sm">סנן לפי:</Label>
-              <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="all" id="filter-all" />
-                  <Label htmlFor="filter-all" className="font-normal cursor-pointer">כל המורים</Label>
-              </div>
-              <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="available" id="filter-available" />
-                  <Label htmlFor="filter-available" className="font-normal cursor-pointer">פנויים כעת</Label>
-              </div>
-          </RadioGroup>
         </div>
       </CardHeader>
 
@@ -369,7 +336,7 @@ export default function TeacherList({
                  <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-12 text-center">
                     <h3 className="text-lg font-semibold text-foreground">לא נמצאו מורים תואמים</h3>
                     <p className="mt-2 text-sm text-muted-foreground">
-                        נסה מונח חיפוש אחר או שנה את אפשרויות הסינון.
+                        נסה מונח חיפוש אחר.
                     </p>
                 </div>
             )

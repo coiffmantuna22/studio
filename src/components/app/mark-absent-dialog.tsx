@@ -56,6 +56,7 @@ interface MarkAbsentDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   teacher: Teacher | null;
+  existingAbsences?: AbsenceDay[] | null;
   onConfirm: (teacher: Teacher, absenceDays: AbsenceDay[]) => void;
 }
 
@@ -64,10 +65,12 @@ export default function MarkAbsentDialog({
   isOpen,
   onOpenChange,
   teacher,
+  existingAbsences,
   onConfirm,
 }: MarkAbsentDialogProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isEditMode = !!existingAbsences && existingAbsences.length > 0;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -77,25 +80,29 @@ export default function MarkAbsentDialog({
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: "absencePeriods",
   });
 
   useEffect(() => {
     if (!isOpen) {
-      form.reset({
-        reason: '',
-        absencePeriods: [],
-      });
+      form.reset({ reason: '', absencePeriods: [] });
       setIsSubmitting(false);
     } else {
-       form.reset({
-        reason: '',
-        absencePeriods: [{ date: startOfDay(new Date()), isAllDay: true, startTime: '08:00', endTime: '16:00' }],
-      });
+       if (isEditMode && existingAbsences) {
+            const absencesToEdit = existingAbsences.map(abs => ({
+                date: typeof abs.date === 'string' ? new Date(abs.date) : abs.date,
+                isAllDay: abs.isAllDay,
+                startTime: abs.startTime,
+                endTime: abs.endTime
+            }));
+            replace(absencesToEdit);
+       } else {
+            replace([{ date: startOfDay(new Date()), isAllDay: true, startTime: '08:00', endTime: '16:00' }]);
+       }
     }
-  }, [isOpen, form]);
+  }, [isOpen, isEditMode, existingAbsences, form, replace]);
 
   if (!teacher) return null;
 
@@ -104,7 +111,7 @@ export default function MarkAbsentDialog({
     try {
       await onConfirm(teacher, values.absencePeriods);
       toast({
-        title: 'היעדרות נרשמה',
+        title: isEditMode ? 'היעדרות עודכנה' : 'היעדרות נרשמה',
         description: `ההיעדרות של ${teacher.name} עודכנה במערכת.`,
       });
       onOpenChange(false);
@@ -134,8 +141,13 @@ export default function MarkAbsentDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>סימון היעדרות עבור {teacher.name}</DialogTitle>
-          <DialogDescription>בחר את תאריכי ושעות ההיעדרות. לאחר אישור, ההיעדרות תירשם במערכת.</DialogDescription>
+          <DialogTitle>{isEditMode ? `עריכת היעדרות עבור ${teacher.name}` : `סימון היעדרות עבור ${teacher.name}`}</DialogTitle>
+          <DialogDescription>
+            {isEditMode
+              ? 'עדכן את פרטי ההיעדרות ולחץ על אישור.'
+              : 'בחר את תאריכי ושעות ההיעדרות. לאחר אישור, ההיעדרות תירשם במערכת.'
+            }
+            </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
@@ -281,10 +293,10 @@ export default function MarkAbsentDialog({
                 {isSubmitting ? (
                   <>
                     <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                    רושם היעדרות...
+                    {isEditMode ? 'מעדכן...' : 'רושם היעדרות...'}
                   </>
                 ) : (
-                  'אישור ורישום היעדרות'
+                  isEditMode ? 'אישור ועריכה' : 'אישור ורישום'
                 )}
               </Button>
             </DialogFooter>

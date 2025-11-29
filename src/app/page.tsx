@@ -7,7 +7,7 @@ import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { Loader2, AlertTriangle, CheckCircle, UserX, School } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, UserX, School, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { format, isSameDay, startOfDay } from 'date-fns';
@@ -44,7 +44,7 @@ export default function Home() {
   const firestore = useFirestore();
 
   const [activeTab, setActiveTab] = useState("teachers");
-  const [teacherToMarkAbsent, setTeacherToMarkAbsent] = useState<Teacher | null>(null);
+  const [teacherToMarkAbsent, setTeacherToMarkAbsent] = useState<{teacher: Teacher, existingAbsences?: AbsenceDay[]} | null>(null);
   const [classToView, setClassToView] = useState<SchoolClass | null>(null);
   const [recommendation, setRecommendation] = useState<{
     results: any[];
@@ -88,14 +88,14 @@ export default function Home() {
 
   const todaysAbsences = useMemo(() => {
     const today = startOfDay(new Date());
-    const dayOfWeek = daysOfWeek[today.getDay()];
-
+    
     return (teachers || [])
       .map(teacher => {
         const todaysTeacherAbsences = (teacher.absences || []).filter(absence => {
-          if (typeof absence.date !== 'string') return false;
+          if (typeof absence.date !== 'string' && !(absence.date instanceof Date)) return false;
           try {
-            return isSameDay(startOfDay(new Date(absence.date)), today);
+            const absenceDate = typeof absence.date === 'string' ? new Date(absence.date) : absence.date;
+            return isSameDay(startOfDay(absenceDate), today);
           } catch (e) {
             return false;
           }
@@ -103,6 +103,7 @@ export default function Home() {
 
         if (todaysTeacherAbsences.length === 0) return null;
 
+        const dayOfWeek = daysOfWeek[today.getDay()];
         const affectedLessons: any[] = [];
         
         const teacherScheduleForToday = teacher.schedule?.[dayOfWeek] || {};
@@ -133,7 +134,7 @@ export default function Home() {
 
         return { teacher, absences: todaysTeacherAbsences, affectedLessons };
       })
-      .filter(item => item !== null);
+      .filter(item => item !== null && item.absences.length > 0);
   }, [teachers, allClasses, allSubstitutions]);
 
 
@@ -252,9 +253,9 @@ export default function Home() {
     const newAbsenceDates = absenceDays.map(d => startOfDay(new Date(d.date)).getTime());
     const updatedAbsences = (absentTeacher.absences || []).filter(
       (existing) => {
-         if (typeof existing.date !== 'string') return true;
+         const existingDate = typeof existing.date === 'string' ? new Date(existing.date) : existing.date;
          try {
-            return !newAbsenceDates.includes(startOfDay(new Date(existing.date)).getTime())
+            return !newAbsenceDates.includes(startOfDay(existingDate).getTime())
          } catch(e) {
             return true;
          }
@@ -340,10 +341,21 @@ export default function Home() {
                         return (
                             <div key={teacher.id} className="flex flex-col justify-between p-4 bg-secondary/30 rounded-xl border">
                                 <div className="flex justify-between items-start">
-                                    <span className="font-semibold text-lg block">{teacher.name}</span>
-                                    <div className="text-xs text-center text-destructive-foreground bg-destructive/80 rounded-md px-2 py-1 font-medium">
-                                    {absenceTime}
+                                    <div className="flex-1">
+                                        <span className="font-semibold text-lg block">{teacher.name}</span>
+                                        <div className="text-xs text-center text-destructive-foreground bg-destructive/80 rounded-md px-2 py-1 font-medium inline-block mt-1">
+                                        {absenceTime}
+                                        </div>
                                     </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 -mr-2"
+                                        onClick={() => setTeacherToMarkAbsent({ teacher, existingAbsences: absences })}
+                                    >
+                                        <Edit className="h-4 w-4 text-muted-foreground" />
+                                        <span className="mr-1">ערוך</span>
+                                    </Button>
                                 </div>
                                 {affectedLessons.length > 0 && (
                                     <div className="mt-3 space-y-2 text-sm">
@@ -443,7 +455,7 @@ export default function Home() {
               {activeTab === "teachers" && (
                 <div className="mt-0">
                   <TeacherList
-                    onMarkAbsent={(teacher) => setTeacherToMarkAbsent(teacher)}
+                    onMarkAbsent={(teacher) => setTeacherToMarkAbsent({teacher})}
                   />
                 </div>
               )}
@@ -472,7 +484,8 @@ export default function Home() {
        <MarkAbsentDialog
         isOpen={!!teacherToMarkAbsent}
         onOpenChange={(open) => !open && setTeacherToMarkAbsent(null)}
-        teacher={teacherToMarkAbsent}
+        teacher={teacherToMarkAbsent?.teacher ?? null}
+        existingAbsences={teacherToMarkAbsent?.existingAbsences}
         onConfirm={handleMarkAbsent}
       />
 
