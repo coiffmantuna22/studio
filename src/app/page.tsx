@@ -157,9 +157,17 @@ export default function Home() {
 
   const handleDeleteTeacher = async (teacherId: string) => {
     if (!firestore || !user) return;
-    
+
     const batch = writeBatch(firestore);
     try {
+        const teacherRef = doc(firestore, 'teachers', teacherId);
+        const teacherSnap = await getDoc(teacherRef);
+        if (!teacherSnap.exists()) return;
+
+        // Clear schedule for the teacher being deleted
+        batch.update(teacherRef, { schedule: {} });
+
+        // Remove teacher from any class schedules
         const classesQuerySnapshot = await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)));
         
         classesQuerySnapshot.forEach(classDoc => {
@@ -185,7 +193,7 @@ export default function Home() {
           }
         });
 
-        const teacherRef = doc(firestore, 'teachers', teacherId);
+        // Finally, delete the teacher document
         batch.delete(teacherRef);
 
         await commitBatchWithContext(batch, {
