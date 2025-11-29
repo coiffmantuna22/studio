@@ -54,6 +54,7 @@ export interface AffectedLesson {
     recommendation: string | null;
     recommendationId: string | null;
     reasoning: string | null;
+    substituteOptions: Teacher[];
 }
 
 export interface TimeSlot {

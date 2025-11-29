@@ -12,6 +12,7 @@ interface FindSubstituteResult {
   recommendation: string | null;
   recommendationId: string | null;
   reasoning: string | null;
+  substituteOptions: Teacher[];
 }
 
 const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -72,10 +73,6 @@ export function isTeacherAvailable(teacher: Teacher, date: Date, time: string, t
   const lessonSlot = timeSlots.find(s => s.start === time);
   if (!lessonSlot) return false;
 
-  const status = getTeacherAvailabilityStatus(teacher, date, timeSlots);
-
-  // For substitution purposes, we only care if they are 'available' at the specific lesson time
-  // which means we need to check their schedule for that *specific* slot, not just the current time.
   const dayOfWeek = dayMap[getDay(date)];
   const availabilityForDay = teacher.availability.find(a => a.day === dayOfWeek);
   if (!availabilityForDay) return false;
@@ -148,36 +145,39 @@ export async function findSubstitute(
       return {
           recommendation: null,
           recommendationId: null,
-          reasoning: 'לא נמצאו מורים פנויים (נוכחים בבית הספר אך ללא שיעור) בשעה זו.',
+          reasoning: 'לא נמצאו מורים פנויים.',
+          substituteOptions: [],
       };
   }
   
   let qualifiedTeachers = availableTeachers.filter(t => t.subjects.includes(lessonDetails.subject));
+  let substituteOptions: Teacher[] = [];
+  let bestChoice: Teacher | null = null;
+  let reasoning: string | null = null;
 
-  if (qualifiedTeachers.length === 0) {
-     const bestOfWorst = availableTeachers[0]; // Just take the first available
-      return {
-        recommendation: bestOfWorst.name,
-        recommendationId: bestOfWorst.id,
-        reasoning: `שימו לב: לא נמצא מורה פנוי המוכשר ב${lessonDetails.subject}. ${bestOfWorst.name} מוצע/ת כמפקח/ת בלבד מאחר והוא/היא זמין/ה.`,
-    };
-  }
-  
-  const scoredTeachers = qualifiedTeachers.map(teacher => ({
-    teacher,
-    score: scoreTeacher(teacher, lessonDetails),
-  })).sort((a, b) => b.score - a.score);
+  if (qualifiedTeachers.length > 0) {
+      const scoredTeachers = qualifiedTeachers.map(teacher => ({
+        teacher,
+        score: scoreTeacher(teacher, lessonDetails),
+      })).sort((a, b) => b.score - a.score);
+      
+      bestChoice = scoredTeachers[0].teacher;
+      reasoning = `${bestChoice.name} מומלץ/ת כי הוא/היא פנוי/ה ומוכשר/ת ב${lessonDetails.subject}.`;
+      if (bestChoice.preferences) {
+          reasoning += ` העדפות: ${bestChoice.preferences}.`
+      }
+      substituteOptions = qualifiedTeachers;
 
-  const bestChoice = scoredTeachers[0].teacher;
-  
-  let reasoning = `${bestChoice.name} פנוי/ה ומוכשר/ת ב${lessonDetails.subject}.`;
-  if (bestChoice.preferences) {
-      reasoning += ` העדפות: ${bestChoice.preferences}.`
+  } else { // No qualified teachers, suggest any available teacher
+     bestChoice = availableTeachers[0];
+     reasoning = `שימו לב: לא נמצא מורה פנוי המוכשר ב${lessonDetails.subject}. ${bestChoice.name} מוצע/ת כמפקח/ת בלבד.`;
+     substituteOptions = availableTeachers;
   }
 
   return {
-    recommendation: bestChoice.name,
-    recommendationId: bestChoice.id,
+    recommendation: bestChoice?.name || null,
+    recommendationId: bestChoice?.id || null,
     reasoning: reasoning,
+    substituteOptions: substituteOptions,
   };
 }

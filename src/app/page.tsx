@@ -34,7 +34,7 @@ export default function Home() {
   const [recommendation, setRecommendation] = useState<{
     results: any[];
     absentTeacher: Teacher;
-    newClassSchedules: any;
+    absenceDays: any[];
   } | null>(null);
 
 
@@ -421,7 +421,7 @@ const handleScheduleUpdate = async (
   const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
       
-      const isInitialSetup = timeSlots.length === 0 && teachers.length === 0 && schoolClasses.length === 0;
+      const isInitialSetup = timeSlots.length === 0 && (teachers?.length ?? 0) === 0 && (schoolClasses?.length ?? 0) === 0;
 
       const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
       const timetableData = { slots: newTimeSlots, userId: user.uid };
@@ -439,15 +439,48 @@ const handleScheduleUpdate = async (
       }
   }
 
-  const handleMarkAbsent = async (teacherId: string, absenceDays: any[]) => {
+  const handleMarkAbsent = async (absentTeacher: Teacher, absenceDays: any[], assignments: any) => {
     if (!firestore || !user) return;
-    const teacherRef = doc(firestore, 'teachers', teacherId);
     
-    const absenceData = absenceDays.map(d => ({...d, date: d.date.toISOString()}));
-
     const batch = writeBatch(firestore);
+
+    // 1. Mark teacher as absent
+    const teacherRef = doc(firestore, 'teachers', absentTeacher.id);
+    const absenceData = absenceDays.map(d => ({...d, date: d.date.toISOString()}));
     batch.update(teacherRef, { absences: absenceData });
-    await commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: { absences: absenceData, userId: user.uid } });
+
+    const allCurrentSchedules = new Map<string, ClassSchedule>();
+
+    for (const assignment of assignments) {
+      const { classId, day, time, newTeacherId, originalLesson } = assignment;
+      
+      if (!allCurrentSchedules.has(classId)) {
+          const classToUpdate = schoolClasses.find(c => c.id === classId);
+          if (classToUpdate) {
+              allCurrentSchedules.set(classId, JSON.parse(JSON.stringify(classToUpdate.schedule)));
+          }
+      }
+      
+      const classSchedule = allCurrentSchedules.get(classId);
+      if (classSchedule) {
+          if (!classSchedule[day]) classSchedule[day] = {};
+
+          if (newTeacherId) { // Assign new teacher
+              classSchedule[day][time] = { ...originalLesson, teacherId: newTeacherId };
+          } else { // Unassign
+              classSchedule[day][time] = null;
+          }
+      }
+    }
+    
+    // Apply all schedule updates to the batch
+    for (const [classId, schedule] of allCurrentSchedules.entries()) {
+        const classRef = doc(firestore, 'classes', classId);
+        await handleScheduleUpdate('class', classId, schedule);
+    }
+    
+    await commitBatchWithContext(batch, { operation: 'update', path: `absences_and_substitutions` });
+    setRecommendation(null);
   }
 
   const todaysAbsences = useMemo(() => {
@@ -568,20 +601,7 @@ const handleScheduleUpdate = async (
         allClasses={schoolClasses}
         timeSlots={timeSlots}
         onShowRecommendation={(results, absentTeacher, absenceDays) => {
-            const updatedClasses = JSON.parse(JSON.stringify(schoolClasses));
-            results.forEach(res => {
-                if (res.recommendationId) {
-                    const classToUpdate = updatedClasses.find((c: SchoolClass) => c.id === res.classId);
-                    if (classToUpdate) {
-                        const dayOfWeek = daysOfWeek[new Date(res.date).getDay()];
-                        if(classToUpdate.schedule[dayOfWeek]?.[res.time]) {
-                            classToUpdate.schedule[dayOfWeek][res.time]!.teacherId = res.recommendationId;
-                        }
-                    }
-                }
-            });
-            handleMarkAbsent(absentTeacher.id, absenceDays);
-            setRecommendation({ results, absentTeacher, newClassSchedules: updatedClasses });
+            setRecommendation({ results, absentTeacher, absenceDays });
         }}
       />
 
@@ -589,18 +609,9 @@ const handleScheduleUpdate = async (
         isOpen={!!recommendation}
         onOpenChange={(open) => !open && setRecommendation(null)}
         recommendationResult={recommendation}
-        onTimetablesUpdate={() => {
-            if (!recommendation) return;
-            const updates: Promise<any>[] = [];
-            recommendation.newClassSchedules.forEach((sc: SchoolClass) => {
-                updates.push(handleScheduleUpdate('class', sc.id, sc.schedule));
-            });
-            Promise.all(updates).then(() => setRecommendation(null));
-        }}
+        onConfirmAssignments={handleMarkAbsent}
       />
 
     </div>
   );
 }
-
-    

@@ -18,7 +18,6 @@ import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
-import { Alert, AlertDescription } from '../ui/alert';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
 
@@ -77,7 +76,7 @@ const getAffectedLessons = (
   allClasses: SchoolClass[],
   timeSlots: TimeSlot[]
 ): AffectedLesson[] => {
-  const affected: AffectedLesson[] = [];
+  const affected: Omit<AffectedLesson, 'recommendation' | 'recommendationId' | 'reasoning' | 'substituteOptions'>[] = [];
   const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
   absenceDays.forEach(day => {
@@ -102,9 +101,6 @@ const getAffectedLessons = (
               date: day.date,
               time: time,
               lesson: lesson,
-              recommendation: null,
-              recommendationId: null,
-              reasoning: null,
             });
           }
         });
@@ -112,6 +108,7 @@ const getAffectedLessons = (
     });
   });
 
+  // @ts-ignore
   return affected;
 };
 
@@ -181,19 +178,8 @@ export default function MarkAbsentDialog({
       const endOfWeek = addDays(today, 6 - getDay(today));
       
       const affectedLessons = getAffectedLessons(teacher, values.absenceDays, allClasses, timeSlots);
-      const weekAbsenceDays = eachDayOfInterval({start: today, end: endOfWeek}).map(date => ({
-          date,
-          isAllDay: true,
-          startTime: '00:00',
-          endTime: '23:59',
-      }));
-      const futureAffectedLessons = getAffectedLessons(teacher, weekAbsenceDays, allClasses, timeSlots)
-        .filter(lesson => !affectedLessons.some(l => l.date === lesson.date && l.time === lesson.time));
-        
-      const allAffectedLessons = [...affectedLessons, ...futureAffectedLessons];
 
-
-      const recommendationPromises = allAffectedLessons.map(affected => 
+      const recommendationPromises = affectedLessons.map(affected => 
         findSubstitute(
           {
             subject: affected.lesson.subject,
@@ -208,11 +194,12 @@ export default function MarkAbsentDialog({
       
       const recommendations = await Promise.all(recommendationPromises);
       
-      const finalResults = allAffectedLessons.map((lesson, index) => ({
+      const finalResults = affectedLessons.map((lesson, index) => ({
         ...lesson,
         recommendation: recommendations[index].recommendation,
         recommendationId: recommendations[index].recommendationId,
         reasoning: recommendations[index].reasoning,
+        substituteOptions: recommendations[index].substituteOptions,
       }));
 
       onShowRecommendation(finalResults, teacher, values.absenceDays);
@@ -234,7 +221,7 @@ export default function MarkAbsentDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>סימון היעדרות עבור {teacher.name}</DialogTitle>
-          <DialogDescription>בחר את תאריכי ושעות ההיעדרות כדי למצוא מחליף. יוצגו המלצות לכל השבוע הקרוב.</DialogDescription>
+          <DialogDescription>בחר את תאריכי ושעות ההיעדרות כדי למצוא מחליף. המערכת תציג את כל השיעורים המושפעים.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
@@ -370,10 +357,10 @@ export default function MarkAbsentDialog({
                 {isSubmitting ? (
                   <>
                     <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                    מחפש מחליפים...
+                    מחפש המלצות...
                   </>
                 ) : (
-                  'הצג המלצות'
+                  'הצג שיעורים מושפעים'
                 )}
               </Button>
             </DialogFooter>
