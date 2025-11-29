@@ -497,13 +497,10 @@ const handleScheduleUpdate = async (
       .filter(item => item.absences.length > 0);
   }, [teachers]);
 
-  const handleShowAffectedLessons = async (teacher: Teacher) => {
-    const today = startOfDay(new Date());
-    const absenceForToday = (teacher.absences || []).filter(a => a.date && isSameDate(startOfDay(new Date(a.date)), today));
+  const handleShowAffectedLessons = async (teacher: Teacher, absences: AbsenceDay[]) => {
+    if (absences.length === 0 || !schoolClasses) return;
     
-    if (absenceForToday.length === 0 || !schoolClasses) return;
-    
-    const affectedLessons = getAffectedLessons(teacher, absenceForToday, schoolClasses, timeSlots);
+    const affectedLessons = getAffectedLessons(teacher, absences, schoolClasses, timeSlots);
 
     const substitutePool = (teachers || []).filter(t => t.id !== teacher.id);
     const recommendationPromises = affectedLessons.map(affected => 
@@ -525,7 +522,7 @@ const handleScheduleUpdate = async (
       substituteOptions: recommendations[index].substituteOptions,
     }));
     
-    setRecommendation({ results: finalResults, absentTeacher: teacher, absenceDays: absenceForToday });
+    setRecommendation({ results: finalResults, absentTeacher: teacher, absenceDays: absences });
   };
 
   if (isDataLoading) {
@@ -574,7 +571,7 @@ const handleScheduleUpdate = async (
                                 <span className="font-semibold text-lg block">{teacher.name}</span>
                                 <p className="text-sm text-muted-foreground mt-1">{absenceTime}</p>
                               </div>
-                              <Button size="sm" variant="outline" className="w-full justify-center" onClick={() => handleShowAffectedLessons(teacher)}>
+                              <Button size="sm" variant="outline" className="w-full justify-center" onClick={() => handleShowAffectedLessons(teacher, absences)}>
                                   <ListChecks className="me-2 h-4 w-4" />
                                   הצג שיעורים מושפעים
                               </Button>
@@ -669,5 +666,3 @@ const handleScheduleUpdate = async (
     </div>
   );
 }
-
-    
