@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -129,7 +127,7 @@ export default function Home() {
 
 
         synchronizedTeachers.forEach(teacher => {
-            const originalTeacher = initialTeachers.find(t => t.name === teacher.name);
+            const originalTeacher = initialTeachers.find(t => t.id === Array.from(teacherRefMap.entries()).find(([, ref]) => ref.id === teacher.id)?.[0]);
             if (originalTeacher) {
                 const teacherRef = teacherRefMap.get(originalTeacher.id)!;
                 transaction.set(teacherRef, teacher);
@@ -167,7 +165,7 @@ export default function Home() {
     if (!firestore || !user) return;
     const teacherRef = doc(firestore, 'teachers', updatedTeacher.id);
     const batch = writeBatch(firestore);
-    batch.update(teacherRef, {...updatedTeacher, userId: user.uid });
+    batch.update(teacherRef, {...updatedTeacher });
     await commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: updatedTeacher });
   }
 
@@ -197,7 +195,7 @@ export default function Home() {
 
           if (classWasModified) {
             const classRef = doc(firestore, 'classes', schoolClass.id);
-            transaction.update(classRef, { schedule: newSchedule, userId: user.uid });
+            transaction.update(classRef, { schedule: newSchedule });
           }
         });
 
@@ -258,7 +256,7 @@ export default function Home() {
                         }
                     });
                 });
-                transaction.update(teacherRef, { schedule: newSchedule, userId: user.uid });
+                transaction.update(teacherRef, { schedule: newSchedule });
             }
         }
         transaction.delete(classRef);
@@ -287,7 +285,7 @@ export default function Home() {
           const teacherSnap = await transaction.get(teacherRef);
           if (!teacherSnap.exists()) return;
           const oldSchedule = teacherSnap.data().schedule || {};
-          transaction.update(teacherRef, { schedule: newSchedule, userId: user.uid });
+          transaction.update(teacherRef, { schedule: newSchedule });
           
           const allRelevantClassIds = new Set<string>();
           [oldSchedule, newSchedule].forEach(schedule => Object.values(schedule).forEach(day => Object.values(day).forEach(lesson => lesson?.classId && allRelevantClassIds.add(lesson.classId))));
@@ -317,7 +315,7 @@ export default function Home() {
                       }
                   });
               });
-              transaction.update(classRef, { schedule: updatedClassSchedule, userId: user.uid });
+              transaction.update(classRef, { schedule: updatedClassSchedule });
           }
 
         } else { // entityType === 'class'
@@ -326,7 +324,7 @@ export default function Home() {
           if (!classSnap.exists()) return;
           const oldSchedule = classSnap.data().schedule || {};
 
-          transaction.update(classRef, { schedule: newSchedule, userId: user.uid });
+          transaction.update(classRef, { schedule: newSchedule });
 
           const allRelevantTeacherIds = new Set<string>();
           [oldSchedule, newSchedule].forEach(schedule => Object.values(schedule).forEach(day => Object.values(day).forEach(lesson => lesson?.teacherId && allRelevantTeacherIds.add(lesson.teacherId))));
@@ -356,7 +354,7 @@ export default function Home() {
                       }
                   });
               });
-              transaction.update(teacherRef, { schedule: updatedTeacherSchedule, userId: user.uid });
+              transaction.update(teacherRef, { schedule: updatedTeacherSchedule });
           }
         }
       });
@@ -364,7 +362,7 @@ export default function Home() {
         const permissionError = new FirestorePermissionError({
             operation: 'update',
             path: `${entityType === 'teacher' ? 'teachers' : 'classes'}/${entityId}`,
-            requestResourceData: { schedule: newSchedule, userId: user.uid },
+            requestResourceData: { schedule: newSchedule },
         });
         errorEmitter.emit('permission-error', permissionError);
         throw permissionError;
