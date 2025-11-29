@@ -54,7 +54,7 @@ const AssignSubstituteDialog = ({
     const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    if (!substitute || lessonsToCover.length === 0) return null;
+    if (!substitute) return null;
 
     const handleConfirm = async () => {
       if (!selectedLessonId) return;
@@ -73,30 +73,34 @@ const AssignSubstituteDialog = ({
                 <DialogHeader>
                     <DialogTitle>שיבוץ מורה מחליף</DialogTitle>
                     <DialogDescription>
-                        שבץ את {substitute.name} להחליף בשיעור הבא.
+                        {lessonsToCover.length > 0 ? `שבץ את ${substitute.name} להחליף באחד מהשיעורים הבאים.` : 'לא נמצאו שיעורים הדורשים החלפה כעת.'}
                     </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
-                    <RadioGroup onValueChange={setSelectedLessonId}>
-                        {lessonsToCover.map((l) => {
-                            const id = `${l.schoolClass.id}-${l.lesson.subject}-${l.time}`;
-                            return (
-                                <div key={id} className="flex items-center space-x-2 space-x-reverse">
-                                    <RadioGroupItem value={id} id={id} />
-                                    <Label htmlFor={id} className="flex flex-col">
-                                        <span>{l.schoolClass.name} - {l.lesson.subject} ({l.time})</span>
-                                        <span className='text-xs text-muted-foreground'>מורה חסר: {l.absentTeacher.name}</span>
-                                    </Label>
-                                </div>
-                            )
-                        })}
-                    </RadioGroup>
-                </div>
+                {lessonsToCover.length > 0 && (
+                  <div className="py-4">
+                      <RadioGroup onValueChange={setSelectedLessonId}>
+                          {lessonsToCover.map((l) => {
+                              const id = `${l.schoolClass.id}-${l.lesson.subject}-${l.time}`;
+                              return (
+                                  <div key={id} className="flex items-center space-x-2 space-x-reverse">
+                                      <RadioGroupItem value={id} id={id} />
+                                      <Label htmlFor={id} className="flex flex-col">
+                                          <span>{l.schoolClass.name} - {l.lesson.subject} ({l.time})</span>
+                                          <span className='text-xs text-muted-foreground'>מורה חסר: {l.absentTeacher.name}</span>
+                                      </Label>
+                                  </div>
+                              )
+                          })}
+                      </RadioGroup>
+                  </div>
+                )}
                 <DialogFooter>
                     <DialogClose asChild><Button variant="ghost">ביטול</Button></DialogClose>
-                    <Button onClick={handleConfirm} disabled={!selectedLessonId || isSubmitting}>
-                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : "אישור שיבוץ"}
-                    </Button>
+                    {lessonsToCover.length > 0 && (
+                      <Button onClick={handleConfirm} disabled={!selectedLessonId || isSubmitting}>
+                          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : "אישור שיבוץ"}
+                      </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -115,7 +119,7 @@ const getStartOfWeek = (date: Date): Date => {
         return startOfDay(addDays(date, 1));
     }
     const diff = date.getDate() - day;
-    return startOfDay(new Date(date.setDate(diff)));
+    return startOfDay(new Date(new Date(date).setDate(diff)));
 }
 
 export default function Timetable({}: TimetableProps) {
@@ -172,7 +176,7 @@ export default function Timetable({}: TimetableProps) {
         const availabilityForDay = teacher.availability.find(a => a.day === day);
         
         const absencesForCurrentDate = (teacher.absences || []).filter(absence => 
-            isSameDay(startOfDay(new Date(absence.date)), currentDate)
+            isSameDay(startOfDay(new Date(absence.date as string)), currentDate)
         );
 
         if (availabilityForDay) {
@@ -196,8 +200,14 @@ export default function Timetable({}: TimetableProps) {
                                 return slotStartNum >= absenceStart && slotStartNum < absenceEnd;
                             });
                         }
+                        
+                         const isSubstituting = (allSubstitutions || []).some(sub => 
+                            sub.substituteTeacherId === teacher.id &&
+                            isSameDay(startOfDay(new Date(sub.date)), currentDate) &&
+                            sub.time === slot.start
+                         );
 
-                        if (!isTeaching && !isAbsent) {
+                        if (!isTeaching && !isAbsent && !isSubstituting) {
                             if (data[day]?.[slot.start]) {
                               data[day][slot.start].push({ name: teacher.name, id: teacher.id, isAbsent: false });
                             }
@@ -215,39 +225,50 @@ export default function Timetable({}: TimetableProps) {
 
 
  const openAssignDialog = (substitute: {id: string, name: string}, day: string, time: string) => {
-      const weekStartDate = getStartOfWeek(new Date());
-      const dayIndex = daysOfWeek.indexOf(day);
-      const date = addDays(weekStartDate, dayIndex);
-      
-      const absentLessons = (allTeachers || [])
-        .flatMap(absentTeacher => {
-            const isAbsent = (absentTeacher.absences || []).some(absence => 
-                isSameDay(startOfDay(new Date(absence.date)), date) &&
-                (absence.isAllDay || (time >= absence.startTime && time < absence.endTime))
-            );
+    const weekStartDate = getStartOfWeek(new Date());
+    const dayIndex = daysOfWeek.indexOf(day);
+    const date = addDays(weekStartDate, dayIndex);
+    
+    const lessonsToCover: any[] = [];
 
-            if (!isAbsent) return [];
+    (allTeachers || []).forEach(absentTeacher => {
+        const isAbsentThisSlot = (absentTeacher.absences || []).some(absence =>
+            isSameDay(startOfDay(new Date(absence.date as string)), date) &&
+            (absence.isAllDay || (time >= absence.startTime && time < absence.endTime))
+        );
 
-            return (allClasses || []).map(schoolClass => {
-                const lesson = schoolClass.schedule?.[day]?.[time];
-                if (lesson && lesson.teacherId === absentTeacher.id) {
-                    return { date, time, absentTeacher, lesson, schoolClass };
+        if (isAbsentThisSlot) {
+            // This teacher is absent. Check if they were supposed to teach.
+            const lesson = absentTeacher.schedule?.[day]?.[time];
+            if (lesson && lesson.classId) {
+                const schoolClass = (allClasses || []).find(c => c.id === lesson.classId);
+                if (schoolClass) {
+                    // Check if this lesson is already covered by another substitution
+                    const isCovered = (allSubstitutions || []).some(sub => 
+                        isSameDay(startOfDay(new Date(sub.date)), date) &&
+                        sub.time === time &&
+                        sub.classId === schoolClass.id
+                    );
+
+                    if (!isCovered) {
+                        lessonsToCover.push({ date, time, absentTeacher, lesson, schoolClass });
+                    }
                 }
-                return null;
-            }).filter(Boolean);
-        });
+            }
+        }
+    });
 
-      const substituteTeacher = allTeachers?.find(t => t.id === substitute.id)
-      if (substituteTeacher) {
-          setAssignDialogState({ isOpen: true, substitute: substituteTeacher, lessonsToCover: absentLessons as any[] });
-      }
-  };
+    const substituteTeacher = allTeachers?.find(t => t.id === substitute.id)
+    if (substituteTeacher) {
+        setAssignDialogState({ isOpen: true, substitute: substituteTeacher, lessonsToCover });
+    }
+};
+
 
  const handleConfirmAssignment = async (substitute: Teacher, lessonToCover: any) => {
         if (!firestore || !user) return;
         
         const { date, time, absentTeacher, lesson, schoolClass } = lessonToCover;
-        const day = daysOfWeek[getDay(date)];
         
         const batch = writeBatch(firestore);
 
@@ -267,13 +288,6 @@ export default function Timetable({}: TimetableProps) {
             createdAt: new Date().toISOString(),
         };
         batch.set(subRef, newSub);
-
-        // 2. Update substitute's schedule
-        const subTeacherRef = doc(firestore, 'teachers', substitute.id);
-        const newSubSchedule = { ...substitute.schedule };
-        if (!newSubSchedule[day]) newSubSchedule[day] = {};
-        newSubSchedule[day][time] = { ...lesson, classId: schoolClass.id };
-        batch.update(subTeacherRef, { schedule: newSubSchedule });
 
         await commitBatchWithContext(batch, {
             operation: 'create',
@@ -318,24 +332,34 @@ export default function Timetable({}: TimetableProps) {
                             </td>
                             {daysOfWeek.map(day => {
                                 const availableSubs = timetableData[day]?.[slot.start] || [];
-                                const absentTeachersInSlot = (allTeachers || [])
-                                    .filter(t => {
-                                        const weekStartDate = getStartOfWeek(new Date());
-                                        const dayIndex = daysOfWeek.indexOf(day);
-                                        const currentDate = addDays(weekStartDate, dayIndex);
-                                        const isAbsent = (t.absences || []).some(a => isSameDay(startOfDay(new Date(a.date)), currentDate) && (a.isAllDay || (slot.start >= a.startTime && slot.start < a.endTime)));
-                                        const isScheduled = t.schedule?.[day]?.[slot.start];
-                                        return isAbsent && isScheduled;
-                                    });
+                                
+                                const weekStartDate = getStartOfWeek(new Date());
+                                const dayIndex = daysOfWeek.indexOf(day);
+                                const currentDate = addDays(weekStartDate, dayIndex);
+
+                                const absentAndScheduled = (allTeachers || [])
+                                    .filter(t => (t.absences || []).some(a => isSameDay(startOfDay(new Date(a.date as string)), currentDate) && (a.isAllDay || (slot.start >= a.startTime && slot.start < a.endTime))))
+                                    .filter(t => t.schedule?.[day]?.[slot.start])
+                                    .map(t => ({...t.schedule?.[day]?.[slot.start], teacher: t}))
+                                    .filter(t => !(allSubstitutions || []).some(sub => isSameDay(startOfDay(new Date(sub.date)), currentDate) && sub.time === slot.start && sub.classId === t.classId));
+                                    
+                                const substitutionsInSlot = (allSubstitutions || [])
+                                    .filter(sub => isSameDay(startOfDay(new Date(sub.date)), currentDate) && sub.time === slot.start);
 
                                 return (
                                 <td key={`${day}-${slot.start}`} className={cn("p-2 align-top h-24 border-r", slot.type === 'break' && 'bg-muted/30')}>
                                 {slot.type === 'break' ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
                                     <div className="flex flex-col items-center gap-1.5 justify-center">
-                                        {absentTeachersInSlot.map(teacher => (
-                                            <Badge key={teacher.id} variant={'destructive'} className="font-normal">
+                                        {absentAndScheduled.map(item => (
+                                            <Badge key={item.teacher.id} variant={'destructive'} className="font-normal">
                                                 <UserX className="h-3 w-3 ml-1" />
-                                                {teacher.name} (חסר/ה)
+                                                {item.teacher.name} (חסר/ה)
+                                            </Badge>
+                                        ))}
+                                         {substitutionsInSlot.map(sub => (
+                                            <Badge key={sub.id} variant={'secondary'} className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 font-normal">
+                                                <UserCheck className="h-3 w-3 ml-1" />
+                                                {sub.substituteTeacherName}
                                             </Badge>
                                         ))}
                                         {availableSubs.map(teacher => (
@@ -346,11 +370,10 @@ export default function Timetable({}: TimetableProps) {
                                              className="h-auto px-2 py-1 font-normal"
                                              onClick={() => openAssignDialog(teacher, day, slot.start)}
                                             >
-                                                <UserCheck className="h-3 w-3 ml-1" />
                                                 {teacher.name}
                                            </Button>
                                         ))}
-                                        {availableSubs.length === 0 && absentTeachersInSlot.length === 0 && (
+                                        {availableSubs.length === 0 && absentAndScheduled.length === 0 && substitutionsInSlot.length === 0 && (
                                             <span className="text-muted-foreground text-xs opacity-70">--</span>
                                         )}
                                     </div>
@@ -369,7 +392,7 @@ export default function Timetable({}: TimetableProps) {
     </Card>
     <AssignSubstituteDialog 
         isOpen={assignDialogState.isOpen}
-        onOpenChange={(isOpen) => setAssignDialogState(s => ({...s, isOpen}))}
+        onOpenChange={(isOpen) => setAssignDialogState(s => ({...s, isOpen, substitute: isOpen ? s.substitute : null, lessonsToCover: isOpen ? s.lessonsToCover : []}))}
         substitute={assignDialogState.substitute}
         lessonsToCover={assignDialogState.lessonsToCover}
         onConfirm={handleConfirmAssignment}
@@ -377,3 +400,5 @@ export default function Timetable({}: TimetableProps) {
     </>
   );
 }
+
+    
