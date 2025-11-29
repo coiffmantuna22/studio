@@ -221,7 +221,7 @@ export default function Timetable({}: TimetableProps) {
     });
 
     return data;
-  }, [allTeachers, timeSlots, allClasses, allSubstitutions]);
+  }, [allTeachers, timeSlots, allSubstitutions]);
 
 
  const openAssignDialog = (substitute: {id: string, name: string}, day: string, time: string) => {
@@ -231,34 +231,37 @@ export default function Timetable({}: TimetableProps) {
     
     const lessonsToCover: any[] = [];
 
-    (allTeachers || []).forEach(absentTeacher => {
-        const isAbsentThisSlot = (absentTeacher.absences || []).some(absence =>
+    // Find all teachers who are absent at this specific time slot
+    const absentTeachers = (allTeachers || []).filter(teacher => {
+        return (teacher.absences || []).some(absence =>
             isSameDay(startOfDay(new Date(absence.date as string)), date) &&
             (absence.isAllDay || (time >= absence.startTime && time < absence.endTime))
         );
+    });
 
-        if (isAbsentThisSlot) {
-            // This teacher is absent. Check if they were supposed to teach.
-            const lesson = absentTeacher.schedule?.[day]?.[time];
-            if (lesson && lesson.classId) {
-                const schoolClass = (allClasses || []).find(c => c.id === lesson.classId);
-                if (schoolClass) {
-                    // Check if this lesson is already covered by another substitution
-                    const isCovered = (allSubstitutions || []).some(sub => 
-                        isSameDay(startOfDay(new Date(sub.date)), date) &&
-                        sub.time === time &&
-                        sub.classId === schoolClass.id
-                    );
+    // For each absent teacher, check if they were supposed to be teaching a lesson
+    absentTeachers.forEach(absentTeacher => {
+        const lesson = absentTeacher.schedule?.[day]?.[time];
 
-                    if (!isCovered) {
-                        lessonsToCover.push({ date, time, absentTeacher, lesson, schoolClass });
-                    }
+        if (lesson && lesson.classId) {
+            const schoolClass = (allClasses || []).find(c => c.id === lesson.classId);
+            
+            if (schoolClass) {
+                // Check if this lesson is already covered by another substitution
+                const isCovered = (allSubstitutions || []).some(sub => 
+                    isSameDay(startOfDay(new Date(sub.date)), date) &&
+                    sub.time === time &&
+                    sub.classId === schoolClass.id
+                );
+
+                if (!isCovered) {
+                    lessonsToCover.push({ date, time, absentTeacher, lesson, schoolClass });
                 }
             }
         }
     });
 
-    const substituteTeacher = allTeachers?.find(t => t.id === substitute.id)
+    const substituteTeacher = allTeachers?.find(t => t.id === substitute.id);
     if (substituteTeacher) {
         setAssignDialogState({ isOpen: true, substitute: substituteTeacher, lessonsToCover });
     }
