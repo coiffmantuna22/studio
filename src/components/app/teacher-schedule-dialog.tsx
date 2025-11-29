@@ -13,7 +13,7 @@ import {
   DialogDescription,
   DialogClose,
 } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { daysOfWeek } from '@/lib/constants';
 import {
   Select,
@@ -235,6 +235,7 @@ export default function TeacherScheduleDialog({
               ))}
             </tbody>
           </table>
+          <ScrollBar orientation="horizontal" />
         </ScrollArea>
         
         <DialogFooter>

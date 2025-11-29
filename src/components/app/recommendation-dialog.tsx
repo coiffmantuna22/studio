@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Teacher, AffectedLesson } from '@/lib/types';
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/accordion"
 import { Badge } from '../ui/badge';
 import { daysOfWeek } from '@/lib/constants';
+import { ScrollArea } from '../ui/scroll-area';
 
 
 interface RecommendationDialogProps {
@@ -67,7 +69,7 @@ export default function RecommendationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-2 max-h-[60vh] overflow-y-auto pl-2">
+        <ScrollArea className="py-2 max-h-[60vh] overflow-y-auto pl-2">
           <Accordion type="multiple" className="w-full" defaultValue={orderedDays.map(d => `day-${d}`)}>
             {orderedDays.map(day => (
               <AccordionItem value={`day-${day}`} key={day}>
@@ -120,7 +122,7 @@ export default function RecommendationDialog({
               </AccordionItem>
             ))}
           </Accordion>
-        </div>
+        </ScrollArea>
 
         <DialogFooter>
           <DialogClose asChild>
