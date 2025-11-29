@@ -482,16 +482,17 @@ const handleScheduleUpdate = async (
 
   const todaysAbsences = useMemo(() => {
     const today = startOfDay(new Date());
-    return (teachers || []).filter(teacher => 
-        (teacher.absences || []).some(absence => {
+    return (teachers || []).map(teacher => {
+        const absences = (teacher.absences || []).filter(absence => {
             if (typeof absence.date !== 'string') return false;
             try {
                 return isSameDay(startOfDay(new Date(absence.date)), today);
             } catch (e) {
                 return false;
             }
-        })
-    );
+        });
+        return { teacher, absences };
+    }).filter(item => item.absences.length > 0);
   }, [teachers]);
 
   const handleShowAffectedLessons = async (teacher: Teacher) => {
@@ -557,32 +558,36 @@ const handleScheduleUpdate = async (
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
-        <Card>
-          <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <AlertTriangle className="text-destructive" />
-                מורים חסרים היום
-              </CardTitle>
-              <CardDescription>סקירה מהירה של ההיעדרויות להיום. לחץ על מורה כדי למצוא מחליפים.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {todaysAbsences.length > 0 ? (
-                <div className="space-y-3">
-                    {todaysAbsences.map(teacher => (
-                        <div key={teacher.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
-                            <span className="font-semibold">{teacher.name}</span>
-                            <Button size="sm" variant="secondary" onClick={() => handleShowAffectedLessons(teacher)}>
-                                <ListChecks className="ml-2 h-4 w-4" />
-                                הצג שיעורים מושפעים
-                            </Button>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">אין היעדרויות רשומות להיום.</p>
-            )}
-          </CardContent>
-        </Card>
+        {todaysAbsences.length > 0 && (
+          <Card>
+            <CardHeader>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <AlertTriangle className="text-destructive" />
+                  מורים חסרים היום
+                </CardTitle>
+                <CardDescription>סקירה מהירה של ההיעדרויות להיום. לחץ על מורה כדי למצוא מחליפים.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                  {todaysAbsences.map(({ teacher, absences }) => {
+                      const absenceTime = absences.map(a => a.isAllDay ? 'יום שלם' : `${a.startTime}-${a.endTime}`).join(', ');
+                      return (
+                          <div key={teacher.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                              <div>
+                                <span className="font-semibold">{teacher.name}</span>
+                                <p className="text-sm text-muted-foreground">{absenceTime}</p>
+                              </div>
+                              <Button size="sm" variant="secondary" onClick={() => handleShowAffectedLessons(teacher)}>
+                                  <ListChecks className="ml-2 h-4 w-4" />
+                                  הצג שיעורים מושפעים
+                              </Button>
+                          </div>
+                      );
+                  })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
