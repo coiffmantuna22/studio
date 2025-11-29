@@ -13,6 +13,7 @@ export const initialTimeSlots: TimeSlot[] = [
   { id: "8", start: '12:45', end: '13:30', type: 'lesson' },
 ];
 
-export const initialTeachers: Teacher[] = [];
+// All initial data has been removed to prepare the app for deployment.
+export const initialTeachers: Omit<Teacher, 'id' | 'userId' | 'schedule' | 'avatar' | 'absences'>[] = [];
 
-export const initialClasses: SchoolClass[] = [];
+export const initialClasses: Omit<SchoolClass, 'id' | 'userId'>[] = [];

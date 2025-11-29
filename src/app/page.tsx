@@ -24,6 +24,8 @@ import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
 import RecommendationDialog from '@/components/app/recommendation-dialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { initialClasses, initialTeachers } from '@/lib/data';
+
 
 export default function Home() {
   const { user, isUserLoading } = useUser();
@@ -79,9 +81,9 @@ export default function Home() {
       
       const teacherDocs = (await getDocs(query(collection(firestore, 'teachers'), where('userId', '==', user.uid)))).docs;
       const classDocs = (await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)))).docs;
-
-      const initialTeachers: Omit<Teacher, 'id' | 'schedule'>[] = [];
-      const initialClasses: SchoolClass[] = [];
+      
+      // If data already exists, don't seed.
+      if (teacherDocs.length > 0 || classDocs.length > 0) return;
 
       const teacherIdMap: { [key: string]: string } = {};
 
@@ -90,20 +92,26 @@ export default function Home() {
         const oldId = `T${index + 1}`;
         teacherIdMap[oldId] = tempRef.id;
 
+        const fallback = t.name.split(' ').map((n) => n[0]).join('').toUpperCase();
         const newTeacher: Teacher = {
           ...t,
           id: tempRef.id,
           userId: user.uid,
           schedule: {},
+          avatar: { fallback },
         };
         batch.set(tempRef, newTeacher);
       });
       
+      const classIdMap: { [key: string]: string } = {};
+
       initialClasses.forEach(c => {
          const tempRef = doc(collection(firestore, 'classes'));
+         classIdMap[c.id] = tempRef.id;
+
          const newSchedule: ClassSchedule = {};
          
-         Object.entries(c.schedule).forEach(([day, daySchedule]) => {
+         Object.entries(c.schedule || {}).forEach(([day, daySchedule]) => {
            newSchedule[day] = {};
            Object.entries(daySchedule).forEach(([time, lesson]) => {
              if (lesson) {
@@ -124,12 +132,14 @@ export default function Home() {
           const newTeacherSchedule: ClassSchedule = {};
 
           initialClasses.forEach(c => {
-              Object.entries(c.schedule).forEach(([day, daySchedule]) => {
+              Object.entries(c.schedule || {}).forEach(([day, daySchedule]) => {
                   Object.entries(daySchedule).forEach(([time, lesson]) => {
                       if (lesson && lesson.teacherId === oldId) {
                           if (!newTeacherSchedule[day]) newTeacherSchedule[day] = {};
-                          const classId = (Object.entries(teacherIdMap).find(([o, n]) => o === lesson.teacherId) || [])[1] || c.id;
-                          newTeacherSchedule[day][time] = { ...lesson, classId: classId };
+                          const newClassId = classIdMap[lesson.classId];
+                          if(newClassId) {
+                            newTeacherSchedule[day][time] = { ...lesson, classId: newClassId };
+                          }
                       }
                   });
               });
@@ -193,10 +203,10 @@ export default function Home() {
 
           Object.keys(newSchedule).forEach(day => {
             if (newSchedule[day]) {
-              Object.keys(newSchedule[day]).forEach(time => {
+              Object.keys(newSchedule[day] as object).forEach(time => {
                 const lesson = newSchedule[day]?.[time];
                 if (lesson && lesson.teacherId === teacherId) {
-                  newSchedule[day][time] = null; 
+                  (newSchedule[day] as any)[time] = null; 
                   classWasModified = true;
                 }
               });
@@ -337,7 +347,7 @@ const handleScheduleUpdate = async (
                         // Case 1: Lesson was removed for this teacher in this slot
                         if (oldLesson?.classId === classId && (!newLesson || newLesson.classId !== classId)) {
                             if (updatedClassSchedule[day]?.[time]?.teacherId === entityId) {
-                                updatedClassSchedule[day][time] = null;
+                                (updatedClassSchedule[day] as any)[time] = null;
                             }
                         }
                         // Case 2: Lesson was added for this teacher in this slot
@@ -384,7 +394,7 @@ const handleScheduleUpdate = async (
                         // Case 1: Lesson was removed for this class for this teacher
                         if (oldLesson?.teacherId === teacherId && (!newLesson || newLesson.teacherId !== teacherId)) {
                              if (updatedTeacherSchedule[day]?.[time]?.classId === entityId) {
-                                updatedTeacherSchedule[day][time] = null;
+                                (updatedTeacherSchedule[day] as any)[time] = null;
                             }
                         }
                         // Case 2: Lesson was added for this class for this teacher
@@ -439,44 +449,57 @@ const handleScheduleUpdate = async (
       }
   }
 
-  const handleMarkAbsent = async (absentTeacher: Teacher, absenceDays: any[], assignments: any) => {
+  const handleMarkAbsent = async (absentTeacher: Teacher, absenceDays: any[], assignments: any[]) => {
     if (!firestore || !user) return;
     
     const batch = writeBatch(firestore);
 
     // 1. Mark teacher as absent
     const teacherRef = doc(firestore, 'teachers', absentTeacher.id);
+    const existingAbsences = absentTeacher.absences || [];
     const absenceData = absenceDays.map(d => ({...d, date: d.date.toISOString()}));
-    batch.update(teacherRef, { absences: absenceData });
+    batch.update(teacherRef, { absences: [...existingAbsences, ...absenceData] });
 
-    const allCurrentSchedules = new Map<string, ClassSchedule>();
+    const allClassSchedulesToUpdate = new Map<string, ClassSchedule>();
+    const allTeacherSchedulesToUpdate = new Map<string, ClassSchedule>();
+    
+    // Prime the maps with current schedules
+    schoolClasses.forEach(c => allClassSchedulesToUpdate.set(c.id, JSON.parse(JSON.stringify(c.schedule))));
+    teachers.forEach(t => allTeacherSchedulesToUpdate.set(t.id, JSON.parse(JSON.stringify(t.schedule || {}))));
+
 
     for (const assignment of assignments) {
       const { classId, day, time, newTeacherId, originalLesson } = assignment;
       
-      if (!allCurrentSchedules.has(classId)) {
-          const classToUpdate = schoolClasses.find(c => c.id === classId);
-          if (classToUpdate) {
-              allCurrentSchedules.set(classId, JSON.parse(JSON.stringify(classToUpdate.schedule)));
-          }
-      }
-      
-      const classSchedule = allCurrentSchedules.get(classId);
+      // Update Class Schedule
+      const classSchedule = allClassSchedulesToUpdate.get(classId);
       if (classSchedule) {
           if (!classSchedule[day]) classSchedule[day] = {};
-
-          if (newTeacherId) { // Assign new teacher
+          if (newTeacherId) { 
               classSchedule[day][time] = { ...originalLesson, teacherId: newTeacherId };
-          } else { // Unassign
+          } else { 
               classSchedule[day][time] = null;
           }
+      }
+
+      // Update new Teacher's schedule
+      if (newTeacherId) {
+        const subTeacherSchedule = allTeacherSchedulesToUpdate.get(newTeacherId);
+        if(subTeacherSchedule) {
+           if (!subTeacherSchedule[day]) subTeacherSchedule[day] = {};
+           subTeacherSchedule[day][time] = { ...originalLesson, classId };
+        }
       }
     }
     
     // Apply all schedule updates to the batch
-    for (const [classId, schedule] of allCurrentSchedules.entries()) {
+    for (const [classId, schedule] of allClassSchedulesToUpdate.entries()) {
         const classRef = doc(firestore, 'classes', classId);
-        await handleScheduleUpdate('class', classId, schedule);
+        batch.update(classRef, { schedule });
+    }
+    for (const [teacherId, schedule] of allTeacherSchedulesToUpdate.entries()) {
+        const teacherRef = doc(firestore, 'teachers', teacherId);
+        batch.update(teacherRef, { schedule });
     }
     
     await commitBatchWithContext(batch, { operation: 'update', path: `absences_and_substitutions` });
