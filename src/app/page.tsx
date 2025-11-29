@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/app/header';
 import TeacherList from '@/components/app/teacher-list';
 import Timetable from '@/components/app/timetable';
@@ -8,15 +8,20 @@ import ClassList from '@/components/app/class-list';
 import SettingsTab from '@/components/app/settings-tab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { initialTeachers, initialClasses as defaultClasses, initialTimeSlots } from '@/lib/data';
-import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson } from '@/lib/types';
+import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus } from '@/lib/types';
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { collection, doc, writeBatch, query, where, getDocs, runTransaction, DocumentReference, getDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
-import { Loader2 } from 'lucide-react';
+import { Loader2, UserX, AlertTriangle } from 'lucide-react';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
 import { Button } from '@/components/ui/button';
 import { daysOfWeek } from '@/lib/constants';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { isSameDay, startOfDay } from 'date-fns';
+import { getTeacherAvailabilityStatus } from '@/lib/substitute-finder';
+import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
+import RecommendationDialog from '@/components/app/recommendation-dialog';
 
 export default function Home() {
   const { user, isUserLoading } = useUser();
@@ -26,11 +31,18 @@ export default function Home() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [schoolClasses, setSchoolClasses] = useState<SchoolClass[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  
+  const [teacherToMarkAbsent, setTeacherToMarkAbsent] = useState<Teacher | null>(null);
+  const [recommendation, setRecommendation] = useState<{
+    results: any[];
+    absentTeacher: Teacher;
+    newClassSchedules: any;
+  } | null>(null);
+
+
   const teachersQuery = user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null;
   const classesQuery = user ? query(collection(firestore, 'classes'), where('userId', '==', user.uid)) : null;
   const settingsQuery = user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null;
-  
+
   const [teachersCollection, teachersLoading] = useCollection(teachersQuery);
   const [classesCollection, classesLoading] = useCollection(classesQuery);
   const [settingsCollection, settingsLoading] = useCollection(settingsQuery);
@@ -66,99 +78,122 @@ export default function Home() {
     }
   }, [settingsCollection, user]);
 
+  const teacherAvailabilityNow = useMemo(() => {
+    const availabilityMap = new Map<string, TeacherAvailabilityStatus>();
+    const now = new Date();
+    teachers.forEach(teacher => {
+        availabilityMap.set(teacher.id, getTeacherAvailabilityStatus(teacher, now, timeSlots));
+    });
+    return availabilityMap;
+}, [teachers, timeSlots]);
+
+
   const seedData = async () => {
     if (!firestore || !user) return;
     try {
-      await runTransaction(firestore, async (transaction) => {
-        const teacherRefMap = new Map<string, DocumentReference>();
-        initialTeachers.forEach(t => {
-            const tempRef = doc(collection(firestore, 'teachers'));
-            teacherRefMap.set(t.id, tempRef);
-        });
+      const batch = writeBatch(firestore);
 
-        const classRefMap = new Map<string, DocumentReference>();
-        defaultClasses.forEach(c => {
-            const tempRef = doc(collection(firestore, 'classes'));
-            classRefMap.set(c.id, tempRef);
-        });
-
-        const synchronizedTeachers = initialTeachers.map(teacher => {
-            const originalId = teacher.id;
-            const newTeacherRef = teacherRefMap.get(originalId)!;
-            const newTeacher = { 
-                ...teacher, 
-                id: newTeacherRef.id, 
-                userId: user.uid, 
-                schedule: {} 
-            };
-            delete (newTeacher as any).schedule;
-            return newTeacher;
-        });
-
-        const synchronizedClasses = defaultClasses.map(sc => {
-            const newSchedule: ClassSchedule = {};
-            daysOfWeek.forEach(day => {
-                newSchedule[day] = {};
-                if(sc.schedule[day]) {
-                    Object.keys(sc.schedule[day]).forEach(time => {
-                        const lesson = sc.schedule[day]![time];
-                        if (lesson) {
-                           const originalTeacherId = lesson.teacherId;
-                           const newTeacherRef = teacherRefMap.get(originalTeacherId);
-                           if(newTeacherRef) {
-                             newSchedule[day]![time] = { ...lesson, teacherId: newTeacherRef.id };
-                           }
-                        }
-                    });
-                }
-            });
-            const newClassRef = classRefMap.get(sc.id)!;
-            return { ...sc, id: newClassRef.id, userId: user.uid, schedule: newSchedule };
-        });
-
-        synchronizedTeachers.forEach(teacher => {
-             const newTeacherSchedule: ClassSchedule = {};
-              daysOfWeek.forEach(day => {
-                newTeacherSchedule[day] = {};
-                synchronizedClasses.forEach(sc => {
-                    if (sc.schedule[day]) {
-                        Object.entries(sc.schedule[day]).forEach(([time, lesson]) => {
-                             if(lesson && lesson.teacherId === teacher.id) {
-                                newTeacherSchedule[day]![time] = { ...lesson, classId: sc.id };
-                            }
-                        })
-                    }
-                })
-            });
-            teacher.schedule = newTeacherSchedule;
-        })
-
-
-        synchronizedTeachers.forEach(teacher => {
-            const originalTeacherId = Array.from(teacherRefMap.entries()).find(([, ref]) => ref.id === teacher.id)?.[0];
-            if (originalTeacherId) {
-                const teacherRef = teacherRefMap.get(originalTeacherId)!;
-                transaction.set(teacherRef, teacher);
-            }
-        });
-
-        synchronizedClasses.forEach(sClass => {
-             const originalId = Array.from(classRefMap.entries()).find(([, ref]) => ref.id === sClass.id)?.[0];
-             if(originalId){
-                const classRef = classRefMap.get(originalId)!;
-                transaction.set(classRef, sClass);
-             }
-        });
-        
-        const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
-        const timetableData = { slots: initialTimeSlots, userId: user.uid };
-        transaction.set(settingsRef, timetableData);
+      const teacherRefMap = new Map<string, DocumentReference>();
+      initialTeachers.forEach(t => {
+        const tempRef = doc(collection(firestore, 'teachers'));
+        teacherRefMap.set(t.id, tempRef);
       });
+
+      const classRefMap = new Map<string, DocumentReference>();
+      defaultClasses.forEach(c => {
+        const tempRef = doc(collection(firestore, 'classes'));
+        classRefMap.set(c.id, tempRef);
+      });
+
+      const synchronizedClasses = defaultClasses.map(sc => {
+        const newSchedule: ClassSchedule = {};
+        daysOfWeek.forEach(day => {
+          newSchedule[day] = {};
+          if (sc.schedule[day]) {
+            Object.keys(sc.schedule[day]).forEach(time => {
+              const lesson = sc.schedule[day]![time];
+              if (lesson) {
+                const originalTeacherId = lesson.teacherId;
+                const newTeacherRef = teacherRefMap.get(originalTeacherId);
+                if (newTeacherRef) {
+                  newSchedule[day]![time] = { ...lesson, teacherId: newTeacherRef.id };
+                }
+              }
+            });
+          }
+        });
+        const newClassRef = classRefMap.get(sc.id)!;
+        return { ...sc, id: newClassRef.id, userId: user.uid, schedule: newSchedule };
+      });
+
+      const synchronizedTeachers = initialTeachers.map(teacher => {
+        const originalId = teacher.id;
+        const newTeacherRef = teacherRefMap.get(originalId)!;
+        const newTeacher = {
+          ...teacher,
+          id: newTeacherRef.id,
+          userId: user.uid,
+          schedule: {}
+        };
+        delete (newTeacher as any).schedule;
+        return newTeacher;
+      });
+      
+      synchronizedTeachers.forEach(teacher => {
+        const newTeacherSchedule: ClassSchedule = {};
+        daysOfWeek.forEach(day => {
+          newTeacherSchedule[day] = {};
+          synchronizedClasses.forEach(sc => {
+            if (sc.schedule[day]) {
+              Object.entries(sc.schedule[day]).forEach(([time, lesson]) => {
+                if (lesson && lesson.teacherId === teacher.id) {
+                  newTeacherSchedule[day]![time] = { ...lesson, classId: sc.id };
+                }
+              })
+            }
+          })
+        });
+        teacher.schedule = newTeacherSchedule;
+      });
+
+      synchronizedTeachers.forEach(teacher => {
+          const originalTeacherId = Array.from(teacherRefMap.entries()).find(([, ref]) => ref.id === teacher.id)?.[0];
+          if(originalTeacherId) {
+             const teacherRef = teacherRefMap.get(originalTeacherId)!;
+             batch.set(teacherRef, teacher);
+          }
+      });
+
+      synchronizedClasses.forEach(sClass => {
+        const originalId = Array.from(classRefMap.entries()).find(([, ref]) => ref.id === sClass.id)?.[0];
+        if (originalId) {
+          const classRef = classRefMap.get(originalId)!;
+          batch.set(classRef, sClass);
+        }
+      });
+
+      const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
+      const timetableData = { slots: initialTimeSlots, userId: user.uid };
+      batch.set(settingsRef, timetableData);
+      
+      await commitBatchWithContext(batch, {
+          operation: 'create',
+          path: `user_data_seed/${user.uid}`
+      });
+
     } catch (e) {
-       console.error("Transaction to seed data failed. This may be a permission error. The error was: ", e);
+      if (!(e instanceof FirestorePermissionError)) {
+        const permissionError = new FirestorePermissionError({
+          operation: 'create',
+          path: `seed data for user ${user.uid}`,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw permissionError;
+      }
+      throw e;
     }
   };
-  
+
   const handleAddTeacher = async (newTeacherData: Omit<Teacher, 'id' | 'userId' | 'avatar'>) => {
     if (!firestore || !user) return;
     const newDocRef = doc(collection(firestore, 'teachers'));
@@ -173,15 +208,15 @@ export default function Home() {
     if (!firestore || !user) return;
     const teacherRef = doc(firestore, 'teachers', updatedTeacher.id);
     const batch = writeBatch(firestore);
-    batch.update(teacherRef, {...updatedTeacher });
+    batch.update(teacherRef, { ...updatedTeacher });
     await commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: updatedTeacher });
   }
 
   const handleDeleteTeacher = async (teacherId: string) => {
     if (!firestore || !user) return;
     
+    const batch = writeBatch(firestore);
     try {
-      await runTransaction(firestore, async (transaction) => {
         const classesQuerySnapshot = await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)));
         
         classesQuerySnapshot.forEach(classDoc => {
@@ -203,20 +238,27 @@ export default function Home() {
 
           if (classWasModified) {
             const classRef = doc(firestore, 'classes', schoolClass.id);
-            transaction.update(classRef, { schedule: newSchedule });
+            batch.update(classRef, { schedule: newSchedule });
           }
         });
 
         const teacherRef = doc(firestore, 'teachers', teacherId);
-        transaction.delete(teacherRef);
-      });
+        batch.delete(teacherRef);
+
+        await commitBatchWithContext(batch, {
+            operation: 'delete',
+            path: `teachers/${teacherId} and related classes`
+        });
     } catch (e) {
-      const permissionError = new FirestorePermissionError({
-        operation: 'delete',
-        path: `teachers/${teacherId} and related classes`,
-      });
-      errorEmitter.emit('permission-error', permissionError);
-      throw permissionError;
+      if (!(e instanceof FirestorePermissionError)) {
+          const permissionError = new FirestorePermissionError({
+            operation: 'delete',
+            path: `teachers/${teacherId} and related classes`,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+          throw permissionError;
+      }
+      throw e;
     }
   }
 
@@ -236,10 +278,10 @@ export default function Home() {
   const handleDeleteClass = async (classId: string) => {
     if (!firestore || !user) return;
 
+    const batch = writeBatch(firestore);
      try {
-      await runTransaction(firestore, async (transaction) => {
         const classRef = doc(firestore, "classes", classId);
-        const classSnap = await transaction.get(classRef);
+        const classSnap = await getDoc(classRef);
         if (!classSnap.exists()) return;
 
         const schoolClass = classSnap.data() as SchoolClass;
@@ -253,29 +295,35 @@ export default function Home() {
 
         for (const teacherId of teacherIds) {
             const teacherRef = doc(firestore, "teachers", teacherId);
-            const teacherSnap = await transaction.get(teacherRef);
+            const teacherSnap = await getDoc(teacherRef);
             if (teacherSnap.exists()) {
                 const teacher = teacherSnap.data() as Teacher;
                 const newSchedule = JSON.parse(JSON.stringify(teacher.schedule || {}));
                 Object.keys(newSchedule).forEach(day => {
-                    Object.keys(newSchedule[day]).forEach(time => {
+                    Object.keys(newSchedule[day] || {}).forEach(time => {
                         if (newSchedule[day][time]?.classId === classId) {
                             newSchedule[day][time] = null;
                         }
                     });
                 });
-                transaction.update(teacherRef, { schedule: newSchedule });
+                batch.update(teacherRef, { schedule: newSchedule });
             }
         }
-        transaction.delete(classRef);
-      });
+        batch.delete(classRef);
+        await commitBatchWithContext(batch, {
+            operation: 'delete',
+            path: `classes/${classId} and related teachers`,
+        });
     } catch (e) {
-      const permissionError = new FirestorePermissionError({
-        operation: 'delete',
-        path: `classes/${classId} and related teachers`,
-      });
-      errorEmitter.emit('permission-error', permissionError);
-      throw permissionError;
+      if (!(e instanceof FirestorePermissionError)) {
+          const permissionError = new FirestorePermissionError({
+            operation: 'delete',
+            path: `classes/${classId} and related teachers`,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+          throw permissionError;
+      }
+      throw e;
     }
   };
 
@@ -286,9 +334,8 @@ const handleScheduleUpdate = async (
 ) => {
     if (!firestore || !user) return;
 
+    const batch = writeBatch(firestore);
     try {
-        const batch = writeBatch(firestore);
-
         if (entityType === 'teacher') {
             const teacherRef = doc(firestore, 'teachers', entityId);
             const teacherSnap = await getDoc(teacherRef);
@@ -298,7 +345,7 @@ const handleScheduleUpdate = async (
             batch.update(teacherRef, { schedule: newSchedule });
 
             const allRelevantClassIds = new Set<string>();
-            [oldSchedule, newSchedule].forEach(schedule => Object.values(schedule).forEach(day => Object.values(day).forEach(lesson => lesson?.classId && allRelevantClassIds.add(lesson.classId))));
+            [oldSchedule, newSchedule].forEach(schedule => Object.values(schedule).forEach(day => Object.values(day || {}).forEach(lesson => lesson?.classId && allRelevantClassIds.add(lesson.classId))));
 
             for (const classId of allRelevantClassIds) {
                 const classRef = doc(firestore, 'classes', classId);
@@ -337,7 +384,7 @@ const handleScheduleUpdate = async (
             batch.update(classRef, { schedule: newSchedule });
 
             const allRelevantTeacherIds = new Set<string>();
-            [oldSchedule, newSchedule].forEach(schedule => Object.values(schedule).forEach(day => Object.values(day).forEach(lesson => lesson?.teacherId && allRelevantTeacherIds.add(lesson.teacherId))));
+            [oldSchedule, newSchedule].forEach(schedule => Object.values(schedule).forEach(day => Object.values(day || {}).forEach(lesson => lesson?.teacherId && allRelevantTeacherIds.add(lesson.teacherId))));
 
             for (const teacherId of allRelevantTeacherIds) {
                 const teacherRef = doc(firestore, 'teachers', teacherId);
@@ -375,8 +422,6 @@ const handleScheduleUpdate = async (
         });
 
     } catch (e) {
-        // commitBatchWithContext will throw a permission error, so we don't need to re-wrap it
-        // but if another error occurs, we wrap it for consistency.
         if (!(e instanceof FirestorePermissionError)) {
             const permissionError = new FirestorePermissionError({
                 operation: 'update',
@@ -386,7 +431,6 @@ const handleScheduleUpdate = async (
             errorEmitter.emit('permission-error', permissionError);
             throw permissionError;
         }
-        // re-throw the original permission error from commitBatchWithContext
         throw e;
     }
 }
@@ -408,7 +452,6 @@ const handleScheduleUpdate = async (
           await seedData();
         }
       } catch (e) {
-        // Error is already emitted by commitBatchWithContext, just log for debugging
         console.error("Failed to update timetable settings.", e);
       }
   }
@@ -423,6 +466,13 @@ const handleScheduleUpdate = async (
     batch.update(teacherRef, { absences: absenceData });
     await commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: { absences: absenceData, userId: user.uid } });
   }
+
+  const todaysAbsences = useMemo(() => {
+    const today = startOfDay(new Date());
+    return teachers.filter(teacher => 
+        teacher.absences?.some(absence => isSameDay(new Date(absence.date), today))
+    );
+  }, [teachers]);
 
   const isDataLoading = isUserLoading || teachersLoading || classesLoading || settingsLoading;
 
@@ -454,46 +504,118 @@ const handleScheduleUpdate = async (
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
-      <main className="flex-1 p-4 sm:p-6 md:p-8">
-        <Tabs defaultValue="teachers" className="w-full">
-          <div className='flex justify-center'>
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-2xl">
-              <TabsTrigger value="teachers">פרופילי מורים</TabsTrigger>
-              <TabsTrigger value="classes">כיתות לימוד</TabsTrigger>
-              <TabsTrigger value="timetable">זמינות מחליפים</TabsTrigger>
-              <TabsTrigger value="settings">הגדרות</TabsTrigger>
-            </TabsList>
-          </div>
-          <TabsContent value="teachers">
-            <TeacherList
-              teachers={teachers}
-              allClasses={schoolClasses}
-              timeSlots={timeSlots}
-              onAddTeacher={handleAddTeacher}
-              onEditTeacher={handleEditTeacher}
-              onDeleteTeacher={handleDeleteTeacher}
-              onMarkAbsent={handleMarkAbsent}
-              onUpdateTeacherSchedule={(teacherId, schedule) => handleScheduleUpdate('teacher', teacherId, schedule)}
-            />
-          </TabsContent>
-           <TabsContent value="classes">
-            <ClassList 
-              initialClasses={schoolClasses} 
-              allTeachers={teachers}
-              timeSlots={timeSlots}
-              onAddClass={handleAddClass}
-              onDeleteClass={handleDeleteClass}
-              onUpdateSchedule={(classId, schedule) => handleScheduleUpdate('class', classId, schedule)}
-            />
-          </TabsContent>
-          <TabsContent value="timetable">
-            <Timetable allTeachers={teachers} timeSlots={timeSlots} />
-          </TabsContent>
-          <TabsContent value="settings">
-            <SettingsTab timeSlots={timeSlots} onUpdate={handleTimetableSettingsUpdate}/>
-          </TabsContent>
-        </Tabs>
+      <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
+        <Card>
+          <CardHeader>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <AlertTriangle className="text-destructive" />
+                מורים חסרים היום
+              </CardTitle>
+              <CardDescription>סקירה מהירה של ההיעדרויות להיום. לחץ על מורה כדי למצוא מחליפים.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {todaysAbsences.length > 0 ? (
+                <div className="space-y-3">
+                    {todaysAbsences.map(teacher => (
+                        <div key={teacher.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                            <span className="font-semibold">{teacher.name}</span>
+                            <Button size="sm" variant="destructive" onClick={() => setTeacherToMarkAbsent(teacher)}>
+                                <UserX className="ml-2 h-4 w-4" />
+                                מצא מחליף
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">אין היעדרויות רשומות להיום.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+             <Tabs defaultValue="teachers" className="w-full">
+              <div className='flex justify-center'>
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-2xl">
+                  <TabsTrigger value="teachers">פרופילי מורים</TabsTrigger>
+                  <TabsTrigger value="classes">כיתות לימוד</TabsTrigger>
+                  <TabsTrigger value="timetable">זמינות מחליפים</TabsTrigger>
+                  <TabsTrigger value="settings">הגדרות</TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="teachers">
+                <TeacherList
+                  teachers={teachers}
+                  allClasses={schoolClasses}
+                  timeSlots={timeSlots}
+                  onAddTeacher={handleAddTeacher}
+                  onEditTeacher={handleEditTeacher}
+                  onDeleteTeacher={handleDeleteTeacher}
+                  onMarkAbsent={(teacher) => setTeacherToMarkAbsent(teacher)}
+                  onUpdateTeacherSchedule={(teacherId, schedule) => handleScheduleUpdate('teacher', teacherId, schedule)}
+                  teacherAvailabilityNow={teacherAvailabilityNow}
+                />
+              </TabsContent>
+              <TabsContent value="classes">
+                <ClassList 
+                  initialClasses={schoolClasses} 
+                  allTeachers={teachers}
+                  timeSlots={timeSlots}
+                  onAddClass={handleAddClass}
+                  onDeleteClass={handleDeleteClass}
+                  onUpdateSchedule={(classId, schedule) => handleScheduleUpdate('class', classId, schedule)}
+                />
+              </TabsContent>
+              <TabsContent value="timetable">
+                <Timetable allTeachers={teachers} timeSlots={timeSlots} />
+              </TabsContent>
+              <TabsContent value="settings">
+                <SettingsTab timeSlots={timeSlots} onUpdate={handleTimetableSettingsUpdate}/>
+              </TabsContent>
+            </Tabs>
+          </CardHeader>
+        </Card>
       </main>
+
+       <MarkAbsentDialog
+        isOpen={!!teacherToMarkAbsent}
+        onOpenChange={(open) => !open && setTeacherToMarkAbsent(null)}
+        teacher={teacherToMarkAbsent}
+        allTeachers={teachers}
+        allClasses={schoolClasses}
+        timeSlots={timeSlots}
+        onShowRecommendation={(results, absentTeacher, absenceDays) => {
+            const updatedClasses = JSON.parse(JSON.stringify(allClasses));
+            results.forEach(res => {
+                if (res.recommendationId) {
+                    const classToUpdate = updatedClasses.find((c: SchoolClass) => c.id === res.classId);
+                    if (classToUpdate) {
+                        const dayOfWeek = daysOfWeek[new Date(res.date).getDay()];
+                        if(classToUpdate.schedule[dayOfWeek]?.[res.time]) {
+                            classToUpdate.schedule[dayOfWeek][res.time]!.teacherId = res.recommendationId;
+                        }
+                    }
+                }
+            });
+            handleMarkAbsent(absentTeacher.id, absenceDays);
+            setRecommendation({ results, absentTeacher, newClassSchedules: updatedClasses });
+        }}
+      />
+
+       <RecommendationDialog
+        isOpen={!!recommendation}
+        onOpenChange={(open) => !open && setRecommendation(null)}
+        recommendationResult={recommendation}
+        onTimetablesUpdate={() => {
+            if (!recommendation) return;
+            const updates: Promise<any>[] = [];
+            recommendation.newClassSchedules.forEach((sc: SchoolClass) => {
+                updates.push(handleScheduleUpdate('class', sc.id, sc.schedule));
+            });
+            Promise.all(updates).then(() => setRecommendation(null));
+        }}
+      />
+
     </div>
   );
 }

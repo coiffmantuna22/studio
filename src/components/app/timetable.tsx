@@ -9,7 +9,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { daysOfWeek } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Coffee, UserCheck, UserX } from 'lucide-react';
-import { getDay, isSameDay, startOfDay } from 'date-fns';
+import { isSameDay, startOfDay } from 'date-fns';
 
 interface TimetableProps {
   allTeachers: Teacher[];
@@ -87,7 +87,7 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
   }, [allTeachers, timeSlots]);
 
   return (
-    <Card className="mt-6">
+    <Card className="mt-6 border-none shadow-none">
       <CardHeader>
         <CardTitle className="text-xl">זמינות מורים להחלפה</CardTitle>
         <CardDescription>

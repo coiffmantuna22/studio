@@ -57,7 +57,7 @@ export default function ClassList({ initialClasses, allTeachers, timeSlots, onAd
   );
 
   return (
-    <Card className="mt-6 border-border/80 rounded-2xl">
+    <Card className="mt-6 border-none shadow-none">
       <CardHeader>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
           <div className='flex-1'>

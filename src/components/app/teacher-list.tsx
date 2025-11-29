@@ -1,18 +1,15 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import type { Teacher, SchoolClass, AffectedLesson, TimeSlot, AbsenceDay, ClassSchedule } from '@/lib/types';
+import { useState } from 'react';
+import type { Teacher, SchoolClass, TimeSlot, ClassSchedule, TeacherAvailabilityStatus } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Plus, Search } from 'lucide-react';
 import TeacherCard from './teacher-card';
 import CreateTeacherDialog from './create-teacher-dialog';
-import MarkAbsentDialog from './mark-absent-dialog';
-import RecommendationDialog from './recommendation-dialog';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { getDay } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,8 +21,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import TeacherScheduleDialog from './teacher-schedule-dialog';
-import { isTeacherAvailable } from '@/lib/substitute-finder';
-import { parse } from 'date-fns';
 
 interface TeacherListProps {
   teachers: Teacher[];
@@ -34,8 +29,9 @@ interface TeacherListProps {
   onAddTeacher: (teacher: Omit<Teacher, 'id' | 'userId' | 'avatar' | 'schedule'>) => void;
   onEditTeacher: (teacher: Omit<Teacher, 'userId' | 'avatar' | 'schedule'>) => void;
   onDeleteTeacher: (teacherId: string) => void;
-  onMarkAbsent: (teacherId: string, absenceDays: AbsenceDay[]) => void;
+  onMarkAbsent: (teacher: Teacher) => void;
   onUpdateTeacherSchedule: (teacherId: string, schedule: ClassSchedule) => void;
+  teacherAvailabilityNow: Map<string, TeacherAvailabilityStatus>;
 }
 
 export default function TeacherList({ 
@@ -46,19 +42,14 @@ export default function TeacherList({
   onEditTeacher,
   onDeleteTeacher,
   onMarkAbsent,
-  onUpdateTeacherSchedule
+  onUpdateTeacherSchedule,
+  teacherAvailabilityNow,
 }: TeacherListProps) {
   const { toast } = useToast();
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
-  const [teacherToMarkAbsent, setTeacherToMarkAbsent] = useState<Teacher | null>(null);
   const [teacherToEdit, setTeacherToEdit] = useState<Teacher | null>(null);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const [teacherToViewSchedule, setTeacherToViewSchedule] = useState<Teacher | null>(null);
-  const [recommendation, setRecommendation] = useState<{
-    results: AffectedLesson[];
-    absentTeacher: Teacher;
-    newClassSchedules: SchoolClass[];
-  } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
  const handleCreateTeacher = (newTeacherData: Omit<Teacher, 'id' | 'userId' | 'avatar' | 'schedule'>) => {
@@ -92,32 +83,6 @@ export default function TeacherList({
     setTeacherToDelete(null);
   };
 
-
-  const handleShowRecommendation = (
-    results: AffectedLesson[],
-    absentTeacher: Teacher,
-    absenceDays: AbsenceDay[]
-  ) => {
-    const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-    const updatedClasses = JSON.parse(JSON.stringify(allClasses)) as SchoolClass[];
-    
-    results.forEach(res => {
-      const substituteId = res.recommendationId;
-      if (substituteId) {
-        const classToUpdate = updatedClasses.find((c: SchoolClass) => c.id === res.classId);
-        if (classToUpdate) {
-          const dayOfWeek = dayMap[getDay(res.date)];
-          if (classToUpdate.schedule[dayOfWeek]?.[res.time]) {
-            classToUpdate.schedule[dayOfWeek][res.time]!.teacherId = substituteId;
-          }
-        }
-      }
-    });
-
-    onMarkAbsent(absentTeacher.id, absenceDays);
-    setRecommendation({ results, absentTeacher, newClassSchedules: updatedClasses });
-  };
-
   const openCreateDialog = () => {
     setTeacherToEdit(null);
     setCreateDialogOpen(true);
@@ -133,96 +98,12 @@ export default function TeacherList({
     setTeacherToEdit(null);
   };
 
-  const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-
- const handleFinalUpdateTimetables = async () => {
-    if (!recommendation) return;
-
-    let lessonsUpdatedCount = 0;
-    
-    const teacherScheduleUpdates = new Map<string, ClassSchedule>();
-
-    // Use newClassSchedules to determine updates
-    recommendation.newClassSchedules.forEach(updatedClass => {
-        const originalClass = allClasses.find(c => c.id === updatedClass.id);
-        if (!originalClass) return;
-        
-        daysOfWeek.forEach(day => {
-            Object.keys(updatedClass.schedule[day] || {}).forEach(time => {
-                const updatedLesson = updatedClass.schedule[day]?.[time];
-                const originalLesson = originalClass.schedule[day]?.[time];
-
-                // If a change occurred
-                if (updatedLesson?.teacherId !== originalLesson?.teacherId) {
-                    lessonsUpdatedCount++;
-                    // Remove lesson from original teacher's schedule if they existed
-                    if (originalLesson?.teacherId) {
-                        const originalTeacherId = originalLesson.teacherId;
-                        const teacherSchedule = teacherScheduleUpdates.get(originalTeacherId) || (teachers.find(t=>t.id === originalTeacherId)?.schedule ? JSON.parse(JSON.stringify(teachers.find(t=>t.id === originalTeacherId)!.schedule)) : {});
-                        if (teacherSchedule[day]?.[time]?.classId === updatedClass.id) {
-                            teacherSchedule[day][time] = null;
-                        }
-                        teacherScheduleUpdates.set(originalTeacherId, teacherSchedule);
-                    }
-
-                    // Add lesson to new teacher's schedule
-                    if (updatedLesson?.teacherId) {
-                        const newTeacherId = updatedLesson.teacherId;
-                        const subSchedule = teacherScheduleUpdates.get(newTeacherId) || (teachers.find(t=>t.id === newTeacherId)?.schedule ? JSON.parse(JSON.stringify(teachers.find(t=>t.id === newTeacherId)!.schedule)) : {});
-                        subSchedule[day] = subSchedule[day] || {};
-                        subSchedule[day][time] = { ...updatedLesson, classId: updatedClass.id };
-                        teacherScheduleUpdates.set(newTeacherId, subSchedule);
-                    }
-                }
-            });
-        });
-    });
-
-    for(const [teacherId, schedule] of teacherScheduleUpdates.entries()) {
-        await onUpdateTeacherSchedule(teacherId, schedule);
-    }
-    
-    if (lessonsUpdatedCount > 0) {
-      toast({
-        title: "מערכת השעות עודכנה",
-        description: `${lessonsUpdatedCount} שיעורים עודכנו עם מחליפים.`,
-      });
-    } else {
-        toast({
-        title: "לא בוצעו שינויים",
-        description: "לא נמצאו המלצות לשיבוץ ולכן מערכת השעות לא עודכנה.",
-      });
-    }
-
-    setRecommendation(null);
-  };
-
   const filteredTeachers = teachers.filter(teacher =>
     teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const teacherAvailabilityNow = useMemo(() => {
-    const now = new Date();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    const currentSlot = timeSlots.find(slot => currentTime >= slot.start && currentTime < slot.end);
-
-    const availabilityMap = new Map<string, boolean>();
-
-    if (currentSlot && currentSlot.type === 'lesson') {
-        teachers.forEach(teacher => {
-            const isAvailable = isTeacherAvailable(teacher, now, currentSlot.start, timeSlots);
-            availabilityMap.set(teacher.id, isAvailable);
-        });
-    } else {
-         teachers.forEach(teacher => availabilityMap.set(teacher.id, false));
-    }
-    return availabilityMap;
-
-  }, [teachers, timeSlots]);
-
-
   return (
-    <Card className="mt-6 border-border/80 rounded-2xl">
+    <Card className="mt-6 border-none shadow-none">
       <CardHeader>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
             <div className='flex-1'>
@@ -271,11 +152,11 @@ export default function TeacherList({
                     <TeacherCard
                         key={teacher.id}
                         teacher={teacher}
-                        onMarkAbsent={() => setTeacherToMarkAbsent(teacher)}
+                        onMarkAbsent={() => onMarkAbsent(teacher)}
                         onEdit={() => openEditDialog(teacher)}
                         onDelete={() => setTeacherToDelete(teacher)}
                         onViewSchedule={() => setTeacherToViewSchedule(teacher)}
-                        isAvailableNow={teacherAvailabilityNow.get(teacher.id) || false}
+                        availabilityStatus={teacherAvailabilityNow.get(teacher.id) || 'unknown'}
                     />
                     ))}
                 </div>
@@ -305,23 +186,6 @@ export default function TeacherList({
         onEditTeacher={handleUpdateTeacher}
         teacherToEdit={teacherToEdit}
         timeSlots={timeSlots}
-      />
-
-      <MarkAbsentDialog
-        isOpen={!!teacherToMarkAbsent}
-        onOpenChange={(open) => !open && setTeacherToMarkAbsent(null)}
-        teacher={teacherToMarkAbsent}
-        allTeachers={teachers}
-        allClasses={allClasses}
-        timeSlots={timeSlots}
-        onShowRecommendation={handleShowRecommendation}
-      />
-
-      <RecommendationDialog
-        isOpen={!!recommendation}
-        onOpenChange={(open) => !open && setRecommendation(null)}
-        recommendationResult={recommendation}
-        onTimetablesUpdate={handleFinalUpdateTimetables}
       />
 
        <TeacherScheduleDialog

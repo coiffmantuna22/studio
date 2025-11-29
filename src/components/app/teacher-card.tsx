@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Teacher } from '@/lib/types';
+import type { Teacher, TeacherAvailabilityStatus } from '@/lib/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,14 +23,6 @@ import {
 import { MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
@@ -40,7 +32,7 @@ interface TeacherCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onViewSchedule: () => void;
-  isAvailableNow: boolean;
+  availabilityStatus: TeacherAvailabilityStatus;
 }
 
 const formatAvailability = (availability: Teacher['availability']) => {
@@ -56,18 +48,33 @@ const formatAvailability = (availability: Teacher['availability']) => {
   return presentDays.join(', ');
 }
 
-export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, onViewSchedule, isAvailableNow }: TeacherCardProps) {
+const AvailabilityBadge = ({ status }: { status: TeacherAvailabilityStatus }) => {
+    switch (status) {
+        case 'available':
+            return <Badge variant="secondary" className='bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'>פנוי/ה</Badge>;
+        case 'teaching':
+            return <Badge variant="secondary" className='bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300'>מלמד/ת</Badge>;
+        case 'absent':
+            return <Badge variant="destructive">בחופש</Badge>;
+        case 'not_in_school':
+            return <Badge variant="outline">לא בביה"ס</Badge>;
+        default:
+            return <Badge variant="outline">לא ידוע</Badge>;
+    }
+}
+
+export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, onViewSchedule, availabilityStatus }: TeacherCardProps) {
   return (
     <Card className="flex flex-col transition-all hover:shadow-md">
       <CardHeader className="flex flex-row items-start gap-4">
-        <Avatar className={cn(
-            "h-12 w-12 border-2",
-            isAvailableNow ? 'border-green-500' : 'border-transparent'
-        )}>
+        <Avatar className="h-12 w-12 border-2 border-transparent">
           <AvatarFallback>{teacher.avatar.fallback}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <CardTitle>{teacher.name}</CardTitle>
+          <div className='mt-1'>
+            <AvailabilityBadge status={availabilityStatus} />
+          </div>
         </div>
          <DropdownMenu>
           <DropdownMenuTrigger asChild>

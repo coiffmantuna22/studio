@@ -1,6 +1,6 @@
 
-import { getDay } from 'date-fns';
-import type { Teacher, SchoolClass, TimeSlot } from './types';
+import { getDay, isSameDay, startOfDay } from 'date-fns';
+import type { Teacher, SchoolClass, TimeSlot, TeacherAvailabilityStatus } from './types';
 
 interface LessonDetails {
   subject: string;
@@ -21,34 +21,88 @@ const parseTimeToNumber = (time: string) => {
     return hours + minutes / 60;
 };
 
+export function getTeacherAvailabilityStatus(teacher: Teacher, date: Date, timeSlots: TimeSlot[]): TeacherAvailabilityStatus {
+    const dayOfWeek = dayMap[getDay(date)];
+    const now = date;
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const currentSlot = timeSlots.find(slot => currentTime >= slot.start && currentTime < slot.end);
+    
+    if (!currentSlot) return 'unknown';
+
+    // 1. Is the teacher marked as absent today?
+    const today = startOfDay(date);
+    const todaysAbsence = teacher.absences?.find(absence => isSameDay(new Date(absence.date), today));
+    if (todaysAbsence) {
+        if (todaysAbsence.isAllDay) return 'absent';
+        const absenceStart = parseTimeToNumber(todaysAbsence.startTime);
+        const absenceEnd = parseTimeToNumber(todaysAbsence.endTime);
+        const slotStart = parseTimeToNumber(currentSlot.start);
+        if (slotStart >= absenceStart && slotStart < absenceEnd) {
+            return 'absent';
+        }
+    }
+
+    // 2. Is the teacher generally present at school during this slot?
+    const availabilityForDay = teacher.availability.find(a => a.day === dayOfWeek);
+    if (!availabilityForDay) {
+        return 'not_in_school';
+    }
+
+    const slotStartNum = parseTimeToNumber(currentSlot.start);
+    const isPresent = availabilityForDay.slots.some(presenceSlot => {
+        const presenceStartNum = parseTimeToNumber(presenceSlot.start);
+        const presenceEndNum = parseTimeToNumber(presenceSlot.end);
+        return slotStartNum >= presenceStartNum && slotStartNum < presenceEndNum;
+    });
+
+    if (!isPresent) {
+        return 'not_in_school';
+    }
+    
+    // 3. Is the teacher teaching a scheduled lesson now?
+    if (teacher.schedule?.[dayOfWeek]?.[currentSlot.start]) {
+        return 'teaching';
+    }
+
+    // If present, not absent, and not teaching, they are available.
+    return 'available';
+}
+
 export function isTeacherAvailable(teacher: Teacher, date: Date, time: string, timeSlots: TimeSlot[]): boolean {
-  const dayOfWeek = dayMap[getDay(date)];
   const lessonSlot = timeSlots.find(s => s.start === time);
   if (!lessonSlot) return false;
 
-  const lessonStartNum = parseTimeToNumber(lessonSlot.start);
-  const lessonEndNum = parseTimeToNumber(lessonSlot.end);
+  const status = getTeacherAvailabilityStatus(teacher, date, timeSlots);
 
-  // 1. Is the teacher present at school?
+  // For substitution purposes, we only care if they are 'available' at the specific lesson time
+  // which means we need to check their schedule for that *specific* slot, not just the current time.
+  const dayOfWeek = dayMap[getDay(date)];
   const availabilityForDay = teacher.availability.find(a => a.day === dayOfWeek);
-  if (!availabilityForDay) {
-    return false;
-  }
+  if (!availabilityForDay) return false;
+
+  const lessonStartNum = parseTimeToNumber(lessonSlot.start);
+
   const isPresent = availabilityForDay.slots.some(slot => {
     const startNum = parseTimeToNumber(slot.start);
     const endNum = parseTimeToNumber(slot.end);
-    return lessonStartNum >= startNum && lessonEndNum <= endNum;
+    return lessonStartNum >= startNum && lessonStartNum < endNum;
   });
 
   if (!isPresent) return false;
-
-  // 2. Is the teacher teaching a scheduled lesson at that time?
+  
   const isTeaching = teacher.schedule?.[dayOfWeek]?.[time];
-  if (isTeaching) {
-      return false;
-  }
+  if (isTeaching) return false;
 
-  // If present and not teaching, they are available.
+  const todaysAbsence = teacher.absences?.find(absence => isSameDay(new Date(absence.date), startOfDay(date)));
+   if (todaysAbsence) {
+        if (todaysAbsence.isAllDay) return false;
+        const absenceStart = parseTimeToNumber(todaysAbsence.startTime);
+        const absenceEnd = parseTimeToNumber(todaysAbsence.endTime);
+        if (lessonStartNum >= absenceStart && lessonStartNum < absenceEnd) {
+            return false;
+        }
+    }
+
   return true;
 }
 

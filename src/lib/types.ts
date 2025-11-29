@@ -63,3 +63,5 @@ export interface TimeSlot {
   type: 'lesson' | 'break';
   userId?: string;
 }
+
+export type TeacherAvailabilityStatus = 'available' | 'teaching' | 'absent' | 'not_in_school' | 'unknown';
