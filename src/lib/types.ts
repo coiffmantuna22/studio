@@ -66,3 +66,18 @@ export interface TimeSlot {
 }
 
 export type TeacherAvailabilityStatus = 'available' | 'teaching' | 'absent' | 'not_in_school' | 'unknown';
+
+export interface SubstitutionRecord {
+  id: string;
+  date: string;
+  time: string;
+  classId: string;
+  className: string;
+  absentTeacherId: string;
+  absentTeacherName: string;
+  substituteTeacherId: string;
+  substituteTeacherName: string;
+  subject: string;
+  userId: string;
+  createdAt: string;
+}

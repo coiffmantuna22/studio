@@ -1,13 +1,25 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import Header from '@/components/app/header';
-import TeacherList from '@/components/app/teacher-list';
-import Timetable from '@/components/app/timetable';
-import ClassList from '@/components/app/class-list';
-import SettingsTab from '@/components/app/settings-tab';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay } from '@/lib/types';
+import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay, SubstitutionRecord } from '@/lib/types';
+
+const TeacherList = dynamic(() => import('@/components/app/teacher-list'), {
+  loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
+});
+const Timetable = dynamic(() => import('@/components/app/timetable'), {
+  loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
+});
+const ClassList = dynamic(() => import('@/components/app/class-list'), {
+  loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
+});
+const SettingsTab = dynamic(() => import('@/components/app/settings-tab'), {
+  loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
+});
+const StatisticsTab = dynamic(() => import('@/components/app/statistics-tab'), {
+  loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
+});
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, doc, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
@@ -33,10 +45,15 @@ const getAffectedLessons = (
   const affected: Omit<AffectedLesson, 'recommendation' | 'recommendationId' | 'reasoning' | 'substituteOptions'>[] = [];
   const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
+  const getMinutes = (time: string) => {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+  };
+
   (absenceDays || []).forEach(day => {
     const dayOfWeek = dayMap[getDay(startOfDay(new Date(day.date)))];
-    const absenceStart = day.isAllDay ? 0 : parseInt(day.startTime.split(':')[0], 10);
-    const absenceEnd = day.isAllDay ? 24 : parseInt(day.endTime.split(':')[0], 10);
+    const absenceStart = day.isAllDay ? 0 : getMinutes(day.startTime);
+    const absenceEnd = day.isAllDay ? 24 * 60 : getMinutes(day.endTime);
 
     (allClasses || []).forEach(schoolClass => {
       const classDaySchedule = schoolClass.schedule?.[dayOfWeek];
@@ -45,10 +62,10 @@ const getAffectedLessons = (
           const lessonSlot = timeSlots.find(s => s.start === time);
           if (!lessonSlot || lessonSlot.type === 'break') return;
 
-          const lessonStartHour = parseInt(lessonSlot.start.split(':')[0], 10);
-          const lessonEndHour = parseInt(lessonSlot.end.split(':')[0], 10);
+          const lessonStart = getMinutes(lessonSlot.start);
+          const lessonEnd = getMinutes(lessonSlot.end);
           
-          if (lesson && lesson.teacherId === absentTeacher.id && isSameDay(startOfDay(new Date(day.date)), startOfDay(new Date(day.date))) && Math.max(lessonStartHour, absenceStart) < Math.min(lessonEndHour, absenceEnd)) {
+          if (lesson && lesson.teacherId === absentTeacher.id && Math.max(lessonStart, absenceStart) < Math.min(lessonEnd, absenceEnd)) {
              affected.push({
               classId: schoolClass.id,
               className: schoolClass.name,
@@ -431,6 +448,28 @@ const handleScheduleUpdate = async (
         }
     }
 
+    // Record substitutions
+    for (const assignment of assignments) {
+        if (assignment.newTeacherId) {
+             const substitutionRef = doc(collection(firestore, 'substitutions'));
+             const substitutionRecord: SubstitutionRecord = {
+                 id: substitutionRef.id,
+                 date: startOfDay(new Date(assignment.originalLesson.date || new Date())).toISOString(), 
+                 time: assignment.time,
+                 classId: assignment.classId,
+                 className: assignment.className || 'Unknown',
+                 absentTeacherId: absentTeacher.id,
+                 absentTeacherName: absentTeacher.name,
+                 substituteTeacherId: assignment.newTeacherId,
+                 substituteTeacherName: assignment.newTeacherName || 'Unknown',
+                 subject: assignment.originalLesson.subject,
+                 userId: user.uid,
+                 createdAt: new Date().toISOString()
+             };
+             batch.set(substitutionRef, substitutionRecord);
+        }
+    }
+
 
     await commitBatchWithContext(batch, { operation: 'update', path: `absences_and_substitutions` });
     setRecommendation(null);
@@ -485,6 +524,8 @@ const handleScheduleUpdate = async (
   };
 
 
+  const [activeTab, setActiveTab] = useState("teachers");
+
   const isDataLoading = isUserLoading || teachersLoading || classesLoading || settingsLoading;
 
   if (isDataLoading) {
@@ -517,26 +558,26 @@ const handleScheduleUpdate = async (
       <Header />
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
         {todaysAbsences.length > 0 && (
-          <Card>
-            <CardHeader>
+          <Card className="border-l-4 border-l-destructive shadow-md">
+            <CardHeader className="pb-3">
                 <CardTitle className="text-xl flex items-center gap-2">
-                  <AlertTriangle className="text-destructive" />
+                  <AlertTriangle className="text-destructive h-5 w-5" />
                   מורים חסרים היום
                 </CardTitle>
                 <CardDescription>סקירה מהירה של ההיעדרויות להיום. לחץ על מורה כדי למצוא מחליפים.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {todaysAbsences.map(({ teacher, absences }) => {
                       const absenceTime = absences.map(a => a.isAllDay ? 'יום שלם' : `${a.startTime}-${a.endTime}`).join(', ');
                       return (
-                          <div key={teacher.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
-                              <div>
-                                <span className="font-semibold">{teacher.name}</span>
-                                <p className="text-sm text-muted-foreground">{absenceTime}</p>
+                          <div key={teacher.id} className="flex flex-col justify-between p-4 bg-secondary/30 rounded-xl border border-border hover:bg-secondary/50 transition-colors">
+                              <div className="mb-3">
+                                <span className="font-semibold text-lg block">{teacher.name}</span>
+                                <p className="text-sm text-muted-foreground mt-1">{absenceTime}</p>
                               </div>
-                              <Button size="sm" variant="secondary" onClick={() => handleShowAffectedLessons(teacher)}>
-                                  <ListChecks className="ml-2 h-4 w-4" />
+                              <Button size="sm" variant="outline" className="w-full justify-center" onClick={() => handleShowAffectedLessons(teacher)}>
+                                  <ListChecks className="me-2 h-4 w-4" />
                                   הצג שיעורים מושפעים
                               </Button>
                           </div>
@@ -547,57 +588,72 @@ const handleScheduleUpdate = async (
           </Card>
         )}
 
-        <Card>
-          <CardHeader>
-             <Tabs defaultValue="teachers" className="w-full">
-              <div className='flex justify-center'>
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-2xl">
-                  <TabsTrigger value="teachers">פרופילי מורים</TabsTrigger>
-                  <TabsTrigger value="classes">כיתות לימוד</TabsTrigger>
-                  <TabsTrigger value="timetable">זמינות מחליפים</TabsTrigger>
-                  <TabsTrigger value="settings">הגדרות</TabsTrigger>
-                </TabsList>
+        <div className="space-y-6">
+             <div className="w-full">
+              <div className="grid w-full grid-cols-2 sm:grid-cols-5 max-w-4xl mx-auto h-auto p-1 bg-muted/50 backdrop-blur-sm rounded-full mb-8">
+                <Button variant="ghost" onClick={() => setActiveTab("teachers")} className={`rounded-full py-2.5 transition-all ${activeTab === "teachers" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>פרופילי מורים</Button>
+                <Button variant="ghost" onClick={() => setActiveTab("classes")} className={`rounded-full py-2.5 transition-all ${activeTab === "classes" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>כיתות לימוד</Button>
+                <Button variant="ghost" onClick={() => setActiveTab("timetable")} className={`rounded-full py-2.5 transition-all ${activeTab === "timetable" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>זמינות מחליפים</Button>
+                <Button variant="ghost" onClick={() => setActiveTab("statistics")} className={`rounded-full py-2.5 transition-all ${activeTab === "statistics" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>סטטיסטיקה</Button>
+                <Button variant="ghost" onClick={() => setActiveTab("settings")} className={`rounded-full py-2.5 transition-all ${activeTab === "settings" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>הגדרות</Button>
               </div>
-              <TabsContent value="teachers">
-                <TeacherList
-                  teachers={teachers}
-                  allClasses={schoolClasses}
-                  timeSlots={timeSlots}
-                  onAddTeacher={handleAddTeacher}
-                  onEditTeacher={handleEditTeacher}
-                  onDeleteTeacher={handleDeleteTeacher}
-                  onMarkAbsent={(teacher) => setTeacherToMarkAbsent(teacher)}
-                  onUpdateTeacherSchedule={(teacherId, schedule) => handleScheduleUpdate('teacher', teacherId, schedule)}
-                  teacherAvailabilityNow={teacherAvailabilityNow}
-                />
-              </TabsContent>
-              <TabsContent value="classes">
-                <ClassList 
-                  initialClasses={schoolClasses} 
-                  allTeachers={teachers}
-                  timeSlots={timeSlots}
-                  onAddClass={handleAddClass}
-                  onDeleteClass={handleDeleteClass}
-                  onUpdateSchedule={(classId, schedule) => handleScheduleUpdate('class', classId, schedule)}
-                />
-              </TabsContent>
-              <TabsContent value="timetable">
-                <Timetable allTeachers={teachers} timeSlots={timeSlots} />
-              </TabsContent>
-              <TabsContent value="settings">
-                <SettingsTab timeSlots={timeSlots} onUpdate={handleTimetableSettingsUpdate}/>
-              </TabsContent>
-            </Tabs>
-          </CardHeader>
-        </Card>
+
+              {activeTab === "teachers" && (
+                <div className="mt-0">
+                  <TeacherList
+                    teachers={teachers || []}
+                    allClasses={schoolClasses || []}
+                    timeSlots={timeSlots}
+                    onAddTeacher={handleAddTeacher}
+                    onEditTeacher={handleEditTeacher}
+                    onDeleteTeacher={handleDeleteTeacher}
+                    onMarkAbsent={(teacher) => setTeacherToMarkAbsent(teacher)}
+                    onUpdateTeacherSchedule={(teacherId, schedule) => handleScheduleUpdate('teacher', teacherId, schedule)}
+                    teacherAvailabilityNow={teacherAvailabilityNow}
+                  />
+                </div>
+              )}
+
+              {activeTab === "classes" && (
+                <div className="mt-0">
+                  <ClassList 
+                    initialClasses={schoolClasses || []} 
+                    allTeachers={teachers || []}
+                    timeSlots={timeSlots}
+                    onAddClass={handleAddClass}
+                    onDeleteClass={handleDeleteClass}
+                    onUpdateSchedule={(classId, schedule) => handleScheduleUpdate('class', classId, schedule)}
+                  />
+                </div>
+              )}
+
+              {activeTab === "timetable" && (
+                <div className="mt-0">
+                  <Timetable allTeachers={teachers || []} timeSlots={timeSlots} />
+                </div>
+              )}
+
+              {activeTab === "statistics" && (
+                <div className="mt-0">
+                  <StatisticsTab />
+                </div>
+              )}
+
+              {activeTab === "settings" && (
+                <div className="mt-0">
+                  <SettingsTab timeSlots={timeSlots} onUpdate={handleTimetableSettingsUpdate}/>
+                </div>
+              )}
+            </div>
+        </div>
       </main>
 
        <MarkAbsentDialog
         isOpen={!!teacherToMarkAbsent}
         onOpenChange={(open) => !open && setTeacherToMarkAbsent(null)}
         teacher={teacherToMarkAbsent}
-        allTeachers={teachers}
-        allClasses={schoolClasses}
+        allTeachers={teachers || []}
+        allClasses={schoolClasses || []}
         timeSlots={timeSlots}
         getAffectedLessons={getAffectedLessons}
         onShowRecommendation={(results, absentTeacher, absenceDays) => {

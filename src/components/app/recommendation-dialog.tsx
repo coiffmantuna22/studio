@@ -56,12 +56,15 @@ export default function RecommendationDialog({
   const handleConfirm = () => {
     const finalAssignments = results.map(res => {
       // Automatically use the recommended teacher
-      const newTeacherId = res.recommendationId; 
+      const recommendation = res.substituteOptions?.find(sub => sub.id === res.recommendationId);
+      const newTeacherId = res.recommendationId;
       return {
         classId: res.classId,
+        className: res.className,
         day: daysOfWeek[getDay(res.date)],
         time: res.time,
         newTeacherId: newTeacherId,
+        newTeacherName: recommendation?.name,
         originalLesson: res.lesson
       }
     });

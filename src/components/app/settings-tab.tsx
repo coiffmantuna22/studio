@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Coffee } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -107,13 +107,56 @@ export default function SettingsTab({ timeSlots, onUpdate, isInitialSetup = fals
         form.trigger('slots'); // Re-run validation after sorting
     }
 
+    const addFiveMinBreaks = () => {
+        const currentSlots = form.getValues('slots');
+        const sortedSlots = [...currentSlots].sort((a, b) => a.start.localeCompare(b.start));
+        const newSlots: any[] = [];
+        let shiftMinutes = 0;
+
+        for (let i = 0; i < sortedSlots.length; i++) {
+            const slot = sortedSlots[i];
+            
+            // Calculate new start/end with accumulated shift
+            const startParts = slot.start.split(':').map(Number);
+            const endParts = slot.end.split(':').map(Number);
+            
+            const startTotal = startParts[0] * 60 + startParts[1] + shiftMinutes;
+            const endTotal = endParts[0] * 60 + endParts[1] + shiftMinutes;
+
+            const newStart = `${Math.floor(startTotal / 60).toString().padStart(2, '0')}:${(startTotal % 60).toString().padStart(2, '0')}`;
+            const newEnd = `${Math.floor(endTotal / 60).toString().padStart(2, '0')}:${(endTotal % 60).toString().padStart(2, '0')}`;
+
+            newSlots.push({ ...slot, start: newStart, end: newEnd });
+
+            // If next slot exists and both are lessons, add a break
+            if (i < sortedSlots.length - 1) {
+                const nextSlot = sortedSlots[i + 1];
+                if (slot.type === 'lesson' && nextSlot.type === 'lesson') {
+                     // Add 5 min break
+                     const breakStart = newEnd;
+                     const breakEndTotal = endTotal + 5;
+                     const breakEnd = `${Math.floor(breakEndTotal / 60).toString().padStart(2, '0')}:${(breakEndTotal % 60).toString().padStart(2, '0')}`;
+                     
+                     newSlots.push({
+                         start: breakStart,
+                         end: breakEnd,
+                         type: 'break'
+                     });
+                     
+                     shiftMinutes += 5;
+                }
+            }
+        }
+        form.setValue('slots', newSlots);
+    };
+
   return (
     <Card className="mt-6 border-border/80 rounded-2xl max-w-4xl mx-auto">
       <CardHeader>
         <CardTitle>הגדרות מערכת שעות</CardTitle>
         <CardDescription>
             {isInitialSetup 
-                ? 'ברוך הבא! כדי להתחיל, הגדר את שעות הלימוד וההפסקות בבית הספר. לאחר השמירה הראשונית, המערכת תייצר עבורך נתוני דמה להתנסות.'
+                ? 'ברוך הבא! כדי להתחיל, הגדר את שעות הלימוד וההפסקות בבית הספר.'
                 : 'כאן ניתן להתאים את שעות הלימוד וההפסקות בבית הספר. השינויים יחולו על כל מערכות השעות באפליקציה.'
             }
         </CardDescription>
@@ -183,6 +226,10 @@ export default function SettingsTab({ timeSlots, onUpdate, isInitialSetup = fals
                      <Button type="button" variant="secondary" onClick={handleSort}>
                         מיין לפי שעה
                     </Button>
+                    <Button type="button" variant="secondary" onClick={addFiveMinBreaks}>
+                        <Coffee className="ml-2 h-4 w-4" />
+                        הוסף הפסקות 5 דק'
+                    </Button>
                 </div>
             </CardContent>
             <CardFooter>
@@ -195,7 +242,7 @@ export default function SettingsTab({ timeSlots, onUpdate, isInitialSetup = fals
                       <AlertDialogTitle>אישור שמירת שינויים</AlertDialogTitle>
                       <AlertDialogDescription>
                         {isInitialSetup 
-                        ? 'פעולה זו תקבע את מבנה מערכת השעות ותייצר נתוני דמה ראשוניים. האם להמשיך?'
+                        ? 'פעולה זו תקבע את מבנה מערכת השעות. האם להמשיך?'
                         : 'שינוי מבנה מערכת השעות עשוי להשפיע על שיבוצים קיימים. האם אתה בטוח שברצונך לשמור את השינויים?'}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
