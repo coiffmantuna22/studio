@@ -12,8 +12,20 @@ import type { SchoolClass, Teacher, TimeSlot } from '@/lib/types';
 import { useUser, useFirestore } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useCollection } from 'react-firebase-hooks/firestore';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, WriteBatch } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
+import { errorEmitter, FirestorePermissionError } from '@/firebase';
+
+function commitBatchWithContext(batch: WriteBatch, context: { operation: 'create' | 'update' | 'delete', path: string, data?: any }) {
+  batch.commit().catch(error => {
+    const permissionError = new FirestorePermissionError({
+      operation: context.operation,
+      path: context.path,
+      requestResourceData: context.data,
+    });
+    errorEmitter.emit('permission-error', permissionError);
+  });
+}
 
 export default function Home() {
   const { user, isUserLoading } = useUser();
@@ -68,7 +80,7 @@ export default function Home() {
   // Seed data for new user
   useEffect(() => {
     if (user && !teachersLoading && !classesLoading && !settingsLoading && teachersCollection?.empty && classesCollection?.empty && settingsCollection?.empty) {
-      const seedData = async () => {
+      const seedData = () => {
         if (!firestore) return;
         const batch = writeBatch(firestore);
         
@@ -83,9 +95,14 @@ export default function Home() {
         });
         
         const settingsRef = doc(firestore, 'users', user.uid, 'settings', 'timetable');
-        batch.set(settingsRef, { slots: initialTimeSlots });
+        const timetableData = { slots: initialTimeSlots };
+        batch.set(settingsRef, timetableData);
         
-        await batch.commit();
+        commitBatchWithContext(batch, {
+          operation: 'create',
+          path: `users/${user.uid}/settings/timetable`,
+          data: timetableData
+        });
       };
       seedData();
     }
@@ -94,12 +111,14 @@ export default function Home() {
   const handleUpdate = async (collectionName: 'teachers' | 'classes', items: (Teacher | SchoolClass)[]) => {
      if (!firestore || !user) return;
     const batch = writeBatch(firestore);
+    let firstPath = '';
     items.forEach(item => {
       const { id, ...data } = item;
       const itemRef = doc(firestore, 'users', user.uid, collectionName, id);
+      if (!firstPath) firstPath = itemRef.path;
       batch.set(itemRef, data);
     });
-    await batch.commit();
+    commitBatchWithContext(batch, { operation: 'update', path: firstPath, data: items });
   }
   
   const handleClassesUpdate = (updatedClasses: SchoolClass[]) => {
@@ -110,32 +129,32 @@ export default function Home() {
     handleUpdate('teachers', updatedTeachers);
   }
 
-  const handleAddTeacher = async (newTeacherData: Omit<Teacher, 'id'>) => {
+  const handleAddTeacher = (newTeacherData: Omit<Teacher, 'id'>) => {
     if (!firestore || !user) return;
     const newDocRef = doc(collection(firestore, 'users', user.uid, 'teachers'));
     const newTeacher = { ...newTeacherData, id: newDocRef.id };
     const batch = writeBatch(firestore);
     batch.set(newDocRef, newTeacher);
-    await batch.commit();
+    commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: newTeacher });
   };
 
-  const handleEditTeacher = async (updatedTeacher: Omit<Teacher, 'avatar'>) => {
+  const handleEditTeacher = (updatedTeacher: Omit<Teacher, 'avatar'>) => {
     if (!firestore || !user) return;
     const teacherRef = doc(firestore, 'users', user.uid, 'teachers', updatedTeacher.id);
     const batch = writeBatch(firestore);
     batch.update(teacherRef, updatedTeacher as any);
-    await batch.commit();
+    commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: updatedTeacher });
   }
 
-  const handleDeleteTeacher = async (teacherId: string) => {
+  const handleDeleteTeacher = (teacherId: string) => {
     if (!firestore || !user) return;
     const batch = writeBatch(firestore);
     const teacherRef = doc(firestore, 'users', user.uid, 'teachers', teacherId);
     batch.delete(teacherRef);
-    await batch.commit();
+    commitBatchWithContext(batch, { operation: 'delete', path: teacherRef.path });
   }
 
-  const handleAddClass = async (className: string) => {
+  const handleAddClass = (className: string) => {
     if (!firestore || !user) return;
     const newDocRef = doc(collection(firestore, 'users', user.uid, 'classes'));
     const newClass: Omit<SchoolClass, 'id'> = {
@@ -144,29 +163,31 @@ export default function Home() {
     };
     const batch = writeBatch(firestore);
     batch.set(newDocRef, newClass);
-    await batch.commit();
+    commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: newClass });
   };
 
-  const handleDeleteClass = async (classId: string) => {
+  const handleDeleteClass = (classId: string) => {
     if (!firestore || !user) return;
     const classRef = doc(firestore, 'users', user.uid, 'classes', classId);
     const batch = writeBatch(firestore);
     batch.delete(classRef);
-    await batch.commit();
+    commitBatchWithContext(batch, { operation: 'delete', path: classRef.path });
   };
 
-  const handleUpdateSchedule = async (classId: string, newSchedule: any) => {
+  const handleUpdateSchedule = (classId: string, newSchedule: any) => {
     if (!firestore || !user) return;
     const classRef = doc(firestore, 'users', user.uid, 'classes', classId);
     const batch = writeBatch(firestore);
     batch.update(classRef, { schedule: newSchedule });
-    await batch.commit();
+    commitBatchWithContext(batch, { operation: 'update', path: classRef.path, data: { schedule: newSchedule } });
   };
   
-  const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
+  const handleTimetableSettingsUpdate = (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
       const settingsRef = doc(firestore, 'users', user.uid, 'settings', 'timetable');
-      await writeBatch(firestore).set(settingsRef, { slots: newTimeSlots }).commit();
+      const batch = writeBatch(firestore);
+      batch.set(settingsRef, { slots: newTimeSlots });
+      commitBatchWithContext(batch, { operation: 'update', path: settingsRef.path, data: { slots: newTimeSlots } });
   }
 
 
@@ -178,7 +199,7 @@ export default function Home() {
     );
   }
   
-  if (timeSlots.length === 0) {
+  if (timeSlots.length === 0 && !teachersLoading && !classesLoading && !settingsLoading && teachersCollection?.empty && classesCollection?.empty && settingsCollection?.empty) {
       return (
          <div className="flex flex-col min-h-screen bg-background">
             <Header />
