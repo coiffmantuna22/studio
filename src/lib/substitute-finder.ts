@@ -44,6 +44,26 @@ export function isTeacherAlreadyScheduled(teacherId: string, date: Date, time: s
     });
 }
 
+// Function to score a teacher's suitability for a substitution.
+const scoreTeacher = (teacher: Teacher, lessonDetails: LessonDetails): number => {
+    let score = 0;
+    // Base score for being qualified
+    if (teacher.subjects.includes(lessonDetails.subject)) {
+        score += 10;
+    }
+
+    // Bonus for matching preferences (example: prefers certain levels)
+    // This is a simple example. A real-world scenario could be more complex.
+    if (teacher.preferences?.includes('כיתות בוגרות')) {
+        score += 2;
+    }
+    if (teacher.preferences?.includes('חינוך מיוחד') && lessonDetails.subject === 'חינוך מיוחד') {
+        score += 5;
+    }
+
+    return score;
+}
+
 export async function findSubstitute(
   lessonDetails: LessonDetails,
   substitutePool: Teacher[],
@@ -51,46 +71,55 @@ export async function findSubstitute(
 ): Promise<FindSubstituteResult> {
   
   // 1. Filter by subject qualification
-  const qualifiedTeachers = substitutePool.filter(t => t.subjects.includes(lessonDetails.subject));
+  let qualifiedTeachers = substitutePool.filter(t => t.subjects.includes(lessonDetails.subject));
 
   if (qualifiedTeachers.length === 0) {
+     // If no one is qualified, check for any teacher available as a last resort
+     const anyAvailableTeacher = substitutePool.filter(t => isTeacherAvailable(t, lessonDetails.date, lessonDetails.time) && !isTeacherAlreadyScheduled(t.id, lessonDetails.date, lessonDetails.time, allClasses));
+     if(anyAvailableTeacher.length > 0) {
+        const bestOfWorst = anyAvailableTeacher[0];
+         return {
+            recommendation: bestOfWorst.name,
+            reasoning: `שימו לב: לא נמצא מורה המוכשר ב${lessonDetails.subject}. ${bestOfWorst.name} מוצע/ת כמפקח/ת בלבד מאחר והוא/היא זמין/ה.`,
+        };
+     }
+
     return {
       recommendation: null,
-      reasoning: 'לא נמצאו מחליפים בעלי הכשרה במקצוע זה.',
+      reasoning: 'לא נמצאו מחליפים בעלי הכשרה במקצוע זה, וגם לא נמצא מורה פנוי שיכול לשמש כמפקח.',
     };
   }
 
   // 2. Filter by availability on the specific day and time
-  const availableQualifiedTeachers = qualifiedTeachers.filter(t => isTeacherAvailable(t, lessonDetails.date, lessonDetails.time));
+  const availableQualifiedTeachers = qualifiedTeachers.filter(t => 
+      isTeacherAvailable(t, lessonDetails.date, lessonDetails.time) &&
+      !isTeacherAlreadyScheduled(t.id, lessonDetails.date, lessonDetails.time, allClasses)
+  );
 
   if (availableQualifiedTeachers.length === 0) {
     return {
       recommendation: null,
-      reasoning: `אף מורה מחליף שמוכשר ב${lessonDetails.subject} אינו זמין בשעה זו.`,
+      reasoning: `כל המורים המוכשרים ב${lessonDetails.subject} אינם זמינים או כבר משובצים לשיעורים אחרים בשעה זו.`,
     };
   }
   
-  // 3. Separate teachers who are free vs. already scheduled
-  const freeTeachers: Teacher[] = [];
+  // 3. Score and sort the available teachers
+  const scoredTeachers = availableQualifiedTeachers.map(teacher => ({
+    teacher,
+    score: scoreTeacher(teacher, lessonDetails),
+  })).sort((a, b) => b.score - a.score);
+
+  // 4. Select the best choice
+  const bestChoice = scoredTeachers[0].teacher;
   
-  availableQualifiedTeachers.forEach(teacher => {
-    if (!isTeacherAlreadyScheduled(teacher.id, lessonDetails.date, lessonDetails.time, allClasses)) {
-        freeTeachers.push(teacher);
-    }
-  });
-  
-  // 4. Prioritize free teachers
-  if (freeTeachers.length > 0) {
-    const bestChoice = freeTeachers[0]; // Simple choice for now, could be expanded
-    return {
-        recommendation: bestChoice.name,
-        reasoning: `${bestChoice.name} זמין/ה, מוכשר/ת ב${lessonDetails.subject}, ואין לו/ה שיעור אחר באותו זמן.`,
-    };
+  let reasoning = `${bestChoice.name} זמין/ה ומוכשר/ת ב${lessonDetails.subject}.`;
+  if (bestChoice.preferences) {
+      reasoning += ` העדפות: ${bestChoice.preferences}.`
   }
 
-  // 5. If no one is completely free, return null (or suggest someone busy as a last resort, but for now, we won't)
+
   return {
-    recommendation: null,
-    reasoning: `כל המורים המוכשרים והזמינים כבר משובצים לשיעורים אחרים בשעה זו.`,
+    recommendation: bestChoice.name,
+    reasoning: reasoning,
   };
 }

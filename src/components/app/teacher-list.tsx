@@ -12,6 +12,16 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { getDay } from 'date-fns';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface TeacherListProps {
   initialTeachers: Teacher[];
@@ -30,6 +40,7 @@ export default function TeacherList({
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [teacherToMarkAbsent, setTeacherToMarkAbsent] = useState<Teacher | null>(null);
   const [teacherToEdit, setTeacherToEdit] = useState<Teacher | null>(null);
+  const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const [recommendation, setRecommendation] = useState<{
     results: AffectedLesson[];
     absentTeacher: Teacher;
@@ -55,6 +66,10 @@ export default function TeacherList({
       avatar: { fallback },
     };
     onTeachersUpdate([teacherWithId, ...initialTeachers]);
+     toast({
+      title: "פרופיל מורה נוצר",
+      description: `הפרופיל של ${teacherWithId.name} נוסף למערכת.`,
+    });
   };
 
   const handleEditTeacher = (updatedTeacher: Omit<Teacher, 'avatar'>) => {
@@ -72,7 +87,40 @@ export default function TeacherList({
       )
     );
     setTeacherToEdit(null);
+     toast({
+      title: "פרופיל עודכן",
+      description: `הפרופיל של ${updatedTeacher.name} עודכן.`,
+    });
   };
+
+  const handleDeleteTeacher = () => {
+    if (!teacherToDelete) return;
+    
+    // First, remove the teacher from all class schedules
+    const updatedClasses = JSON.parse(JSON.stringify(allClasses));
+    updatedClasses.forEach((schoolClass: SchoolClass) => {
+      Object.keys(schoolClass.schedule).forEach(day => {
+        Object.keys(schoolClass.schedule[day]).forEach(time => {
+          const lesson = schoolClass.schedule[day][time];
+          if (lesson && lesson.teacherId === teacherToDelete.id) {
+            schoolClass.schedule[day][time] = null; // Unassign the teacher
+          }
+        });
+      });
+    });
+    onClassesUpdate(updatedClasses);
+
+    // Then, remove the teacher from the main list
+    onTeachersUpdate(initialTeachers.filter(t => t.id !== teacherToDelete.id));
+
+    toast({
+      title: "המורה נמחק",
+      description: `הפרופיל של ${teacherToDelete.name} וכל השיבוצים שלו הוסרו מהמערכת.`,
+    });
+
+    setTeacherToDelete(null);
+  };
+
 
   const handleShowRecommendation = (
     results: AffectedLesson[],
@@ -98,37 +146,44 @@ export default function TeacherList({
 
   const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
-  const handleFinalUpdateTimetables = () => {
-      if (!recommendation) return;
+ const handleFinalUpdateTimetables = () => {
+    if (!recommendation) return;
 
-      const updatedClasses = JSON.parse(JSON.stringify(allClasses));
-      let lessonsUpdatedCount = 0;
+    const updatedClasses = JSON.parse(JSON.stringify(allClasses));
+    let lessonsUpdatedCount = 0;
 
-      recommendation.results.forEach(res => {
-          const substituteId = getSubstituteTeacherId(res.recommendation);
-          if (substituteId) {
-              const classToUpdate = updatedClasses.find((c: SchoolClass) => c.id === res.classId);
-              if (classToUpdate) {
-                  lessonsUpdatedCount++;
-                  const dayOfWeek = dayMap[getDay(res.date)];
-                  if (classToUpdate.schedule[dayOfWeek]) {
-                      classToUpdate.schedule[dayOfWeek][res.time] = {
-                          subject: res.lesson.subject,
-                          teacherId: substituteId,
-                      };
-                  }
-              }
+    recommendation.results.forEach(res => {
+      const substituteId = getSubstituteTeacherId(res.recommendation);
+      if (substituteId) {
+        const classToUpdate = updatedClasses.find((c: SchoolClass) => c.id === res.classId);
+        if (classToUpdate) {
+          const dayOfWeek = dayMap[getDay(res.date)];
+          if (classToUpdate.schedule[dayOfWeek]?.[res.time] !== undefined) {
+             lessonsUpdatedCount++;
+            classToUpdate.schedule[dayOfWeek][res.time] = {
+              subject: res.lesson.subject,
+              teacherId: substituteId,
+            };
           }
-      });
-      
+        }
+      }
+    });
+    
+    if (lessonsUpdatedCount > 0) {
       onClassesUpdate(updatedClasses);
-
       toast({
-          title: "מערכת השעות עודכנה",
-          description: `${lessonsUpdatedCount} שיעורים עודכנו עם מחליפים.`,
+        title: "מערכת השעות עודכנה",
+        description: `${lessonsUpdatedCount} שיעורים עודכנו עם מחליפים.`,
       });
+    } else {
+        toast({
+        variant: "destructive",
+        title: "פעולה בוטלה",
+        description: "לא נבחרו המלצות ולכן לא בוצע עדכון.",
+      });
+    }
 
-      setRecommendation(null);
+    setRecommendation(null);
   };
 
   const filteredTeachers = initialTeachers.filter(teacher =>
@@ -137,7 +192,7 @@ export default function TeacherList({
 
 
   return (
-    <Card className="mt-6 border border-border/80 rounded-2xl">
+    <Card className="mt-6 border-border/80 rounded-2xl">
       <CardHeader>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
             <div>
@@ -173,11 +228,12 @@ export default function TeacherList({
                         teacher={teacher}
                         onMarkAbsent={() => setTeacherToMarkAbsent(teacher)}
                         onEdit={() => openEditDialog(teacher)}
+                        onDelete={() => setTeacherToDelete(teacher)}
                     />
                     ))}
                 </div>
             ) : (
-                 <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border text-center p-12">
+                 <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-12 text-center">
                     <h3 className="text-lg font-semibold text-foreground">לא נמצאו מורים תואמים</h3>
                     <p className="mt-2 text-sm text-muted-foreground">
                         נסה מונח חיפוש אחר.
@@ -185,7 +241,7 @@ export default function TeacherList({
                 </div>
             )
         ) : (
-          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border text-center p-12">
+          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-12 text-center">
               <h3 className="text-lg font-semibold text-foreground">לא נמצאו מורים</h3>
               <p className="mt-2 text-sm text-muted-foreground">
                 התחל על ידי יצירת פרופיל מורה חדש.
@@ -215,9 +271,25 @@ export default function TeacherList({
         isOpen={!!recommendation}
         onOpenChange={(open) => !open && setRecommendation(null)}
         recommendationResult={recommendation}
-        allTeachers={initialTeachers}
         onTimetablesUpdate={handleFinalUpdateTimetables}
       />
+
+       <AlertDialog open={!!teacherToDelete} onOpenChange={(open) => !open && setTeacherToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
+            <AlertDialogDescription>
+              פעולה זו תמחק את הפרופיל של {teacherToDelete?.name} לצמיתות ותסיר אותו/ה מכל מערכות השעות. לא ניתן לבטל את הפעולה.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ביטול</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTeacher}>
+              מחק
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

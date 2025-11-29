@@ -1,3 +1,5 @@
+'use client';
+
 import type { Teacher } from '@/lib/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -9,18 +11,27 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Book, Calendar, UserX, Pencil } from 'lucide-react';
+import { Book, Calendar, UserX, Pencil, Trash2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+import { MoreVertical } from 'lucide-react';
 
 interface TeacherCardProps {
   teacher: Teacher;
   onMarkAbsent: () => void;
   onEdit: () => void;
+  onDelete: () => void;
 }
 
 const formatAvailability = (availability: Teacher['availability']) => {
   const availableDays = availability
     .filter(day => day.slots.length > 0)
-    .map(day => day.day.substring(0, 3)); 
+    .map(day => day.day.substring(0, 3));
   if (availableDays.length === 0) {
     return 'לא זמין/ה';
   }
@@ -30,16 +41,35 @@ const formatAvailability = (availability: Teacher['availability']) => {
   return availableDays.join(', ');
 }
 
-export default function TeacherCard({ teacher, onMarkAbsent, onEdit }: TeacherCardProps) {
+export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete }: TeacherCardProps) {
   return (
     <Card className="flex flex-col transition-all hover:shadow-md">
-      <CardHeader className="flex flex-row items-center gap-4">
+      <CardHeader className="flex flex-row items-start gap-4">
         <Avatar className="h-12 w-12">
           <AvatarFallback>{teacher.avatar.fallback}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <CardTitle>{teacher.name}</CardTitle>
         </div>
+         <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+              <MoreVertical className="h-4 w-4" />
+              <span className="sr-only">More options</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onEdit}>
+              <Pencil className="ml-2 h-4 w-4" />
+              עריכה
+            </DropdownMenuItem>
+             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+              <Trash2 className="ml-2 h-4 w-4" />
+              מחק
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </CardHeader>
       <CardContent className="flex-grow space-y-4">
         <div className="flex items-start gap-3">
@@ -63,14 +93,10 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit }: TeacherCa
           </div>
         </div>
       </CardContent>
-      <CardFooter className="grid grid-cols-2 gap-2">
-        <Button variant="outline" className="w-full" onClick={onMarkAbsent}>
+      <CardFooter className="grid grid-cols-1 gap-2">
+        <Button className="w-full" onClick={onMarkAbsent}>
           <UserX className="ml-2 h-4 w-4" />
           סימון היעדרות
-        </Button>
-        <Button variant="secondary" className="w-full" onClick={onEdit}>
-          <Pencil className="ml-2 h-4 w-4" />
-          עריכה
         </Button>
       </CardFooter>
     </Card>
