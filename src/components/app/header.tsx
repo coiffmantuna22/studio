@@ -4,7 +4,7 @@ import { useAuth, useUser } from '@/firebase';
 import { Button } from '../ui/button';
 
 export default function Header() {
-  const { auth } = useAuth();
+  const auth = useAuth();
   const { user, isUserLoading } = useUser();
 
   return (
@@ -14,7 +14,7 @@ export default function Header() {
           <div className="flex items-center gap-3">
             <BookOpenCheck className="h-7 w-7 text-primary" />
             <h1 className="text-2xl font-bold tracking-tight text-foreground font-headline">
-              SubFinder
+              מורה מחליף
             </h1>
           </div>
           <div className="flex items-center gap-2">
