@@ -66,7 +66,7 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
   const isMobile = useIsMobile();
   
   return (
-    <Card className="flex flex-col transition-all hover:shadow-lg dark:border-border/60">
+    <Card className="flex flex-col transition-all hover:shadow-lg">
       <CardHeader className="flex flex-row items-start gap-4">
         <Avatar className="h-12 w-12 border-2 border-primary/20">
           <AvatarFallback className='bg-primary/10 text-primary font-bold'>{teacher.avatar.fallback}</AvatarFallback>
@@ -137,9 +137,9 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
             <CalendarClock className="ml-2 h-4 w-4" />
             צפה במערכת
           </Button>
-          <Button variant="secondary" className="w-full text-amber-600 dark:text-amber-500" onClick={onMarkAbsent}>
-            <UserX className="ml-2 h-4 w-4" />
-            סמן היעדרות
+          <Button variant="secondary" className="w-full" onClick={onMarkAbsent}>
+             <UserX className="ml-2 h-4 w-4 text-amber-600 dark:text-amber-500" />
+            <span className="text-amber-600 dark:text-amber-500">סמן היעדרות</span>
           </Button>
         </CardFooter>
       )}
