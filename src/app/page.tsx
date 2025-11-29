@@ -101,7 +101,6 @@ export default function Home() {
         const todaysTeacherAbsences = (teacher.absences || []).filter(absence => {
           try {
             const absenceDate = typeof absence.date === 'string' ? new Date(absence.date) : absence.date;
-            // Ensure both dates are compared at the start of the day
             return isSameDay(startOfDay(absenceDate), today);
           } catch (e) {
             console.error("Error parsing absence date:", absence.date);
@@ -287,14 +286,19 @@ export default function Home() {
     const batch = writeBatch(firestore);
     const teacherRef = doc(firestore, 'teachers', absentTeacher.id);
 
-    // Filter out old absences for the same days and add the new ones.
-    const newAbsenceDates = absenceDays.map(d => startOfDay(new Date(d.date)).getTime());
+    // Get the dates of the new/edited absences
+    const newAbsenceDates = new Set(
+        absenceDays.map(d => startOfDay(new Date(d.date)).getTime())
+    );
+
+    // Filter out any existing absences that fall on the same day as the new ones.
     const updatedAbsences = (absentTeacher.absences || []).filter(
       (existing) => {
-         const existingDate = typeof existing.date === 'string' ? new Date(existing.date) : existing.date;
          try {
-            return !newAbsenceDates.includes(startOfDay(existingDate).getTime())
+            const existingDate = typeof existing.date === 'string' ? new Date(existing.date) : existing.date;
+            return !newAbsenceDates.has(startOfDay(existingDate).getTime())
          } catch(e) {
+            // Keep the absence if date parsing fails, to be safe.
             return true;
          }
       }
@@ -310,7 +314,7 @@ export default function Home() {
     await commitBatchWithContext(batch, {
         operation: 'update',
         path: teacherRef.path,
-        data: { absences: '...' }
+        data: { absences: '...' } // Don't log full absence array
     });
 
      const schoolClasses = allClasses || [];
