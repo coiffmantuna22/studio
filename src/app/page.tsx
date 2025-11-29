@@ -19,6 +19,7 @@ import { commitBatchWithContext } from '@/lib/firestore-utils';
 import { findSubstitute } from '@/lib/substitute-finder';
 import { daysOfWeek } from '@/lib/constants';
 import { groupBy } from 'lodash';
+import { cn } from '@/lib/utils';
 
 const TeacherList = dynamic(() => import('@/components/app/teacher-list'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
@@ -136,20 +137,28 @@ export default function Home() {
   }, [teachers, allClasses, allSubstitutions]);
 
 
-  const uncoveredClasses = useMemo(() => {
+  const affectedClasses = useMemo(() => {
     if (!todaysAbsences) return [];
-    
+  
     const allAffectedLessons = todaysAbsences.flatMap(absence => absence.affectedLessons);
-    const uncoveredLessons = allAffectedLessons.filter(lesson => !lesson.isCovered);
-    
-    const lessonsByClass = groupBy(uncoveredLessons, 'classId');
-
+    if (allAffectedLessons.length === 0) return [];
+  
+    const lessonsByClass = groupBy(allAffectedLessons, 'classId');
+  
     return Object.entries(lessonsByClass).map(([classId, lessons]) => {
       const schoolClass = allClasses.find(c => c.id === classId);
+      const uncoveredLessons = lessons.filter(l => !l.isCovered);
+      const isFullyCovered = uncoveredLessons.length === 0;
+  
       return {
         classId,
         className: schoolClass?.name || 'Unknown Class',
-        lessons: lessons.map(l => ({ subject: l.subject, time: l.time, absentTeacherName: l.absentTeacherName })),
+        isFullyCovered,
+        lessons: uncoveredLessons.map(l => ({ 
+          subject: l.subject, 
+          time: l.time, 
+          absentTeacherName: l.absentTeacherName 
+        })),
       };
     });
   }, [todaysAbsences, allClasses]);
@@ -367,7 +376,7 @@ export default function Home() {
             </Card>
             )}
 
-            {uncoveredClasses.length > 0 && (
+            {affectedClasses.length > 0 && (
                 <Card className="border-l-4 border-l-amber-500 shadow-md">
                 <CardHeader className="pb-3">
                     <CardTitle className="text-xl flex items-center gap-2">
@@ -378,28 +387,40 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                     <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
-                    {uncoveredClasses.map(({ classId, className, lessons }) => {
+                    {affectedClasses.map(({ classId, className, lessons, isFullyCovered }) => {
                         const schoolClass = allClasses.find(c => c.id === classId);
                         return (
                         <div 
                             key={classId} 
-                            className="flex flex-col justify-between p-4 bg-secondary/30 rounded-xl border transition-colors hover:bg-secondary/50 cursor-pointer"
+                            className={cn(
+                              "flex flex-col justify-between p-4 rounded-xl border-2 transition-colors hover:bg-secondary/50 cursor-pointer",
+                              isFullyCovered 
+                               ? "border-green-500/50 bg-green-500/5"
+                               : "border-destructive/50 bg-destructive/5"
+                            )}
                             onClick={() => schoolClass && setClassToView(schoolClass)}
                         >
                             <span className="font-semibold text-lg block">{className}</span>
-                            <div className="mt-3 space-y-2 text-sm">
-                            <h4 className="font-medium text-muted-foreground">שיעורים לא מכוסים:</h4>
-                            <ul className="space-y-1">
-                                {lessons.map((lesson, index) => (
-                                <li key={index} className="flex items-center justify-between">
-                                    <span>{lesson.subject} ({lesson.time})</span>
-                                    <span className="text-xs text-muted-foreground">
-                                    עם {lesson.absentTeacherName}
-                                    </span>
-                                </li>
-                                ))}
-                            </ul>
-                            </div>
+                            {isFullyCovered ? (
+                                <div className="mt-3 flex items-center gap-2 text-green-600 dark:text-green-400">
+                                    <CheckCircle className="h-5 w-5"/>
+                                    <span className="font-medium">כל השיעורים מכוסים</span>
+                                </div>
+                            ) : (
+                                <div className="mt-3 space-y-2 text-sm">
+                                <h4 className="font-medium text-muted-foreground">שיעורים לא מכוסים:</h4>
+                                <ul className="space-y-1">
+                                    {lessons.map((lesson, index) => (
+                                    <li key={index} className="flex items-center justify-between">
+                                        <span>{lesson.subject} ({lesson.time})</span>
+                                        <span className="text-xs text-muted-foreground">
+                                        עם {lesson.absentTeacherName}
+                                        </span>
+                                    </li>
+                                    ))}
+                                </ul>
+                                </div>
+                            )}
                         </div>
                         )
                     })}
