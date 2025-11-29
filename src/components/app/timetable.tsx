@@ -9,7 +9,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { daysOfWeek } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Coffee, UserCheck, UserX } from 'lucide-react';
-import { isSameDay, startOfDay } from 'date-fns';
+import { isSameDay, startOfDay, getDay } from 'date-fns';
 
 interface TimetableProps {
   allTeachers: Teacher[];
@@ -37,8 +37,8 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
       });
     });
 
-    allTeachers.forEach(teacher => {
-      const dayIndex = today.getDay();
+    (allTeachers || []).forEach(teacher => {
+      const dayIndex = getDay(today);
       const currentDayOfWeek = dayMap[dayIndex];
 
       const todaysAbsences = (teacher.absences || []).filter(absence => isSameDay(new Date(absence.date), today));
@@ -142,3 +142,5 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
     </Card>
   );
 }
+
+    

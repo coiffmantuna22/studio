@@ -69,7 +69,7 @@ export default function Home() {
         availabilityMap.set(teacher.id, getTeacherAvailabilityStatus(teacher, now, timeSlots));
     });
     return availabilityMap;
-}, [teachers, timeSlots]);
+  }, [teachers, timeSlots]);
 
 
   const seedData = async () => {
@@ -152,7 +152,7 @@ export default function Home() {
       if (!(e instanceof FirestorePermissionError)) {
         const permissionError = new FirestorePermissionError({
           operation: 'create',
-          path: `seed data for user ${user.uid}`,
+          path: `seed data for user ${user?.uid}`,
         });
         errorEmitter.emit('permission-error', permissionError);
         throw permissionError;
@@ -601,11 +601,6 @@ const handleScheduleUpdate = async (
 
     </div>
   );
-
-    
-
-    
-
-    
+}
 
     
