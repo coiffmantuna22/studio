@@ -177,7 +177,7 @@ export default function MarkAbsentDialog({
       const substituteProfiles = allTeachers.filter((t) => t.id !== teacher.id);
       
       const today = startOfDay(new Date());
-      const endOfWeek = addDays(today, 6 - getDay(today)); // Find the end of the current week (Friday)
+      const endOfWeek = addDays(today, 6 - getDay(today));
       
       const affectedLessons = getAffectedLessons(teacher, values.absenceDays, allClasses, timeSlots);
       const weekAbsenceDays = eachDayOfInterval({start: today, end: endOfWeek}).map(date => ({

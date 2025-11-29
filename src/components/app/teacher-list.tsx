@@ -148,8 +148,6 @@ export default function TeacherList({
 
     let lessonsUpdatedCount = 0;
     
-    // We can't update teachers directly, we need to do it via a transaction in the parent
-    // But we can calculate the changes here
     const teacherScheduleUpdates = new Map<string, ClassSchedule>();
 
     recommendation.results.forEach(res => {
@@ -161,13 +159,11 @@ export default function TeacherList({
         const day = dayMap[getDay(res.date)];
         const time = res.time;
 
-        // Add to new teacher's schedule
         const subSchedule = teacherScheduleUpdates.get(subId) || (teachers.find(t=>t.id === subId)?.schedule ? JSON.parse(JSON.stringify(teachers.find(t=>t.id === subId)!.schedule)) : {});
         subSchedule[day] = subSchedule[day] || {};
         subSchedule[day][time] = {subject: res.lesson.subject, teacherId: subId, classId: res.classId};
         teacherScheduleUpdates.set(subId, subSchedule);
 
-        // Remove from absent teacher's schedule
         const absentTeacherId = recommendation.absentTeacher.id;
         const absentTeacherSchedule = teacherScheduleUpdates.get(absentTeacherId) || (recommendation.absentTeacher.schedule ? JSON.parse(JSON.stringify(recommendation.absentTeacher.schedule)) : {});
         if (absentTeacherSchedule[day]?.[time]) {
@@ -248,6 +244,21 @@ export default function TeacherList({
       </CardHeader>
 
       <CardContent>
+       <AlertDialog open={!!teacherToDelete} onOpenChange={(open) => !open && setTeacherToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
+            <AlertDialogDescription>
+              פעולה זו תמחק את הפרופיל של {teacherToDelete?.name} לצמיתות ותסיר אותו/ה מכל מערכות השעות. לא ניתן לבטל את הפעולה.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ביטול</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDeleteTeacher}>
+              מחק
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
         {teachers.length > 0 ? (
             filteredTeachers.length > 0 ? (
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -279,6 +290,7 @@ export default function TeacherList({
               </p>
           </div>
         )}
+      </AlertDialog>
       </CardContent>
 
       <CreateTeacherDialog
@@ -316,23 +328,6 @@ export default function TeacherList({
         onUpdateSchedule={onUpdateTeacherSchedule}
         allTeachers={teachers}
       />
-
-       <AlertDialog open={!!teacherToDelete} onOpenChange={(open) => !open && setTeacherToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
-            <AlertDialogDescription>
-              פעולה זו תמחק את הפרופיל של {teacherToDelete?.name} לצמיתות ותסיר אותו/ה מכל מערכות השעות. לא ניתן לבטל את הפעולה.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>ביטול</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleDeleteTeacher}>
-              מחק
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </Card>
   );
 }

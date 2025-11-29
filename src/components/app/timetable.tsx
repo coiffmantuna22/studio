@@ -54,10 +54,8 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
             timeSlots.forEach(slot => {
                 if (slot.type === 'lesson') {
                     const slotStartNum = parseTimeToNumber(slot.start);
-                    // Check if teacher is present at school
                     if (slotStartNum >= startNum && slotStartNum < endNum) {
                         
-                        // Check if teacher is NOT teaching at this time
                         const isTeaching = teacherSchedule[availDay.day]?.[slot.start];
 
                         if (!isTeaching) {

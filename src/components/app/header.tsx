@@ -1,3 +1,4 @@
+'use client';
 import { BookOpenCheck, LogOut, Loader2 } from 'lucide-react';
 import { ModeToggle } from '../mode-toggle';
 import { useAuth, useUser } from '@/firebase';
@@ -21,7 +22,7 @@ export default function Header() {
             {isUserLoading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : user ? (
-              <Button variant="ghost" size="icon" onClick={() => auth.signOut()}>
+              <Button variant="ghost" size="icon" onClick={() => auth?.signOut()}>
                 <LogOut className="h-5 w-5" />
               </Button>
             ) : null}
