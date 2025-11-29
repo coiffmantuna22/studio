@@ -56,13 +56,16 @@ export default function Home() {
   } | null>(null);
   
   const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
-  const { data: teachers = [], isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
+  const { data: teachersData, isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
+  const teachers = teachersData || [];
 
   const classesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'classes'), where('userId', '==', user.uid)) : null, [user, firestore]);
-  const { data: allClasses = [], isLoading: classesLoading } = useCollection<SchoolClass>(classesQuery);
+  const { data: classesData, isLoading: classesLoading } = useCollection<SchoolClass>(classesQuery);
+  const allClasses = classesData || [];
 
   const substitutionsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'substitutions'), where('userId', '==', user.uid)) : null, [user, firestore]);
-  const { data: allSubstitutions = [], isLoading: substitutionsLoading } = useCollection<SubstitutionRecord>(substitutionsQuery);
+  const { data: substitutionsData, isLoading: substitutionsLoading } = useCollection<SubstitutionRecord>(substitutionsQuery);
+  const allSubstitutions = substitutionsData || [];
 
   const settingsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null, [user, firestore]);
   const { data: settingsCollection, isLoading: settingsLoading } = useCollection(settingsQuery);
