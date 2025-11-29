@@ -94,7 +94,7 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete }:
         </div>
       </CardContent>
       <CardFooter className="grid grid-cols-1 gap-2">
-        <Button className="w-full" onClick={onMarkAbsent}>
+        <Button variant="destructive" className="w-full" onClick={onMarkAbsent}>
           <UserX className="ml-2 h-4 w-4" />
           סימון היעדרות
         </Button>
