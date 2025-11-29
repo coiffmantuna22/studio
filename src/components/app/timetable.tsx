@@ -9,7 +9,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { daysOfWeek } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Coffee, UserCheck, UserX } from 'lucide-react';
-import { isSameDay, startOfDay, getDay } from 'date-fns';
+import { isSameDay, startOfDay, getDay, addDays } from 'date-fns';
 
 interface TimetableProps {
   allTeachers: Teacher[];
@@ -17,18 +17,26 @@ interface TimetableProps {
 }
 
 const parseTimeToNumber = (time: string) => {
+    if (!time || !time.includes(':')) return 0;
     const [hours, minutes] = time.split(':').map(Number);
     return hours + minutes / 60;
 };
 
+const getStartOfWeek = (date: Date): Date => {
+    const day = getDay(date); // Sunday is 0, Saturday is 6
+    if (day === 6) { // If it's Saturday, start from next Sunday
+        return startOfDay(addDays(date, 1));
+    }
+    const diff = date.getDate() - day;
+    return startOfDay(new Date(date.setDate(diff)));
+}
+
 export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
   const timetableData = useMemo(() => {
     const data: Record<string, Record<string, {name: string, isAbsent: boolean}[]>> = {};
-    const today = startOfDay(new Date());
-    const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+    const weekStartDate = getStartOfWeek(new Date());
 
-
-    daysOfWeek.forEach(day => {
+    daysOfWeek.forEach((day, dayIndex) => {
       data[day] = {};
       timeSlots.forEach(slot => {
         if (slot.type !== 'break') {
@@ -38,15 +46,14 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
     });
 
     (allTeachers || []).forEach(teacher => {
-      const dayIndex = getDay(today);
-      const currentDayOfWeek = dayMap[dayIndex];
-
-      const todaysAbsences = (teacher.absences || []).filter(absence => isSameDay(new Date(absence.date), today));
-      
-      const teacherSchedule = teacher.schedule || {};
-
-      daysOfWeek.forEach(day => {
+      daysOfWeek.forEach((day, dayIndex) => {
+        const currentDate = addDays(weekStartDate, dayIndex);
         const availabilityForDay = teacher.availability.find(a => a.day === day);
+        
+        const absencesForCurrentDate = (teacher.absences || []).filter(absence => 
+            isSameDay(startOfDay(new Date(absence.date)), currentDate)
+        );
+
         if (availabilityForDay) {
           availabilityForDay.slots.forEach(timeRange => {
             const startNum = parseTimeToNumber(timeRange.start);
@@ -55,24 +62,23 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
             timeSlots.forEach(slot => {
                 if (slot.type === 'lesson') {
                     const slotStartNum = parseTimeToNumber(slot.start);
+
                     if (slotStartNum >= startNum && slotStartNum < endNum) {
-                        
-                        const isTeaching = teacherSchedule[day]?.[slot.start];
+                        const isTeaching = teacher.schedule?.[day]?.[slot.start];
 
-                        if (!isTeaching) {
+                        let isAbsent = false;
+                        if (absencesForCurrentDate.length > 0) {
+                            isAbsent = absencesForCurrentDate.some(absence => {
+                                if (absence.isAllDay) return true;
+                                const absenceStart = parseTimeToNumber(absence.startTime);
+                                const absenceEnd = parseTimeToNumber(absence.endTime);
+                                return slotStartNum >= absenceStart && slotStartNum < absenceEnd;
+                            });
+                        }
+
+                        if (!isTeaching && !isAbsent) {
                             if (data[day]?.[slot.start]) {
-                              let isAbsent = false;
-                              if(day === currentDayOfWeek && todaysAbsences.length > 0) {
-                                  const lessonStart = parseTimeToNumber(slot.start);
-                                  isAbsent = todaysAbsences.some(absence => {
-                                      if (absence.isAllDay) return true;
-                                      const absenceStart = parseTimeToNumber(absence.startTime);
-                                      const absenceEnd = parseTimeToNumber(absence.endTime);
-                                      return lessonStart >= absenceStart && lessonStart < absenceEnd;
-                                  });
-                              }
-
-                              data[day][slot.start].push({ name: teacher.name, isAbsent });
+                              data[day][slot.start].push({ name: teacher.name, isAbsent: false });
                             }
                         }
                     }
@@ -91,7 +97,7 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
       <CardHeader>
         <CardTitle className="text-xl">זמינות מורים להחלפה</CardTitle>
         <CardDescription>
-          הטבלה מציגה מורים הנוכחים בבית הספר אך אינם משובצים לשיעור.
+          הטבלה מציגה מורים הנוכחים בבית הספר אך אינם משובצים לשיעור או בחופש.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -119,8 +125,8 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
                                 <div className="flex flex-wrap gap-1.5 justify-center">
                                     {timetableData[day]?.[slot.start]?.length > 0 ? (
                                         timetableData[day][slot.start].map(teacher => (
-                                        <Badge key={teacher.name} variant={teacher.isAbsent ? 'destructive': 'secondary'} className="font-normal">
-                                            {teacher.isAbsent ? <UserX className="h-3 w-3 ml-1" /> : <UserCheck className="h-3 w-3 ml-1" />}
+                                        <Badge key={teacher.name} variant={'secondary'} className="font-normal">
+                                            <UserCheck className="h-3 w-3 ml-1" />
                                             {teacher.name}
                                         </Badge>
                                         ))

@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Header from '@/components/app/header';
-import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay } from '@/lib/types';
-import { startOfDay, getDay, format } from 'date-fns';
+import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay, SubstitutionRecord } from '@/lib/types';
+import { startOfDay, getDay, format, isSameDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 
 const TeacherList = dynamic(() => import('@/components/app/teacher-list'), {
@@ -21,7 +21,7 @@ const SettingsTab = dynamic(() => import('@/components/app/settings-tab'), {
 });
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { collection, doc, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch, query, where, getDocs, getDoc, orderBy, limit } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
@@ -98,7 +98,7 @@ export default function Home() {
   const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
   const classesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'classes'), where('userId', '==', user.uid)) : null, [user, firestore]);
   const settingsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null, [user, firestore]);
-
+  
   const { data: teachers = [], isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
   const { data: schoolClasses = [], isLoading: classesLoading } = useCollection<SchoolClass>(classesQuery);
   const { data: settingsCollection, isLoading: settingsLoading } = useCollection(settingsQuery);
@@ -488,7 +488,7 @@ const handleScheduleUpdate = async (
             handleShowAffectedLessons(absenceToReview.teacher, absenceToReview.absences);
             setAbsenceToReview(null);
         }
-    }, [absenceToReview]);
+    }, [absenceToReview, schoolClasses, teachers, timeSlots]);
 
   if (isDataLoading) {
     return (
