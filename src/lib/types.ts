@@ -52,6 +52,7 @@ export interface AffectedLesson {
     time: string;
     lesson: Lesson;
     recommendation: string | null;
+    recommendationId: string | null;
     reasoning: string | null;
 }
 

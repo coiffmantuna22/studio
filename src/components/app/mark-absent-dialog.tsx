@@ -103,6 +103,7 @@ const getAffectedLessons = (
               time: time,
               lesson: lesson,
               recommendation: null,
+              recommendationId: null,
               reasoning: null,
             });
           }
@@ -210,6 +211,7 @@ export default function MarkAbsentDialog({
       const finalResults = allAffectedLessons.map((lesson, index) => ({
         ...lesson,
         recommendation: recommendations[index].recommendation,
+        recommendationId: recommendations[index].recommendationId,
         reasoning: recommendations[index].reasoning,
       }));
 

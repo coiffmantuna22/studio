@@ -10,6 +10,7 @@ interface LessonDetails {
 
 interface FindSubstituteResult {
   recommendation: string | null;
+  recommendationId: string | null;
   reasoning: string | null;
 }
 
@@ -92,6 +93,7 @@ export async function findSubstitute(
   if(availableTeachers.length === 0) {
       return {
           recommendation: null,
+          recommendationId: null,
           reasoning: 'לא נמצאו מורים פנויים (נוכחים בבית הספר אך ללא שיעור) בשעה זו.',
       };
   }
@@ -102,6 +104,7 @@ export async function findSubstitute(
      const bestOfWorst = availableTeachers[0]; // Just take the first available
       return {
         recommendation: bestOfWorst.name,
+        recommendationId: bestOfWorst.id,
         reasoning: `שימו לב: לא נמצא מורה פנוי המוכשר ב${lessonDetails.subject}. ${bestOfWorst.name} מוצע/ת כמפקח/ת בלבד מאחר והוא/היא זמין/ה.`,
     };
   }
@@ -120,6 +123,7 @@ export async function findSubstitute(
 
   return {
     recommendation: bestChoice.name,
+    recommendationId: bestChoice.id,
     reasoning: reasoning,
   };
 }

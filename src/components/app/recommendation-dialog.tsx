@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Teacher, AffectedLesson } from '@/lib/types';
+import type { Teacher, AffectedLesson, SchoolClass } from '@/lib/types';
 import { format, getDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,7 @@ interface RecommendationDialogProps {
   recommendationResult: {
     results: AffectedLesson[];
     absentTeacher: Teacher;
+    newClassSchedules: SchoolClass[];
   } | null;
   onTimetablesUpdate: () => void;
 }
@@ -59,7 +60,7 @@ export default function RecommendationDialog({
     onOpenChange(false);
   }
 
-  const hasRecommendations = results.some(r => r.recommendation !== null);
+  const hasRecommendations = results.some(r => r.recommendationId !== null);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

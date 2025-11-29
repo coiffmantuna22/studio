@@ -61,12 +61,6 @@ export default function TeacherList({
   } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const getSubstituteTeacherId = (name: string | null): string | null => {
-    if (!name) return null;
-    const teacher = teachers.find(t => t.name === name);
-    return teacher ? teacher.id : null;
-  }
-
  const handleCreateTeacher = (newTeacherData: Omit<Teacher, 'id' | 'userId' | 'avatar' | 'schedule'>) => {
     onAddTeacher(newTeacherData);
      toast({
@@ -108,7 +102,7 @@ export default function TeacherList({
     const updatedClasses = JSON.parse(JSON.stringify(allClasses)) as SchoolClass[];
     
     results.forEach(res => {
-      const substituteId = getSubstituteTeacherId(res.recommendation);
+      const substituteId = res.recommendationId;
       if (substituteId) {
         const classToUpdate = updatedClasses.find((c: SchoolClass) => c.id === res.classId);
         if (classToUpdate) {
