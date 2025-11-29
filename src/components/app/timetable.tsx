@@ -45,7 +45,7 @@ export default function Timetable({ allTeachers }: TimetableProps) {
   }, [allTeachers]);
 
   return (
-    <Card className="mt-6 shadow-none border-0 sm:border sm:shadow-sm">
+    <Card className="mt-6">
       <CardHeader>
         <CardTitle className="text-xl">זמינות כלל המורים המחליפים</CardTitle>
         <CardDescription>

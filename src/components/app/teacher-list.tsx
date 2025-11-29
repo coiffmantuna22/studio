@@ -152,7 +152,7 @@ export default function TeacherList({
 
 
   return (
-    <Card className="mt-6 shadow-none border-0 sm:border sm:shadow-sm">
+    <Card className="mt-6">
       <CardHeader>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
             <div>
