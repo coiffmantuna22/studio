@@ -59,6 +59,8 @@ export default function RecommendationDialog({
     onOpenChange(false);
   }
 
+  const hasRecommendations = results.some(r => r.recommendation !== null);
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg md:max-w-2xl">
@@ -130,7 +132,7 @@ export default function RecommendationDialog({
               בטל
             </Button>
           </DialogClose>
-           <Button type="button" onClick={handleConfirm} disabled={results.every(r => r.recommendation === null)}>
+           <Button type="button" onClick={handleConfirm} disabled={!hasRecommendations}>
               עדכן מערכת שעות
             </Button>
         </DialogFooter>
