@@ -103,11 +103,13 @@ function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses, isAbs
     };
     
     const currentClass = lesson?.classId ? allClasses.find(c => c.id === lesson.classId) : null;
+    
+    const canSave = (subject && classId) || (!subject && !classId && lesson !== null);
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
-                <div className={cn(
+                 <div className={cn(
                     "w-full h-full p-2 flex flex-col justify-center items-center text-center cursor-pointer min-h-[6rem] transition-colors rounded-md",
                     isAbsent && 'bg-destructive/10',
                     lesson ? 'bg-primary/10 hover:bg-primary/20' : 'bg-card hover:bg-muted',
@@ -167,7 +169,7 @@ function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses, isAbs
                             <X className="w-4 h-4 ml-2"/>
                             נקה שיבוץ
                         </Button>
-                        <Button size="sm" onClick={handleSave} disabled={!(subject && classId)}>שמור</Button>
+                        <Button size="sm" onClick={handleSave} disabled={!canSave}>שמור</Button>
                     </div>
                 </div>
             </PopoverContent>
