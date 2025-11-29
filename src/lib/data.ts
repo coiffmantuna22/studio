@@ -1,12 +1,24 @@
-import type { Teacher, SchoolClass } from './types';
-import { timeSlots, daysOfWeek } from './constants';
+import type { Teacher, SchoolClass, TimeSlot } from './types';
+import { daysOfWeek } from './constants';
+
+export const initialTimeSlots: TimeSlot[] = [
+  { id: "1", start: '08:00', end: '08:45', type: 'lesson' },
+  { id: "2", start: '08:45', end: '09:30', type: 'lesson' },
+  { id: "3", start: '09:30', end: '10:00', type: 'break' },
+  { id: "4", start: '10:00', end: '10:45', type: 'lesson' },
+  { id: "5", start: '10:45', end: '11:30', type: 'lesson' },
+  { id: "6", start: '11:30', end: '12:00', type: 'break' },
+  { id: "7", start: '12:00', end: '12:45', type: 'lesson' },
+  { id: "8", start: '12:45', end: '13:30', type: 'lesson' },
+];
+
 
 const defaultAvailability = [
   { day: 'ראשון', slots: [] },
-  { day: 'שני', slots: [{ start: '08:00', end: '16:00' }] },
-  { day: 'שלישי', slots: [{ start: '08:00', end: '16:00' }] },
-  { day: 'רביעי', slots: [{ start: '08:00', end: '12:00' }] },
-  { day: 'חמישי', slots: [{ start: '08:00', end: '16:00' }] },
+  { day: 'שני', slots: [{ start: '08:00', end: '13:30' }] },
+  { day: 'שלישי', slots: [{ start: '08:00', end: '13:30' }] },
+  { day: 'רביעי', slots: [{ start: '08:00', end: '11:30' }] },
+  { day: 'חמישי', slots: [{ start: '08:00', end: '13:30' }] },
   { day: 'שישי', slots: [] },
 ];
 
@@ -26,10 +38,10 @@ export const initialTeachers: Teacher[] = [
     availability: [
       { day: 'ראשון', slots: [] },
       { day: 'שני', slots: [] },
-      { day: 'שלישי', slots: [{ start: '10:00', end: '14:00' }] },
+      { day: 'שלישי', slots: [{ start: '10:00', end: '12:45' }] },
       { day: 'רביעי', slots: [] },
-      { day: 'חמישי', slots: [{ start: '10:00', end: '14:00' }] },
-      { day: 'שישי', slots: [{ start: '09:00', end: '13:00' }] },
+      { day: 'חמישי', slots: [{ start: '10:00', end: '12:45' }] },
+      { day: 'שישי', slots: [{ start: '08:45', end: '12:00' }] },
     ],
     avatar: { fallback: 'דס' },
     preferences: 'זמין להחלפות של יום שלם',
@@ -40,10 +52,10 @@ export const initialTeachers: Teacher[] = [
     subjects: ['כימיה', 'ביולוגיה'],
     availability: [
       { day: 'ראשון', slots: [] },
-      { day: 'שני', slots: [{ start: '09:00', end: '17:00' }] },
-      { day: 'שלישי', slots: [{ start: '09:00', end: '17:00' }] },
-      { day: 'רביעי', slots: [{ start: '09:00', end: '17:00' }] },
-      { day: 'חמישי', slots: [{ start: '09:00', end: '17:00' }] },
+      { day: 'שני', slots: [{ start: '08:45', end: '13:30' }] },
+      { day: 'שלישי', slots: [{ start: '08:45', end: '13:30' }] },
+      { day: 'רביעי', slots: [{ start: '08:45', end: '13:30' }] },
+      { day: 'חמישי', slots: [{ start: '08:45', end: '13:30' }] },
       { day: 'שישי', slots: [] },
     ],
     avatar: { fallback: 'חו' },
@@ -57,9 +69,9 @@ export const initialTeachers: Teacher[] = [
        { day: 'ראשון', slots: [] },
        { day: 'שני', slots: [] },
        { day: 'שלישי', slots: [] },
-       { day: 'רביעי', slots: [{ start: '12:00', end: '18:00' }] },
+       { day: 'רביעי', slots: [{ start: '12:00', end: '13:30' }] },
        { day: 'חמישי', slots: [] },
-       { day: 'שישי', slots: [{ start: '09:00', end: '15:00' }] },
+       { day: 'שישי', slots: [{ start: '08:45', end: '12:45' }] },
     ],
     avatar: { fallback: 'פא' },
     preferences: '',
@@ -69,12 +81,12 @@ export const initialTeachers: Teacher[] = [
     name: 'מיכאל ג\'ונסון',
     subjects: ['חינוך גופני'],
     availability: [
-      { day: 'ראשון', slots: [{ start: '07:00', end: '19:00' }] },
-      { day: 'שני', slots: [{ start: '07:00', end: '19:00' }] },
-      { day: 'שלישי', slots: [{ start: '07:00', end: '19:00' }] },
-      { day: 'רביעי', slots: [{ start: '07:00', end: '19:00' }] },
-      { day: 'חמישי', slots: [{ start: '07:00', end: '19:00' }] },
-      { day: 'שישי', slots: [{ start: '07:00', end: '14:00' }] },
+      { day: 'ראשון', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'שני', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'שלישי', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'רביעי', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'חמישי', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'שישי', slots: [{ start: '08:00', end: '12:00' }] },
     ],
     avatar: { fallback: 'מג' },
     preferences: 'יכול לאמן גם קבוצות ספורט',
@@ -84,11 +96,11 @@ export const initialTeachers: Teacher[] = [
     name: 'שרה כהן',
     subjects: ['ספרות', 'לשון'],
     availability: [
-      { day: 'ראשון', slots: [{ start: '08:00', end: '12:00' }] },
+      { day: 'ראשון', slots: [{ start: '08:00', end: '11:30' }] },
       { day: 'שני', slots: [] },
-      { day: 'שלישי', slots: [{ start: '08:00', end: '12:00' }] },
+      { day: 'שלישי', slots: [{ start: '08:00', end: '11:30' }] },
       { day: 'רביעי', slots: [] },
-      { day: 'חמישי', slots: [{ start: '08:00', end: '12:00' }] },
+      { day: 'חמישי', slots: [{ start: '08:00', end: '11:30' }] },
       { day: 'שישי', slots: [] },
     ],
     avatar: { fallback: 'שכ' },
@@ -99,10 +111,10 @@ export const initialTeachers: Teacher[] = [
     name: 'יוסף לוי',
     subjects: ['היסטוריה', 'אזרחות'],
     availability: [
-      { day: 'ראשון', slots: [{ start: '12:00', end: '16:00' }] },
-      { day: 'שני', slots: [{ start: '12:00', end: '16:00' }] },
+      { day: 'ראשון', slots: [{ start: '12:00', end: '13:30' }] },
+      { day: 'שני', slots: [{ start: '12:00', end: '13:30' }] },
       { day: 'שלישי', slots: [] },
-      { day: 'רביעי', slots: [{ start: '10:00', end: '14:00' }] },
+      { day: 'רביעי', slots: [{ start: '10:00', end: '12:45' }] },
       { day: 'חמישי', slots: [] },
       { day: 'שישי', slots: [] },
     ],
@@ -114,25 +126,56 @@ export const initialTeachers: Teacher[] = [
     name: 'נועה מזרחי',
     subjects: ['מתמטיקה', 'מדעי המחשב'],
     availability: [
-      { day: 'ראשון', slots: [{ start: '09:00', end: '15:00' }] },
-      { day: 'שני', slots: [{ start: '09:00', end: '15:00' }] },
-      { day: 'שלישי', slots: [{ start: '09:00', end: '15:00' }] },
-      { day: 'רביעי', slots: [{ start: '09:00', end: '15:00' }] },
-      { day: 'חמישי', slots: [{ start: '09:00', end: '15:00' }] },
+      { day: 'ראשון', slots: [{ start: '08:45', end: '12:45' }] },
+      { day: 'שני', slots: [{ start: '08:45', end: '12:45' }] },
+      { day: 'שלישי', slots: [{ start: '08:45', end: '12:45' }] },
+      { day: 'רביעי', slots: [{ start: '08:45', end: '12:45' }] },
+      { day: 'חמישי', slots: [{ start: '08:45', end: '12:45' }] },
       { day: 'שישי', slots: [] },
     ],
     avatar: { fallback: 'נמ' },
     preferences: 'ראש צוות פיתוח לשעבר',
-  }
+  },
+  {
+    id: '9',
+    name: 'אביגיל ביטון',
+    subjects: ['תנ"ך', 'מחשבת ישראל'],
+    availability: [
+      { day: 'ראשון', slots: [{ start: '08:00', end: '11:30' }] },
+      { day: 'שלישי', slots: [{ start: '08:00', end: '11:30' }] },
+      { day: 'חמישי', slots: [{ start: '08:00', end: '11:30' }] },
+    ],
+    avatar: { fallback: 'אב' },
+    preferences: 'מעדיפה כיתות קטנות',
+  },
+  {
+    id: '10',
+    name: 'איתן ישראלי',
+    subjects: ['גיאוגרפיה', 'של"ח'],
+    availability: [
+      { day: 'שני', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'רביעי', slots: [{ start: '08:00', end: '13:30' }] },
+    ],
+    avatar: { fallback: 'אי' },
+    preferences: 'אוהב לצאת לסיורים',
+  },
+  {
+    id: '11',
+    name: 'רותם חדד',
+    subjects: ['לשון', 'ערבית'],
+    availability: [
+      { day: 'שלישי', slots: [{ start: '10:00', end: '13:30' }] },
+      { day: 'חמישי', slots: [{ start: '10:00', end: '13:30' }] },
+    ],
+    avatar: { fallback: 'רח' },
+    preferences: '',
+  },
 ];
 
 const generateEmptySchedule = () => {
-    const schedule = {};
+    const schedule: SchoolClass['schedule'] = {};
     daysOfWeek.forEach(day => {
         schedule[day] = {};
-        timeSlots.forEach(time => {
-            schedule[day][time] = null;
-        });
     });
     return schedule;
 };
@@ -145,44 +188,38 @@ export const initialClasses: SchoolClass[] = [
         schedule: {
             'ראשון': {
                 '08:00': { subject: 'ספרות', teacherId: '6' },
-                '09:00': { subject: 'מתמטיקה', teacherId: '1' },
+                '08:45': { subject: 'מתמטיקה', teacherId: '1' },
                 '10:00': { subject: 'מתמטיקה', teacherId: '1' },
-                '11:00': { subject: 'אנגלית', teacherId: '2' },
-                 '12:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '07:00': null, '18:00': null
+                '10:45': { subject: 'אנגלית', teacherId: '2' },
             },
             'שני': {
-                '09:00': { subject: 'מתמטיקה', teacherId: '1' },
+                '08:45': { subject: 'מתמטיקה', teacherId: '1' },
                 '10:00': { subject: 'מתמטיקה', teacherId: '1' },
-                '11:00': { subject: 'חינוך גופני', teacherId: '5' },
+                '10:45': { subject: 'חינוך גופני', teacherId: '5' },
                  '12:00': { subject: 'היסטוריה', teacherId: '7' },
-                '13:00': { subject: 'היסטוריה', teacherId: '7' },
-                 '07:00': null, '08:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
+                '12:45': { subject: 'היסטוריה', teacherId: '7' },
             },
             'שלישי': {
                 '08:00': { subject: 'ספרות', teacherId: '6' },
-                '09:00': { subject: 'ספרות', teacherId: '6' },
+                '08:45': { subject: 'ספרות', teacherId: '6' },
                 '10:00': { subject: 'אנגלית', teacherId: '2' },
-                '11:00': { subject: 'אנגלית', teacherId: '2' },
+                '10:45': { subject: 'אנגלית', teacherId: '2' },
                 '12:00': { subject: 'כימיה', teacherId: '3' },
-                 '07:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
             },
             'רביעי': {
                 '10:00': { subject: 'אזרחות', teacherId: '7' },
-                '11:00': { subject: 'כימיה', teacherId: '3' },
+                '10:45': { subject: 'כימיה', teacherId: '3' },
                 '12:00': { subject: 'כימיה', teacherId: '3' },
-                '13:00': { subject: 'אמנות', teacherId: '4' },
-                '14:00': { subject: 'אמנות', teacherId: '4' },
-                '07:00': null, '08:00': null, '09:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
+                '12:45': { subject: 'אמנות', teacherId: '4' },
             },
             'חמישי': {
                 '08:00': { subject: 'ספרות', teacherId: '6' },
-                '09:00': { subject: 'לשון', teacherId: '6' },
+                '08:45': { subject: 'לשון', teacherId: '6' },
                 '10:00': { subject: 'פיזיקה', teacherId: '1' },
-                '11:00': { subject: 'פיזיקה', teacherId: '1' },
+                '10:45': { subject: 'פיזיקה', teacherId: '1' },
                  '12:00': { subject: 'חינוך גופני', teacherId: '5' },
-                 '07:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
             },
-            'שישי': generateEmptySchedule()['שישי'],
+            'שישי': {},
         }
     },
     {
@@ -195,37 +232,57 @@ export const initialClasses: SchoolClass[] = [
         name: 'כיתה ט׳1',
         schedule: {
             'ראשון': {
-                '09:00': { subject: 'מתמטיקה', teacherId: '8' },
+                '08:45': { subject: 'מתמטיקה', teacherId: '8' },
                 '10:00': { subject: 'מתמטיקה', teacherId: '8' },
-                '11:00': { subject: 'היסטוריה', teacherId: '2' },
-                '07:00': null, '08:00': null, '12:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
+                '10:45': { subject: 'היסטוריה', teacherId: '2' },
             },
             'שני': {
-                '09:00': { subject: 'מדעי המחשב', teacherId: '8' },
+                '08:45': { subject: 'מדעי המחשב', teacherId: '8' },
                 '10:00': { subject: 'מדעי המחשב', teacherId: '8' },
-                '11:00': { subject: 'חינוך גופני', teacherId: '5' },
-                '07:00': null, '08:00': null, '12:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
+                '10:45': { subject: 'חינוך גופני', teacherId: '5' },
             },
-             ...generateEmptySchedule(),
+            'שלישי': {
+                '08:00': { subject: 'תנ"ך', teacherId: '9'},
+                '08:45': { subject: 'תנ"ך', teacherId: '9'},
+            },
+            'רביעי': {},'חמישי': {},'שישי': {},
         }
     },
     {
         id: 'c4',
         name: 'כיתה י״ב2',
         schedule: {
-             ...generateEmptySchedule(),
              'רביעי': {
-                '09:00': { subject: 'ביולוגיה', teacherId: '3' },
+                '08:45': { subject: 'ביולוגיה', teacherId: '3' },
                 '10:00': { subject: 'ביולוגיה', teacherId: '3' },
-                '11:00': { subject: 'מוזיקה', teacherId: '4' },
-                '07:00': null, '08:00': null, '12:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
+                '10:45': { subject: 'מוזיקה', teacherId: '4' },
             },
             'חמישי': {
                 '10:00': { subject: 'אנגלית', teacherId: '2' },
-                '11:00': { subject: 'אנגלית', teacherId: '2' },
+                '10:45': { subject: 'אנגלית', teacherId: '2' },
                 '12:00': { subject: 'אזרחות', teacherId: '7' },
-                '07:00': null, '08:00': null, '09:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
-            }
+            },
+            'ראשון': {}, 'שני': {}, 'שלישי': {},'שישי': {},
         }
+    },
+    {
+        id: 'c5',
+        name: 'כיתה ז׳4',
+        schedule: generateEmptySchedule(),
+    },
+    {
+        id: 'c6',
+        name: 'כיתה ח׳2',
+        schedule: {
+            'שני': {
+                '08:00': { subject: 'גיאוגרפיה', teacherId: '10' },
+                '08:45': { subject: 'גיאוגרפיה', teacherId: '10' },
+            },
+            'שלישי': {
+                '10:00': { subject: 'ערבית', teacherId: '11' },
+                '10:45': { subject: 'ערבית', teacherId: '11' },
+            },
+            'ראשון': {}, 'רביעי': {}, 'חמישי': {}, 'שישי': {},
+        },
     }
 ]

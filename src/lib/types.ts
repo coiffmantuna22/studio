@@ -47,3 +47,10 @@ export interface AffectedLesson {
     recommendation: string | null;
     reasoning: string | null;
 }
+
+export interface TimeSlot {
+  id: string;
+  start: string;
+  end: string;
+  type: 'lesson' | 'break';
+}

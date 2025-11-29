@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Teacher, SchoolClass, AffectedLesson } from '@/lib/types';
+import type { Teacher, SchoolClass, AffectedLesson, TimeSlot } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Plus, Search } from 'lucide-react';
 import TeacherCard from './teacher-card';
@@ -26,19 +26,23 @@ import {
 interface TeacherListProps {
   initialTeachers: Teacher[];
   allClasses: SchoolClass[];
+  timeSlots: TimeSlot[];
   onAddTeacher: (teacher: Omit<Teacher, 'id'|'avatar'>) => void;
   onEditTeacher: (teacher: Omit<Teacher, 'avatar'>) => void;
   onDeleteTeacher: (teacherId: string) => void;
   onClassesUpdate: (classes: SchoolClass[]) => void;
+  onTeachersUpdate: (teachers: Teacher[]) => void;
 }
 
 export default function TeacherList({ 
   initialTeachers, 
-  allClasses, 
+  allClasses,
+  timeSlots,
   onAddTeacher,
   onEditTeacher,
   onDeleteTeacher,
-  onClassesUpdate
+  onClassesUpdate,
+  onTeachersUpdate,
 }: TeacherListProps) {
   const { toast } = useToast();
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
@@ -77,19 +81,23 @@ export default function TeacherList({
   const handleDeleteTeacher = () => {
     if (!teacherToDelete) return;
     
-    const updatedClasses = JSON.parse(JSON.stringify(allClasses));
-    updatedClasses.forEach((schoolClass: SchoolClass) => {
+    // Create a deep copy to avoid direct state mutation
+    const updatedClasses = JSON.parse(JSON.stringify(allClasses)) as SchoolClass[];
+    
+    updatedClasses.forEach((schoolClass) => {
       Object.keys(schoolClass.schedule).forEach(day => {
         if(schoolClass.schedule[day]) {
             Object.keys(schoolClass.schedule[day]).forEach(time => {
                 const lesson = schoolClass.schedule[day][time];
                 if (lesson && lesson.teacherId === teacherToDelete.id) {
-                    delete schoolClass.schedule[day][time]; 
+                    // Set lesson to null instead of deleting the property
+                    schoolClass.schedule[day][time] = null;
                 }
             });
         }
       });
     });
+    
     onClassesUpdate(updatedClasses);
     onDeleteTeacher(teacherToDelete.id);
 
@@ -180,20 +188,20 @@ export default function TeacherList({
                 <CardDescription>ניהול מורים מחליפים וסימון היעדרויות.</CardDescription>
             </div>
             <div className="flex flex-col sm:flex-row-reverse gap-2 w-full sm:w-auto">
+                <Button onClick={openCreateDialog} className='shrink-0'>
+                    <Plus className="ml-2 h-4 w-4" />
+                    יצירת פרופיל
+                </Button>
                 <div className="relative flex-grow">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         type="search"
                         placeholder="חיפוש מורה..."
-                        className="pl-9 w-full"
+                        className="w-full pl-9"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <Button onClick={openCreateDialog} className='shrink-0'>
-                    <Plus className="ml-2 h-4 w-4" />
-                    יצירת פרופיל
-                </Button>
             </div>
         </div>
       </CardHeader>
@@ -236,6 +244,7 @@ export default function TeacherList({
         onAddTeacher={handleCreateTeacher}
         onEditTeacher={handleUpdateTeacher}
         teacherToEdit={teacherToEdit}
+        timeSlots={timeSlots}
       />
 
       <MarkAbsentDialog
@@ -244,6 +253,7 @@ export default function TeacherList({
         teacher={teacherToMarkAbsent}
         allTeachers={initialTeachers}
         allClasses={allClasses}
+        timeSlots={timeSlots}
         onShowRecommendation={handleShowRecommendation}
       />
 

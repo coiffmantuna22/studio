@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { SchoolClass, Teacher, ClassSchedule } from '@/lib/types';
+import type { SchoolClass, Teacher, ClassSchedule, TimeSlot } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, Edit, Eye, Search } from 'lucide-react';
 import {
@@ -30,12 +30,13 @@ import { Input } from '../ui/input';
 interface ClassListProps {
   initialClasses: SchoolClass[];
   allTeachers: Teacher[];
+  timeSlots: TimeSlot[];
   onAddClass: (name: string) => void;
   onDeleteClass: (classId: string) => void;
   onUpdateSchedule: (classId: string, schedule: ClassSchedule) => void;
 }
 
-export default function ClassList({ initialClasses, allTeachers, onAddClass, onDeleteClass, onUpdateSchedule }: ClassListProps) {
+export default function ClassList({ initialClasses, allTeachers, timeSlots, onAddClass, onDeleteClass, onUpdateSchedule }: ClassListProps) {
   const [isCreateClassOpen, setCreateClassOpen] = useState(false);
   const [classToView, setClassToView] = useState<SchoolClass | null>(null);
   const [classToEditSchedule, setClassToEditSchedule] = useState<SchoolClass | null>(null);
@@ -54,30 +55,29 @@ export default function ClassList({ initialClasses, allTeachers, onAddClass, onD
     schoolClass.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-
   return (
     <Card className="mt-6 border-border/80 rounded-2xl">
       <CardHeader>
-        <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
+        <div className='flex flex-col sm:flex-row-reverse sm:items-center sm:justify-between gap-4'>
           <div className='flex-1'>
               <CardTitle className="text-xl">כיתות לימוד</CardTitle>
               <CardDescription>ניהול מערכת השעות הכיתתית.</CardDescription>
           </div>
           <div className="flex flex-col sm:flex-row-reverse gap-2 w-full sm:w-auto">
+              <Button onClick={() => setCreateClassOpen(true)} className='shrink-0'>
+                <Plus className="ml-2 h-4 w-4" />
+                הוסף כיתה
+              </Button>
               <div className="relative flex-grow">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                       type="search"
                       placeholder="חיפוש כיתה..."
-                      className="pl-9 w-full"
+                      className="w-full pl-9"
                       value={searchTerm}
                       onChange={e => setSearchTerm(e.target.value)}
                   />
               </div>
-              <Button onClick={() => setCreateClassOpen(true)} className='shrink-0'>
-                <Plus className="ml-2 h-4 w-4" />
-                הוסף כיתה
-              </Button>
           </div>
         </div>
       </CardHeader>
@@ -160,6 +160,7 @@ export default function ClassList({ initialClasses, allTeachers, onAddClass, onD
         allTeachers={allTeachers}
         isEditing={false}
         allClasses={initialClasses}
+        timeSlots={timeSlots}
       />
 
       <ClassTimetableDialog
@@ -170,6 +171,7 @@ export default function ClassList({ initialClasses, allTeachers, onAddClass, onD
         onUpdateSchedule={onUpdateSchedule}
         isEditing={true}
         allClasses={initialClasses}
+        timeSlots={timeSlots}
       />
 
     </Card>

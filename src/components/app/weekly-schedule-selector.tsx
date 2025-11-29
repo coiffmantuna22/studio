@@ -2,46 +2,58 @@
 
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import type { DayAvailability } from '@/lib/types';
+import type { DayAvailability, TimeSlot } from '@/lib/types';
 import { Button } from '../ui/button';
 import { Trash2 } from 'lucide-react';
 
 interface WeeklyScheduleSelectorProps {
   value: DayAvailability[];
   onChange: (value: DayAvailability[]) => void;
+  timeSlots: TimeSlot[];
 }
 
 const daysOfWeek = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
-const timeSlots = Array.from({ length: 12 }, (_, i) => `${(i + 7).toString().padStart(2, '0')}:00`); // 07:00 to 18:00
 
-const parseTimeToNumber = (time: string) => parseInt(time.split(':')[0], 10);
-
-const groupConsecutiveSlots = (slots: number[]) => {
-  if (slots.length === 0) return [];
-  const sortedSlots = [...slots].sort((a, b) => a - b);
-  const groups = [];
-  let currentGroup = { start: sortedSlots[0], end: sortedSlots[0] };
-
-  for (let i = 1; i < sortedSlots.length; i++) {
-    if (sortedSlots[i] === currentGroup.end + 1) {
-      currentGroup.end = sortedSlots[i];
-    } else {
-      groups.push({
-        start: `${currentGroup.start.toString().padStart(2, '0')}:00`,
-        end: `${(currentGroup.end + 1).toString().padStart(2, '0')}:00`,
-      });
-      currentGroup = { start: sortedSlots[i], end: sortedSlots[i] };
-    }
-  }
-  groups.push({
-    start: `${currentGroup.start.toString().padStart(2, '0')}:00`,
-    end: `${(currentGroup.end + 1).toString().padStart(2, '0')}:00`,
-  });
-
-  return groups;
+const parseTimeToNumber = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours + minutes / 60;
 };
 
-export default function WeeklyScheduleSelector({ value, onChange }: WeeklyScheduleSelectorProps) {
+const groupConsecutiveSlots = (slots: number[], allSlots: TimeSlot[]) => {
+    if (slots.length === 0) return [];
+    
+    const sortedSlots = [...slots].sort((a,b) => a-b);
+    const groups = [];
+    let currentGroup: {start: number, end: number} | null = null;
+    
+    sortedSlots.forEach(slotIndex => {
+        if(allSlots[slotIndex].type === 'break') return;
+
+        if (currentGroup === null) {
+            currentGroup = { start: slotIndex, end: slotIndex };
+        } else if (slotIndex === currentGroup.end + 1) {
+            currentGroup.end = slotIndex;
+        } else {
+            groups.push({
+                start: allSlots[currentGroup.start].start,
+                end: allSlots[currentGroup.end].end,
+            });
+            currentGroup = { start: slotIndex, end: slotIndex };
+        }
+    });
+
+    if (currentGroup !== null) {
+         groups.push({
+            start: allSlots[currentGroup.start].start,
+            end: allSlots[currentGroup.end].end,
+        });
+    }
+
+    return groups;
+};
+
+
+export default function WeeklyScheduleSelector({ value, onChange, timeSlots }: WeeklyScheduleSelectorProps) {
   const [selectedSlots, setSelectedSlots] = useState<Record<string, number[]>>({});
 
   useEffect(() => {
@@ -53,32 +65,39 @@ export default function WeeklyScheduleSelector({ value, onChange }: WeeklySchedu
     if (Array.isArray(value)) {
         value.forEach(dayAvailability => {
             if (dayAvailability.slots && initialSlots[dayAvailability.day]) {
-                dayAvailability.slots.forEach(slot => {
-                    const startHour = parseTimeToNumber(slot.start);
-                    const endHour = parseTimeToNumber(slot.end);
-                    for (let hour = startHour; hour < endHour; hour++) {
-                    initialSlots[dayAvailability.day]?.push(hour);
-                    }
+                dayAvailability.slots.forEach(slotRange => {
+                    const startNum = parseTimeToNumber(slotRange.start);
+                    const endNum = parseTimeToNumber(slotRange.end);
+                    timeSlots.forEach((slot, index) => {
+                        if (slot.type === 'lesson') {
+                            const slotStartNum = parseTimeToNumber(slot.start);
+                            if (slotStartNum >= startNum && slotStartNum < endNum) {
+                                initialSlots[dayAvailability.day]?.push(index);
+                            }
+                        }
+                    });
                 });
             }
         });
     }
     setSelectedSlots(initialSlots);
-  }, [value]);
+  }, [value, timeSlots]);
 
-  const handleSlotClick = (day: string, hour: number) => {
+  const handleSlotClick = (day: string, slotIndex: number) => {
+    if (timeSlots[slotIndex].type === 'break') return;
+    
     const newSelectedSlots = { ...selectedSlots };
     if (!newSelectedSlots[day]) {
       newSelectedSlots[day] = [];
     }
 
     const daySlots = newSelectedSlots[day];
-    const slotIndex = daySlots.indexOf(hour);
+    const indexInDay = daySlots.indexOf(slotIndex);
 
-    if (slotIndex > -1) {
-      daySlots.splice(slotIndex, 1);
+    if (indexInDay > -1) {
+      daySlots.splice(indexInDay, 1);
     } else {
-      daySlots.push(hour);
+      daySlots.push(slotIndex);
     }
 
     updateAvailability(newSelectedSlots);
@@ -92,47 +111,53 @@ export default function WeeklyScheduleSelector({ value, onChange }: WeeklySchedu
   const updateAvailability = (newSelectedSlots: Record<string, number[]>) => {
     setSelectedSlots(newSelectedSlots);
     
-    const updatedAvailability: DayAvailability[] = Object.entries(newSelectedSlots).map(([day, slots]) => ({
+    const updatedAvailability: DayAvailability[] = Object.entries(newSelectedSlots).map(([day, slotIndices]) => ({
       day,
-      slots: groupConsecutiveSlots(slots),
+      slots: groupConsecutiveSlots(slotIndices, timeSlots),
     }));
+    
     onChange(updatedAvailability);
   }
+  
+  const totalSlots = timeSlots.length;
 
   return (
     <div className="flex flex-col gap-2" dir="rtl">
-      <div className="grid grid-cols-[1fr_auto] gap-x-2">
-        <div className="grid grid-cols-12 text-center text-xs text-muted-foreground">
+      <div className="grid grid-cols-[auto_1fr] gap-x-2">
+         <div className="w-24"></div>
+        <div className="grid text-center text-xs text-muted-foreground" style={{gridTemplateColumns: `repeat(${totalSlots}, minmax(0, 1fr))`}}>
           {timeSlots.map(time => (
-            <div key={time}>{time}</div>
+            <div key={time.id}>{time.start}</div>
           ))}
         </div>
-        <div className="w-24"></div> {/* Spacer for alignment */}
       </div>
       {daysOfWeek.map(day => (
-        <div key={day} className="grid grid-cols-[1fr_auto] items-center gap-x-2">
-          <div className="grid grid-cols-12 gap-px bg-border rounded-md overflow-hidden" dir="ltr">
-            {timeSlots.map((time, index) => {
-              const hour = index + 7;
-              const isSelected = selectedSlots[day]?.includes(hour);
-              return (
-                <div
-                  key={`${day}-${time}`}
-                  onClick={() => handleSlotClick(day, hour)}
-                  className={cn(
-                    'h-7 w-full cursor-pointer transition-colors',
-                    isSelected ? 'bg-primary' : 'bg-card hover:bg-secondary'
-                  )}
-                />
-              );
-            })}
-          </div>
-          <div className="flex items-center justify-start gap-2 w-24">
-            <span className="font-semibold text-sm">{day}</span>
-             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => clearDay(day)}>
-                <Trash2 className="h-3.5 w-3.5 text-muted-foreground"/>
-             </Button>
-          </div>
+        <div key={day} className="grid grid-cols-[auto_1fr] items-center gap-x-2">
+            <div className="flex items-center justify-end gap-2 w-24">
+                <span className="font-semibold text-sm">{day}</span>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => clearDay(day)}>
+                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground"/>
+                </Button>
+            </div>
+            <div className="grid gap-px bg-border rounded-md overflow-hidden" style={{gridTemplateColumns: `repeat(${totalSlots}, minmax(0, 1fr))`}} dir="ltr">
+                {timeSlots.map((slot, index) => {
+                const isSelected = selectedSlots[day]?.includes(index);
+                const isBreak = slot.type === 'break';
+                return (
+                    <div
+                    key={`${day}-${slot.id}`}
+                    onClick={() => handleSlotClick(day, index)}
+                    className={cn(
+                        'h-7 w-full transition-colors',
+                        isBreak 
+                          ? 'bg-muted/50 cursor-not-allowed'
+                          : 'cursor-pointer',
+                        !isBreak && (isSelected ? 'bg-primary' : 'bg-card hover:bg-secondary')
+                    )}
+                    />
+                );
+                })}
+            </div>
         </div>
       ))}
     </div>

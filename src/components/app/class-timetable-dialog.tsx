@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import type { SchoolClass, Teacher, Lesson, ClassSchedule } from '@/lib/types';
+import type { SchoolClass, Teacher, Lesson, ClassSchedule, TimeSlot } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,7 +13,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { timeSlots, daysOfWeek } from '@/lib/constants';
+import { daysOfWeek } from '@/lib/constants';
 import {
   Select,
   SelectContent,
@@ -23,11 +23,13 @@ import {
 } from "@/components/ui/select"
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { X, Book, User, BookOpen } from 'lucide-react';
+import { X, Book, User, BookOpen, Coffee } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Combobox } from '../ui/combobox';
 import { isTeacherAvailable, isTeacherAlreadyScheduled } from '@/lib/substitute-finder';
 import { startOfToday } from 'date-fns';
+import { Badge } from '../ui/badge';
+
 
 interface ClassTimetableDialogProps {
   isOpen: boolean;
@@ -35,6 +37,7 @@ interface ClassTimetableDialogProps {
   schoolClass: SchoolClass | null;
   allTeachers: Teacher[];
   allClasses: SchoolClass[];
+  timeSlots: TimeSlot[];
   isEditing: boolean;
   onUpdateSchedule?: (classId: string, schedule: ClassSchedule) => void;
 }
@@ -47,9 +50,10 @@ interface EditSlotPopoverProps {
     allTeachers: Teacher[];
     allClasses: SchoolClass[];
     schoolClass: SchoolClass;
+    timeSlots: TimeSlot[];
 }
 
-function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, schoolClass }: EditSlotPopoverProps) {
+function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, schoolClass, timeSlots }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [subject, setSubject] = useState(lesson?.subject || '');
     const [teacherId, setTeacherId] = useState(lesson?.teacherId || null);
@@ -62,26 +66,18 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
     }, [lesson, isOpen]);
 
     const availableTeachersForSlot = useMemo(() => {
-        // Mock date for availability check. The exact date doesn't matter, only the day of the week.
         const dayIndex = daysOfWeek.indexOf(day);
-        // Create a date that falls on the correct day of the week.
         const today = startOfToday();
         const todayIndex = today.getDay();
         const date = new Date(today.setDate(today.getDate() - todayIndex + dayIndex));
         
         return allTeachers.filter(t => {
-            // Teacher must be generally available at this time
-            const isGenerallyAvailable = isTeacherAvailable(t, date, time);
-            
-            // Teacher must not be scheduled in another class at the same time
+            const isGenerallyAvailable = isTeacherAvailable(t, date, time, timeSlots);
             const isScheduledElsewhere = isTeacherAlreadyScheduled(t.id, date, time, allClasses, schoolClass.id);
-
-            // The current teacher of the lesson is always considered available for editing purposes.
             const isCurrentTeacher = t.id === lesson?.teacherId;
-            
             return (isGenerallyAvailable && !isScheduledElsewhere) || isCurrentTeacher;
         });
-    }, [day, time, allTeachers, allClasses, schoolClass.id, lesson?.teacherId]);
+    }, [day, time, allTeachers, allClasses, schoolClass.id, lesson?.teacherId, timeSlots]);
 
 
     const qualifiedTeachersForSlot = useMemo(() => {
@@ -141,7 +137,6 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
                             value={subject}
                             onChange={(newSubject) => {
                                 setSubject(newSubject);
-                                // Reset teacher if they can't teach the new subject
                                 const currentTeacher = allTeachers.find(t => t.id === teacherId);
                                 if (currentTeacher && !currentTeacher.subjects.includes(newSubject)) {
                                     setTeacherId(null);
@@ -177,13 +172,13 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
     )
 }
 
-
 export default function ClassTimetableDialog({
   isOpen,
   onOpenChange,
   schoolClass,
   allTeachers,
   allClasses,
+  timeSlots,
   isEditing,
   onUpdateSchedule
 }: ClassTimetableDialogProps) {
@@ -192,11 +187,9 @@ export default function ClassTimetableDialog({
 
   useEffect(() => {
     if(schoolClass) {
-        // Deep copy of schedule
         setLocalSchedule(JSON.parse(JSON.stringify(schoolClass.schedule || {})));
     }
   }, [schoolClass]);
-
 
   if (!schoolClass) return null;
 
@@ -206,7 +199,6 @@ export default function ClassTimetableDialog({
         if (!newSchedule[day]) newSchedule[day] = {};
         
         if(lesson === null){
-            // Using delete is fine here as we are working with a new object
             if(newSchedule[day]) {
               delete newSchedule[day][time];
             }
@@ -224,10 +216,9 @@ export default function ClassTimetableDialog({
     }
   }
 
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl md:max-w-6xl">
+      <DialogContent className="max-w-4xl md:max-w-7xl">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? `עריכת מערכת שעות: ${schoolClass.name}` : `מערכת שעות: ${schoolClass.name}`}
@@ -240,51 +231,57 @@ export default function ClassTimetableDialog({
         <ScrollArea className="w-full whitespace-nowrap rounded-md border">
           <div className="relative">
             <table className="w-full text-sm text-center table-fixed">
-              <thead>
-                <tr className="bg-muted/40">
-                  <th className="sticky right-0 top-0 bg-muted/40 p-2 w-24 z-20">שעה</th>
+              <thead className='bg-muted/40'>
+                <tr className='bg-muted/40'>
+                  <th className="sticky right-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
                   {daysOfWeek.map(day => (
                     <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">{day}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {timeSlots.map(time => (
-                  <tr key={time} className="border-t">
-                    <td className="sticky right-0 font-semibold bg-card p-2 w-24 z-10">{time}</td>
+                {timeSlots.map(slot => (
+                  <tr key={slot.id} className="border-t">
+                    <td className="sticky right-0 font-semibold bg-card p-2 w-40 z-10 text-center">
+                        <div>{slot.start} - {slot.end}</div>
+                        {slot.type === 'break' && <Badge variant="outline" className='mt-1'>הפסקה</Badge>}
+                    </td>
                     {daysOfWeek.map(day => {
-                      const lesson = localSchedule?.[day]?.[time] || null;
+                      const lesson = localSchedule?.[day]?.[slot.start] || null;
                       const teacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
+                      const isBreak = slot.type === 'break';
                       return (
-                        <td key={`${day}-${time}`} className="p-0 align-top border-l">
-                            {isEditing ? (
+                        <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-l", isBreak && 'bg-muted/30')}>
+                            {isEditing && !isBreak ? (
                                 <EditSlotPopover 
                                     day={day} 
-                                    time={time}
+                                    time={slot.start}
                                     lesson={lesson}
                                     onSave={handleSaveSlot}
                                     allTeachers={allTeachers}
                                     allClasses={allClasses}
                                     schoolClass={schoolClass}
+                                    timeSlots={timeSlots}
                                 />
                             ) : (
                                 <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-center">
-                                {lesson && teacher ? (
-                                    <div className="bg-secondary/50 rounded-md p-2 text-right h-full flex flex-col justify-center">
-                                      <div className="flex items-center gap-2">
-                                        <BookOpen className="h-4 w-4 text-primary" />
-                                        <p className="font-semibold text-primary">{lesson.subject}</p>
-                                      </div>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <User className="h-4 w-4 text-muted-foreground" />
-                                        <p className="text-sm text-muted-foreground">{teacher.name}</p>
-                                      </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center justify-center h-full">
-                                        <span className="text-muted-foreground text-xs">--</span>
-                                    </div>
-
+                                {isBreak ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
+                                    lesson && teacher ? (
+                                        <div className="bg-secondary/50 rounded-md p-2 text-right h-full flex flex-col justify-center">
+                                        <div className="flex items-center gap-2">
+                                            <BookOpen className="h-4 w-4 text-primary shrink-0" />
+                                            <p className="font-semibold text-primary">{lesson.subject}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                                            <p className="text-sm text-muted-foreground">{teacher.name}</p>
+                                        </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-center h-full">
+                                            <span className="text-muted-foreground text-xs">--</span>
+                                        </div>
+                                    )
                                 )}
                                 </div>
                             )}

@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { Teacher, DayAvailability } from '@/lib/types';
+import type { Teacher, DayAvailability, TimeSlot } from '@/lib/types';
 import { useEffect } from 'react';
 import WeeklyScheduleSelector from './weekly-schedule-selector';
 import SubjectInput from './subject-input';
@@ -50,6 +50,7 @@ interface CreateTeacherDialogProps {
   onAddTeacher: (teacher: Omit<Teacher, 'id' | 'avatar'>) => void;
   onEditTeacher: (teacher: Omit<Teacher, 'avatar'>) => void;
   teacherToEdit: Teacher | null;
+  timeSlots: TimeSlot[];
 }
 
 const defaultAvailability = [
@@ -67,6 +68,7 @@ export default function CreateTeacherDialog({
   onAddTeacher,
   onEditTeacher,
   teacherToEdit,
+  timeSlots,
 }: CreateTeacherDialogProps) {
   const isEditMode = !!teacherToEdit;
 
@@ -168,7 +170,7 @@ export default function CreateTeacherDialog({
                   <FormLabel>זמינות שבועית</FormLabel>
                    <p className="text-sm text-muted-foreground">לחץ על משבצות זמן כדי לסמן זמינות.</p>
                   <FormControl>
-                    <WeeklyScheduleSelector {...field} />
+                    <WeeklyScheduleSelector {...field} timeSlots={timeSlots} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

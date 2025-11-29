@@ -1,5 +1,5 @@
 import { getDay } from 'date-fns';
-import type { Teacher, SchoolClass } from './types';
+import type { Teacher, SchoolClass, TimeSlot } from './types';
 
 interface LessonDetails {
   subject: string;
@@ -14,11 +14,18 @@ interface FindSubstituteResult {
 
 const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
-const parseTimeToNumber = (time: string) => parseInt(time.split(':')[0], 10);
+const parseTimeToNumber = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours + minutes / 60;
+};
 
-export function isTeacherAvailable(teacher: Teacher, date: Date, time: string): boolean {
+export function isTeacherAvailable(teacher: Teacher, date: Date, time: string, timeSlots: TimeSlot[]): boolean {
   const dayOfWeek = dayMap[getDay(date)];
-  const lessonHour = parseTimeToNumber(time);
+  const lessonSlot = timeSlots.find(s => s.start === time);
+  if (!lessonSlot) return false;
+
+  const lessonStartNum = parseTimeToNumber(lessonSlot.start);
+  const lessonEndNum = parseTimeToNumber(lessonSlot.end);
 
   const availabilityForDay = teacher.availability.find(a => a.day === dayOfWeek);
   if (!availabilityForDay) {
@@ -26,9 +33,9 @@ export function isTeacherAvailable(teacher: Teacher, date: Date, time: string): 
   }
 
   return availabilityForDay.slots.some(slot => {
-    const startHour = parseTimeToNumber(slot.start);
-    const endHour = parseTimeToNumber(slot.end);
-    return lessonHour >= startHour && lessonHour < endHour;
+    const startNum = parseTimeToNumber(slot.start);
+    const endNum = parseTimeToNumber(slot.end);
+    return lessonStartNum >= startNum && lessonEndNum <= endNum;
   });
 }
 
@@ -36,7 +43,6 @@ export function isTeacherAlreadyScheduled(teacherId: string, date: Date, time: s
     const dayOfWeek = dayMap[getDay(date)];
     
     return allClasses.some(schoolClass => {
-        // If we're checking for a specific class's timetable, we should ignore that class itself.
         if (schoolClass.id === ignoreClassId) return false;
 
         const lesson = schoolClass.schedule[dayOfWeek]?.[time];
@@ -44,16 +50,12 @@ export function isTeacherAlreadyScheduled(teacherId: string, date: Date, time: s
     });
 }
 
-// Function to score a teacher's suitability for a substitution.
 const scoreTeacher = (teacher: Teacher, lessonDetails: LessonDetails): number => {
     let score = 0;
-    // Base score for being qualified
     if (teacher.subjects.includes(lessonDetails.subject)) {
         score += 10;
     }
 
-    // Bonus for matching preferences (example: prefers certain levels)
-    // This is a simple example. A real-world scenario could be more complex.
     if (teacher.preferences?.includes('כיתות בוגרות')) {
         score += 2;
     }
@@ -67,15 +69,17 @@ const scoreTeacher = (teacher: Teacher, lessonDetails: LessonDetails): number =>
 export async function findSubstitute(
   lessonDetails: LessonDetails,
   substitutePool: Teacher[],
-  allClasses: SchoolClass[]
+  allClasses: SchoolClass[],
+  timeSlots: TimeSlot[],
 ): Promise<FindSubstituteResult> {
   
-  // 1. Filter by subject qualification
   let qualifiedTeachers = substitutePool.filter(t => t.subjects.includes(lessonDetails.subject));
 
   if (qualifiedTeachers.length === 0) {
-     // If no one is qualified, check for any teacher available as a last resort
-     const anyAvailableTeacher = substitutePool.filter(t => isTeacherAvailable(t, lessonDetails.date, lessonDetails.time) && !isTeacherAlreadyScheduled(t.id, lessonDetails.date, lessonDetails.time, allClasses));
+     const anyAvailableTeacher = substitutePool.filter(t => 
+        isTeacherAvailable(t, lessonDetails.date, lessonDetails.time, timeSlots) && 
+        !isTeacherAlreadyScheduled(t.id, lessonDetails.date, lessonDetails.time, allClasses)
+     );
      if(anyAvailableTeacher.length > 0) {
         const bestOfWorst = anyAvailableTeacher[0];
          return {
@@ -90,9 +94,8 @@ export async function findSubstitute(
     };
   }
 
-  // 2. Filter by availability on the specific day and time
   const availableQualifiedTeachers = qualifiedTeachers.filter(t => 
-      isTeacherAvailable(t, lessonDetails.date, lessonDetails.time) &&
+      isTeacherAvailable(t, lessonDetails.date, lessonDetails.time, timeSlots) &&
       !isTeacherAlreadyScheduled(t.id, lessonDetails.date, lessonDetails.time, allClasses)
   );
 
@@ -103,20 +106,17 @@ export async function findSubstitute(
     };
   }
   
-  // 3. Score and sort the available teachers
   const scoredTeachers = availableQualifiedTeachers.map(teacher => ({
     teacher,
     score: scoreTeacher(teacher, lessonDetails),
   })).sort((a, b) => b.score - a.score);
 
-  // 4. Select the best choice
   const bestChoice = scoredTeachers[0].teacher;
   
   let reasoning = `${bestChoice.name} זמין/ה ומוכשר/ת ב${lessonDetails.subject}.`;
   if (bestChoice.preferences) {
       reasoning += ` העדפות: ${bestChoice.preferences}.`
   }
-
 
   return {
     recommendation: bestChoice.name,

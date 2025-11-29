@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { findSubstitute } from '@/lib/substitute-finder';
-import type { Teacher, AbsenceDay, SchoolClass, AffectedLesson } from '@/lib/types';
+import type { Teacher, AbsenceDay, SchoolClass, AffectedLesson, TimeSlot } from '@/lib/types';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -62,6 +62,7 @@ interface MarkAbsentDialogProps {
   teacher: Teacher | null;
   allTeachers: Teacher[];
   allClasses: SchoolClass[];
+  timeSlots: TimeSlot[];
   onShowRecommendation: (
     results: AffectedLesson[],
     absentTeacher: Teacher
@@ -71,7 +72,8 @@ interface MarkAbsentDialogProps {
 const getAffectedLessons = (
   absentTeacher: Teacher,
   absenceDays: AbsenceDay[],
-  allClasses: SchoolClass[]
+  allClasses: SchoolClass[],
+  timeSlots: TimeSlot[]
 ): AffectedLesson[] => {
   const affected: AffectedLesson[] = [];
   const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -85,15 +87,20 @@ const getAffectedLessons = (
       const classDaySchedule = schoolClass.schedule[dayOfWeek];
       if (classDaySchedule) {
         Object.entries(classDaySchedule).forEach(([time, lesson]) => {
-          const lessonHour = parseInt(time.split(':')[0]);
-          if (lesson && lesson.teacherId === absentTeacher.id && lessonHour >= absenceStart && lessonHour < absenceEnd) {
+          const lessonSlot = timeSlots.find(s => s.start === time);
+          if (!lessonSlot || lessonSlot.type === 'break') return;
+
+          const lessonStartHour = parseInt(lessonSlot.start.split(':')[0]);
+          const lessonEndHour = parseInt(lessonSlot.end.split(':')[0]);
+          
+          if (lesson && lesson.teacherId === absentTeacher.id && Math.max(lessonStartHour, absenceStart) < Math.min(lessonEndHour, absenceEnd)) {
             affected.push({
               classId: schoolClass.id,
               className: schoolClass.name,
               date: day.date,
               time: time,
               lesson: lesson,
-              recommendation: null, // Will be filled later
+              recommendation: null,
               reasoning: null,
             });
           }
@@ -111,6 +118,7 @@ export default function MarkAbsentDialog({
   teacher,
   allTeachers,
   allClasses,
+  timeSlots,
   onShowRecommendation,
 }: MarkAbsentDialogProps) {
   const { toast } = useToast();
@@ -165,7 +173,7 @@ export default function MarkAbsentDialog({
     try {
       const substituteProfiles = allTeachers.filter((t) => t.id !== teacher.id);
       
-      const affectedLessons = getAffectedLessons(teacher, values.absenceDays, allClasses);
+      const affectedLessons = getAffectedLessons(teacher, values.absenceDays, allClasses, timeSlots);
       
       const recommendationPromises = affectedLessons.map(affected => 
         findSubstitute(
@@ -175,7 +183,8 @@ export default function MarkAbsentDialog({
             time: affected.time
           },
           substituteProfiles,
-          allClasses
+          allClasses,
+          timeSlots
         )
       );
       
@@ -269,7 +278,7 @@ export default function MarkAbsentDialog({
                               control={form.control}
                               name={`absenceDays.${index}.isAllDay`}
                               render={({ field }) => (
-                                <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                                <FormItem className="flex flex-row-reverse items-center space-x-2 space-x-reverse space-y-0">
                                   <FormControl>
                                     <Checkbox
                                       checked={field.value}
