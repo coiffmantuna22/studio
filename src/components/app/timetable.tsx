@@ -156,6 +156,53 @@ export default function Timetable({}: TimetableProps) {
     return [];
   }, [settingsCollection, user]);
 
+  const uncoveredLessons = useMemo(() => {
+    const uncovered = new Map<string, { teacher: Teacher; lesson: Lesson }[]>();
+    if (!allTeachers || !allSubstitutions) return uncovered;
+
+    const weekStartDate = getStartOfWeek(new Date());
+
+    allTeachers.forEach(teacher => {
+      (teacher.absences || []).forEach(absence => {
+        const absenceDate = startOfDay(new Date(absence.date as string));
+        const dayOfWeek = daysOfWeek[getDay(absenceDate)];
+        
+        const dayDifference = (getDay(absenceDate) - getDay(weekStartDate) + 7) % 7;
+        if(dayDifference < 0 || dayDifference >= daysOfWeek.length) return;
+
+
+        const relevantTimeSlots = timeSlots.filter(slot => {
+          if (absence.isAllDay) return slot.type === 'lesson';
+          const slotStartNum = parseTimeToNumber(slot.start);
+          const absenceStart = parseTimeToNumber(absence.startTime);
+          const absenceEnd = parseTimeToNumber(absence.endTime);
+          return slotStartNum >= absenceStart && slotStartNum < absenceEnd;
+        });
+
+        relevantTimeSlots.forEach(slot => {
+          const lesson = teacher.schedule?.[dayOfWeek]?.[slot.start];
+          if (lesson) {
+            const isCovered = allSubstitutions.some(sub => 
+              isSameDay(startOfDay(new Date(sub.date)), absenceDate) &&
+              sub.time === slot.start &&
+              sub.classId === lesson.classId
+            );
+
+            if (!isCovered) {
+              const key = `${dayOfWeek}-${slot.start}`;
+              if (!uncovered.has(key)) {
+                uncovered.set(key, []);
+              }
+              uncovered.get(key)!.push({ teacher, lesson });
+            }
+          }
+        });
+      });
+    });
+
+    return uncovered;
+  }, [allTeachers, allSubstitutions, timeSlots]);
+
 
   const timetableData = useMemo(() => {
     const data: Record<string, Record<string, {name: string, id: string, isAbsent: boolean}[]>> = {};
@@ -231,23 +278,18 @@ export default function Timetable({}: TimetableProps) {
     
     const lessonsToCover: any[] = [];
 
-    // Find all teachers who are absent at this specific time slot
     const absentTeachers = (allTeachers || []).filter(teacher => {
         return (teacher.absences || []).some(absence =>
             isSameDay(startOfDay(new Date(absence.date as string)), date) &&
             (absence.isAllDay || (time >= absence.startTime && time < absence.endTime))
         );
     });
-
-    // For each absent teacher, check if they were supposed to be teaching a lesson
+    
     absentTeachers.forEach(absentTeacher => {
         const lesson = absentTeacher.schedule?.[day]?.[time];
-
         if (lesson && lesson.classId) {
             const schoolClass = (allClasses || []).find(c => c.id === lesson.classId);
-            
             if (schoolClass) {
-                // Check if this lesson is already covered by another substitution
                 const isCovered = (allSubstitutions || []).some(sub => 
                     isSameDay(startOfDay(new Date(sub.date)), date) &&
                     sub.time === time &&
@@ -275,7 +317,6 @@ export default function Timetable({}: TimetableProps) {
         
         const batch = writeBatch(firestore);
 
-        // 1. Create substitution record
         const subRef = doc(collection(firestore, 'substitutions'));
         const newSub: Omit<SubstitutionRecord, 'id'> = {
             date: format(date, 'yyyy-MM-dd'),
@@ -339,24 +380,20 @@ export default function Timetable({}: TimetableProps) {
                                 const weekStartDate = getStartOfWeek(new Date());
                                 const dayIndex = daysOfWeek.indexOf(day);
                                 const currentDate = addDays(weekStartDate, dayIndex);
-
-                                const absentAndScheduled = (allTeachers || [])
-                                    .filter(t => (t.absences || []).some(a => isSameDay(startOfDay(new Date(a.date as string)), currentDate) && (a.isAllDay || (slot.start >= a.startTime && slot.start < a.endTime))))
-                                    .filter(t => t.schedule?.[day]?.[slot.start])
-                                    .map(t => ({...t.schedule?.[day]?.[slot.start], teacher: t}))
-                                    .filter(t => !(allSubstitutions || []).some(sub => isSameDay(startOfDay(new Date(sub.date)), currentDate) && sub.time === slot.start && sub.classId === t.classId));
                                     
                                 const substitutionsInSlot = (allSubstitutions || [])
                                     .filter(sub => isSameDay(startOfDay(new Date(sub.date)), currentDate) && sub.time === slot.start);
+                                
+                                const uncoveredInSlot = uncoveredLessons.get(`${day}-${slot.start}`);
 
                                 return (
                                 <td key={`${day}-${slot.start}`} className={cn("p-2 align-top h-24 border-r", slot.type === 'break' && 'bg-muted/30')}>
                                 {slot.type === 'break' ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
-                                    <div className="flex flex-col items-center gap-1.5 justify-center">
-                                        {absentAndScheduled.map(item => (
-                                            <Badge key={item.teacher.id} variant={'destructive'} className="font-normal">
+                                    <div className="flex flex-col items-center gap-1.5 justify-center h-full">
+                                        {uncoveredInSlot && uncoveredInSlot.map(({ teacher, lesson }) => (
+                                            <Badge key={teacher.id} variant={'destructive'} className="font-normal">
                                                 <UserX className="h-3 w-3 ml-1" />
-                                                {item.teacher.name} (חסר/ה)
+                                                דרוש מחליף ({teacher.name})
                                             </Badge>
                                         ))}
                                          {substitutionsInSlot.map(sub => (
@@ -376,7 +413,7 @@ export default function Timetable({}: TimetableProps) {
                                                 {teacher.name}
                                            </Button>
                                         ))}
-                                        {availableSubs.length === 0 && absentAndScheduled.length === 0 && substitutionsInSlot.length === 0 && (
+                                        {availableSubs.length === 0 && !uncoveredInSlot && substitutionsInSlot.length === 0 && (
                                             <span className="text-muted-foreground text-xs opacity-70">--</span>
                                         )}
                                     </div>
