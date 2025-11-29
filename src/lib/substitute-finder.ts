@@ -42,15 +42,11 @@ export function isTeacherAvailable(teacher: Teacher, date: Date, time: string, t
 export function isTeacherAlreadyScheduled(teacherId: string, date: Date, time: string, allClasses: SchoolClass[], ignoreClassId?: string): boolean {
     const dayOfWeek = dayMap[getDay(date)];
     
-    for (const schoolClass of allClasses) {
-        if (schoolClass.id === ignoreClassId) continue;
-        
+    return allClasses.some(schoolClass => {
+        if (schoolClass.id === ignoreClassId) return false;
         const lesson = schoolClass.schedule[dayOfWeek]?.[time];
-        if (lesson?.teacherId === teacherId) {
-            return true;
-        }
-    }
-    return false;
+        return lesson?.teacherId === teacherId;
+    });
 }
 
 const scoreTeacher = (teacher: Teacher, lessonDetails: LessonDetails): number => {

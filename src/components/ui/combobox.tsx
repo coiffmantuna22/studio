@@ -44,13 +44,13 @@ export function Combobox({ items, value, onChange, placeholder, searchPlaceholde
 
   const handleInputChange = (search: string) => {
     setInputValue(search);
-    if (search && !internalItems.some(item => item.value.toLowerCase() === search.toLowerCase())) {
+    if (search && !items.some(item => item.value.toLowerCase() === search.toLowerCase())) {
       const newItem = { label: `הוסף "${search}"`, value: search };
       const filteredItems = items.filter(item => item.label.toLowerCase().includes(search.toLowerCase()));
       setInternalItems([newItem, ...filteredItems]);
     } else {
         const filteredItems = items.filter(item => item.label.toLowerCase().includes(search.toLowerCase()));
-        setInternalItems(filteredItems);
+        setInternalItems(filteredItems.length > 0 ? filteredItems : items);
     }
   }
   
@@ -62,14 +62,17 @@ export function Combobox({ items, value, onChange, placeholder, searchPlaceholde
     setInputValue("");
   }
 
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if(!isOpen) {
+        setInternalItems(items);
+        setInputValue("");
+    }
+  }
+
 
   return (
-    <Popover open={open} onOpenChange={(isOpen) => {
-        setOpen(isOpen);
-        if (!isOpen) {
-            setInternalItems(items); // Reset items on close
-        }
-    }}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -78,7 +81,7 @@ export function Combobox({ items, value, onChange, placeholder, searchPlaceholde
           className="w-full justify-between"
         >
           {value
-            ? items.find((item) => item.value === value)?.label
+            ? items.find((item) => item.value === value)?.label ?? value
             : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -87,6 +90,7 @@ export function Combobox({ items, value, onChange, placeholder, searchPlaceholde
         <Command>
           <CommandInput 
             placeholder={searchPlaceholder} 
+            value={inputValue}
             onValueChange={handleInputChange}
             onBlur={handleInputBlur}
           />
