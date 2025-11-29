@@ -3,9 +3,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Header from '@/components/app/header';
-import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay } from '@/lib/types';
-import { startOfDay, getDay, format, isSameDay } from 'date-fns';
+import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { useRouter } from 'next/navigation';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { format, isSameDay, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
+import type { Teacher, AbsenceDay, TimeSlot } from '@/lib/types';
+import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
+import RecommendationDialog from '@/components/app/recommendation-dialog';
 
 const TeacherList = dynamic(() => import('@/components/app/teacher-list'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
@@ -19,67 +28,7 @@ const ClassList = dynamic(() => import('@/components/app/class-list'), {
 const SettingsTab = dynamic(() => import('@/components/app/settings-tab'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
 });
-import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { useRouter } from 'next/navigation';
-import { collection, doc, writeBatch, query, where, getDocs, getDoc, orderBy, limit } from 'firebase/firestore';
-import { useCollection } from '@/firebase/firestore/use-collection';
-import { Loader2, AlertTriangle } from 'lucide-react';
-import { commitBatchWithContext } from '@/lib/firestore-utils';
-import { Button } from '@/components/ui/button';
-import { daysOfWeek } from '@/lib/constants';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getTeacherAvailabilityStatus, findSubstitute } from '@/lib/substitute-finder';
-import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
-import RecommendationDialog from '@/components/app/recommendation-dialog';
-import { FirestorePermissionError } from '@/firebase/errors';
-import { errorEmitter } from '@/firebase/error-emitter';
 
-const getAffectedLessons = (
-  absentTeacher: Teacher,
-  absenceDays: AbsenceDay[],
-  allClasses: SchoolClass[],
-  timeSlots: TimeSlot[]
-): Omit<AffectedLesson, 'recommendation' | 'recommendationId' | 'reasoning' | 'substituteOptions'>[] => {
-  const affected: Omit<AffectedLesson, 'recommendation' | 'recommendationId' | 'reasoning' | 'substituteOptions'>[] = [];
-  const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-
-  const getMinutes = (time: string) => {
-    if (!time || !time.includes(':')) return 0;
-    const [h, m] = time.split(':').map(Number);
-    return h * 60 + m;
-  };
-
-  (absenceDays || []).forEach(day => {
-    const dayOfWeek = dayMap[getDay(startOfDay(new Date(day.date)))];
-    const absenceStart = day.isAllDay ? 0 : getMinutes(day.startTime);
-    const absenceEnd = day.isAllDay ? 24 * 60 : getMinutes(day.endTime);
-
-    (allClasses || []).forEach(schoolClass => {
-      const classDaySchedule = schoolClass.schedule?.[dayOfWeek];
-      if (classDaySchedule) {
-        Object.entries(classDaySchedule).forEach(([time, lesson]) => {
-          const lessonSlot = timeSlots.find(s => s.start === time);
-          if (!lessonSlot || lessonSlot.type === 'break') return;
-
-          const lessonStart = getMinutes(lessonSlot.start);
-          const lessonEnd = getMinutes(lessonSlot.end);
-          
-          if (lesson && lesson.teacherId === absentTeacher.id && Math.max(lessonStart, absenceStart) < Math.min(lessonEnd, absenceEnd)) {
-             affected.push({
-              classId: schoolClass.id,
-              className: schoolClass.name,
-              date: new Date(day.date),
-              time: time,
-              lesson: lesson,
-            });
-          }
-        });
-      }
-    });
-  });
-
-  return affected;
-};
 
 export default function Home() {
   const { user, isUserLoading } = useUser();
@@ -89,19 +38,14 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("teachers");
   const [teacherToMarkAbsent, setTeacherToMarkAbsent] = useState<Teacher | null>(null);
   const [recommendation, setRecommendation] = useState<{
-    results: AffectedLesson[];
+    results: any[];
     absentTeacher: Teacher;
     absenceDays: any[];
   } | null>(null);
-  const [absenceToReview, setAbsenceToReview] = useState<{ teacher: Teacher; absences: AbsenceDay[] } | null>(null);
+   const [absenceToReview, setAbsenceToReview] = useState<{ teacher: Teacher; absences: AbsenceDay[] } | null>(null);
 
 
-  const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
-  const classesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'classes'), where('userId', '==', user.uid)) : null, [user, firestore]);
   const settingsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null, [user, firestore]);
-  
-  const { data: teachers = [], isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
-  const { data: schoolClasses = [], isLoading: classesLoading } = useCollection<SchoolClass>(classesQuery);
   const { data: settingsCollection, isLoading: settingsLoading } = useCollection(settingsQuery);
 
   const timeSlots: TimeSlot[] = useMemo(() => {
@@ -114,285 +58,19 @@ export default function Home() {
     return [];
   }, [settingsCollection, user]);
 
+  const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
+  const { data: teachers = [], isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
+
+
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
 
-  const isDataLoading = isUserLoading || teachersLoading || classesLoading || settingsLoading;
 
-  const isInitialSetup = !isDataLoading && user && timeSlots.length === 0;
+  const isInitialSetup = !isUserLoading && !settingsLoading && user && timeSlots.length === 0;
 
-  const teacherAvailabilityNow = useMemo(() => {
-    const availabilityMap = new Map<string, TeacherAvailabilityStatus>();
-    const now = new Date();
-    (teachers || []).forEach(teacher => {
-        availabilityMap.set(teacher.id, getTeacherAvailabilityStatus(teacher, now, timeSlots));
-    });
-    return availabilityMap;
-  }, [teachers, timeSlots]);
-
-
-  const handleAddTeacher = async (newTeacherData: Omit<Teacher, 'id' | 'userId' | 'avatar'>) => {
-    if (!firestore || !user) return;
-    const newDocRef = doc(collection(firestore, 'teachers'));
-    const fallback = newTeacherData.name.split(' ').map((n) => n[0]).join('').toUpperCase();
-    const newTeacher = { ...newTeacherData, id: newDocRef.id, userId: user.uid, avatar: { fallback }, schedule: {}, absences: [] };
-    const batch = writeBatch(firestore);
-    batch.set(newDocRef, newTeacher);
-    await commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: newTeacher });
-  };
-
-  const handleEditTeacher = async (updatedTeacher: Omit<Teacher, 'avatar' | 'userId' | 'schedule' | 'absences'>) => {
-    if (!firestore || !user) return;
-    const teacherRef = doc(firestore, 'teachers', updatedTeacher.id);
-    const batch = writeBatch(firestore);
-    batch.update(teacherRef, { ...updatedTeacher });
-    await commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: updatedTeacher });
-  }
-
-  const handleDeleteTeacher = async (teacherId: string) => {
-    if (!firestore || !user) return;
-    const batch = writeBatch(firestore);
-    try {
-        const teacherRef = doc(firestore, 'teachers', teacherId);
-        const teacherSnap = await getDoc(teacherRef);
-        if (!teacherSnap.exists()) return;
-
-        // Clear schedule for the teacher being deleted
-        batch.update(teacherRef, { schedule: {} });
-
-        // Remove teacher from any class schedules
-        const classesQuerySnapshot = await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)));
-        
-        classesQuerySnapshot.forEach(classDoc => {
-          const schoolClass = { id: classDoc.id, ...classDoc.data() } as SchoolClass;
-          let classWasModified = false;
-          const newSchedule = { ...schoolClass.schedule };
-
-          Object.keys(newSchedule).forEach(day => {
-            if (newSchedule[day]) {
-              Object.keys(newSchedule[day] as object).forEach(time => {
-                const lesson = newSchedule[day]?.[time];
-                if (lesson && lesson.teacherId === teacherId) {
-                  (newSchedule[day] as any)[time] = null; 
-                  classWasModified = true;
-                }
-              });
-            }
-          });
-
-          if (classWasModified) {
-            const classRef = doc(firestore, 'classes', schoolClass.id);
-            batch.update(classRef, { schedule: newSchedule });
-          }
-        });
-
-        // Finally, delete the teacher document
-        batch.delete(teacherRef);
-
-        await commitBatchWithContext(batch, {
-            operation: 'delete',
-            path: `teachers/${teacherId} and related classes`
-        });
-    } catch (e) {
-      if (!(e instanceof FirestorePermissionError)) {
-          const permissionError = new FirestorePermissionError({
-            operation: 'delete',
-            path: `teachers/${teacherId} and related classes`,
-          });
-          errorEmitter.emit('permission-error', permissionError);
-          throw permissionError;
-      }
-      throw e;
-    }
-  }
-
-  const handleAddClass = async (className: string) => {
-    if (!firestore || !user) return;
-    const newDocRef = doc(collection(firestore, 'classes'));
-    const newClass: Omit<SchoolClass, 'id'> = {
-      name: className,
-      schedule: {},
-      userId: user.uid,
-    };
-    const batch = writeBatch(firestore);
-    batch.set(newDocRef, { ...newClass, id: newDocRef.id });
-    await commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: { ...newClass, id: newDocRef.id } });
-  };
-
-  const handleDeleteClass = async (classId: string) => {
-    if (!firestore || !user) return;
-    const batch = writeBatch(firestore);
-     try {
-        const classRef = doc(firestore, "classes", classId);
-        const classSnap = await getDoc(classRef);
-        if (!classSnap.exists()) return;
-
-        const schoolClass = classSnap.data() as SchoolClass;
-
-        const teacherIds = new Set<string>();
-        Object.values(schoolClass.schedule || {}).forEach(daySchedule => {
-            Object.values(daySchedule).forEach(lesson => {
-                if (lesson) teacherIds.add(lesson.teacherId);
-            });
-        });
-
-        for (const teacherId of teacherIds) {
-            const teacherRef = doc(firestore, "teachers", teacherId);
-            const teacherSnap = await getDoc(teacherRef);
-            if (teacherSnap.exists()) {
-                const teacher = teacherSnap.data() as Teacher;
-                const newSchedule = JSON.parse(JSON.stringify(teacher.schedule || {}));
-                Object.keys(newSchedule).forEach(day => {
-                    Object.keys(newSchedule[day] || {}).forEach(time => {
-                        if (newSchedule[day][time]?.classId === classId) {
-                            delete newSchedule[day][time];
-                        }
-                    });
-                });
-                batch.update(teacherRef, { schedule: newSchedule });
-            }
-        }
-        batch.delete(classRef);
-        await commitBatchWithContext(batch, {
-            operation: 'delete',
-            path: `classes/${classId} and related teachers`,
-        });
-    } catch (e) {
-      if (!(e instanceof FirestorePermissionError)) {
-          const permissionError = new FirestorePermissionError({
-            operation: 'delete',
-            path: `classes/${classId} and related teachers`,
-          });
-          errorEmitter.emit('permission-error', permissionError);
-          throw permissionError;
-      }
-      throw e;
-    }
-  };
-
-const handleScheduleUpdate = async (
-    entityType: 'teacher' | 'class',
-    entityId: string,
-    newSchedule: ClassSchedule
-) => {
-    if (!firestore || !user) return;
-
-    const batch = writeBatch(firestore);
-    try {
-        if (entityType === 'teacher') {
-            const teacherRef = doc(firestore, 'teachers', entityId);
-            const teacherSnap = await getDoc(teacherRef);
-            if (!teacherSnap.exists()) return;
-            const oldSchedule = teacherSnap.data().schedule || {};
-
-            batch.update(teacherRef, { schedule: newSchedule });
-
-            const allRelevantClassIds = new Set<string>();
-            for (const schedule of [oldSchedule, newSchedule]) {
-                Object.values(schedule || {}).forEach(day => 
-                    Object.values(day || {}).forEach(lesson => 
-                        lesson?.classId && allRelevantClassIds.add(lesson.classId)
-                    )
-                )
-            }
-            
-            for (const classId of allRelevantClassIds) {
-                const classRef = doc(firestore, 'classes', classId);
-                const classSnap = await getDoc(classRef);
-                if (!classSnap.exists()) continue;
-
-                const classData = classSnap.data() as SchoolClass;
-                const updatedClassSchedule = JSON.parse(JSON.stringify(classData.schedule || {}));
-
-                daysOfWeek.forEach(day => {
-                    (timeSlots || []).forEach(slot => {
-                        const time = slot.start;
-                        const oldLesson = oldSchedule[day]?.[time];
-                        const newLesson = newSchedule[day]?.[time];
-
-                        if (oldLesson?.classId === classId && (!newLesson || newLesson.classId !== classId)) {
-                            if (updatedClassSchedule[day]?.[time]?.teacherId === entityId) {
-                                (updatedClassSchedule[day] as any)[time] = null;
-                            }
-                        }
-                        if (newLesson?.classId === classId) {
-                            updatedClassSchedule[day] = updatedClassSchedule[day] || {};
-                            updatedClassSchedule[day][time] = { ...(newLesson as Lesson), teacherId: entityId };
-                        }
-                    });
-                });
-                batch.update(classRef, { schedule: updatedClassSchedule });
-            }
-
-        } else { 
-            const classRef = doc(firestore, 'classes', entityId);
-            const classSnap = await getDoc(classRef);
-            if (!classSnap.exists()) return;
-            const oldSchedule = classSnap.data().schedule || {};
-
-            batch.update(classRef, { schedule: newSchedule });
-
-            const allRelevantTeacherIds = new Set<string>();
-            for (const schedule of [oldSchedule, newSchedule]) {
-                Object.values(schedule || {}).forEach(day => 
-                    Object.values(day || {}).forEach(lesson => 
-                        lesson?.teacherId && allRelevantTeacherIds.add(lesson.teacherId)
-                    )
-                )
-            }
-
-            for (const teacherId of allRelevantTeacherIds) {
-                const teacherRef = doc(firestore, 'teachers', teacherId);
-                const teacherSnap = await getDoc(teacherRef);
-                if (!teacherSnap.exists()) continue;
-
-                const teacherData = teacherSnap.data() as Teacher;
-                const updatedTeacherSchedule = JSON.parse(JSON.stringify(teacherData.schedule || {}));
-
-                daysOfWeek.forEach(day => {
-                    (timeSlots || []).forEach(slot => {
-                        const time = slot.start;
-                        const oldLesson = oldSchedule[day]?.[time];
-                        const newLesson = newSchedule[day]?.[time];
-
-                        if (oldLesson?.teacherId === teacherId && (!newLesson || newLesson.teacherId !== teacherId)) {
-                             if (updatedTeacherSchedule[day]?.[time]?.classId === entityId) {
-                                (updatedTeacherSchedule[day] as any)[time] = null;
-                            }
-                        }
-                        if (newLesson?.teacherId === teacherId) {
-                            updatedTeacherSchedule[day] = updatedTeacherSchedule[day] || {};
-                            updatedTeacherSchedule[day][time] = { ...(newLesson as Lesson), classId: entityId };
-                        }
-                    });
-                });
-                batch.update(teacherRef, { schedule: updatedTeacherSchedule });
-            }
-        }
-
-        await commitBatchWithContext(batch, {
-            operation: 'update',
-            path: `${entityType === 'teacher' ? 'teachers' : 'classes'}/${entityId}`,
-            data: { schedule: newSchedule }
-        });
-
-    } catch (e) {
-      if (!(e instanceof FirestorePermissionError)) {
-        const permissionError = new FirestorePermissionError({
-            operation: 'update',
-            path: `${entityType === 'teacher' ? 'teachers' : 'classes'}/${entityId}`,
-            requestResourceData: { schedule: newSchedule },
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        throw permissionError;
-      }
-      throw e;
-    }
-}
-  
   const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
       
@@ -434,6 +112,10 @@ const handleScheduleUpdate = async (
         data: { absences: '...' }
     });
 
+     const classesQuery = query(collection(firestore, 'classes'), where('userId', '==', user.uid));
+     const schoolClassesSnap = await getDocs(classesQuery);
+     const schoolClasses = schoolClassesSnap.docs.map(d => ({...d.data(), id: d.id})) as any[];
+
     const affected = getAffectedLessons(absentTeacher, newAbsenceData, schoolClasses, timeSlots);
     if(affected.length > 0) {
        setAbsenceToReview({teacher: absentTeacher, absences: newAbsenceData})
@@ -459,42 +141,7 @@ const handleScheduleUpdate = async (
       .filter(item => item.absences.length > 0);
   }, [teachers]);
 
-  const handleShowAffectedLessons = async (teacher: Teacher, absences: AbsenceDay[]) => {
-    if (absences.length === 0 || !schoolClasses) return;
-    
-    const affectedLessons = getAffectedLessons(teacher, absences, schoolClasses, timeSlots);
-
-    const substitutePool = (teachers || []).filter(t => t.id !== teacher.id);
-    const recommendationPromises = affectedLessons.map(affected => 
-      findSubstitute(
-        { subject: affected.lesson.subject, date: affected.date, time: affected.time },
-        substitutePool,
-        schoolClasses,
-        timeSlots
-      )
-    );
-      
-    const recommendations = await Promise.all(recommendationPromises);
-    
-    const finalResults = affectedLessons.map((lesson, index) => ({
-      ...lesson,
-      recommendation: recommendations[index].recommendation,
-      recommendationId: recommendations[index].recommendationId,
-      reasoning: recommendations[index].reasoning,
-      substituteOptions: recommendations[index].substituteOptions,
-    }));
-    
-    setRecommendation({ results: finalResults, absentTeacher: teacher, absenceDays: absences });
-  };
-  
-    useEffect(() => {
-        if (absenceToReview) {
-            handleShowAffectedLessons(absenceToReview.teacher, absenceToReview.absences);
-            setAbsenceToReview(null);
-        }
-    }, [absenceToReview, schoolClasses, teachers, timeSlots]);
-
-  if (isDataLoading) {
+  if (isUserLoading || settingsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -564,35 +211,20 @@ const handleScheduleUpdate = async (
               {activeTab === "teachers" && (
                 <div className="mt-0">
                   <TeacherList
-                    teachers={teachers || []}
-                    allClasses={schoolClasses || []}
-                    timeSlots={timeSlots}
-                    onAddTeacher={handleAddTeacher}
-                    onEditTeacher={handleEditTeacher}
-                    onDeleteTeacher={handleDeleteTeacher}
                     onMarkAbsent={(teacher) => setTeacherToMarkAbsent(teacher)}
-                    onUpdateTeacherSchedule={(teacherId, schedule) => handleScheduleUpdate('teacher', teacherId, schedule)}
-                    teacherAvailabilityNow={teacherAvailabilityNow}
                   />
                 </div>
               )}
 
               {activeTab === "classes" && (
                 <div className="mt-0">
-                  <ClassList 
-                    initialClasses={schoolClasses || []} 
-                    allTeachers={teachers || []}
-                    timeSlots={timeSlots}
-                    onAddClass={handleAddClass}
-                    onDeleteClass={handleDeleteClass}
-                    onUpdateSchedule={(classId, schedule) => handleScheduleUpdate('class', classId, schedule)}
-                  />
+                  <ClassList />
                 </div>
               )}
 
               {activeTab === "timetable" && (
                 <div className="mt-0">
-                  <Timetable allTeachers={teachers || []} timeSlots={timeSlots} />
+                  <Timetable />
                 </div>
               )}
 
@@ -625,5 +257,3 @@ const handleScheduleUpdate = async (
     </div>
   );
 }
-
-    

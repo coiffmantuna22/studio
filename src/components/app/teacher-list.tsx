@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Teacher, SchoolClass, TimeSlot, ClassSchedule, TeacherAvailabilityStatus } from '@/lib/types';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Plus, Search } from 'lucide-react';
@@ -21,47 +21,83 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import TeacherScheduleDialog from './teacher-schedule-dialog';
+import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where, doc, writeBatch, getDoc, getDocs } from 'firebase/firestore';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { commitBatchWithContext } from '@/lib/firestore-utils';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { getTeacherAvailabilityStatus } from '@/lib/substitute-finder';
+import { Loader2 } from 'lucide-react';
 
 interface TeacherListProps {
-  teachers: Teacher[];
-  allClasses: SchoolClass[];
-  timeSlots: TimeSlot[];
-  onAddTeacher: (teacher: Omit<Teacher, 'id' | 'userId' | 'avatar' | 'schedule'>) => void;
-  onEditTeacher: (teacher: Omit<Teacher, 'userId' | 'avatar' | 'schedule'>) => void;
-  onDeleteTeacher: (teacherId: string) => void;
   onMarkAbsent: (teacher: Teacher) => void;
-  onUpdateTeacherSchedule: (teacherId: string, schedule: ClassSchedule) => void;
-  teacherAvailabilityNow: Map<string, TeacherAvailabilityStatus>;
 }
 
 export default function TeacherList({ 
-  teachers, 
-  allClasses,
-  timeSlots,
-  onAddTeacher,
-  onEditTeacher,
-  onDeleteTeacher,
   onMarkAbsent,
-  onUpdateTeacherSchedule,
-  teacherAvailabilityNow,
 }: TeacherListProps) {
   const { toast } = useToast();
+  const { user } = useUser();
+  const firestore = useFirestore();
+
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [teacherToEdit, setTeacherToEdit] = useState<Teacher | null>(null);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const [teacherToViewSchedule, setTeacherToViewSchedule] = useState<Teacher | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
- const handleCreateTeacher = (newTeacherData: Omit<Teacher, 'id' | 'userId' | 'avatar' | 'schedule'>) => {
-    onAddTeacher(newTeacherData);
-     toast({
+  const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
+  const { data: teachers = [], isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
+
+  const classesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'classes'), where('userId', '==', user.uid)) : null, [user, firestore]);
+  const { data: allClasses = [] } = useCollection<SchoolClass>(classesQuery);
+
+  const settingsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null, [user, firestore]);
+  const { data: settingsCollection } = useCollection(settingsQuery);
+
+  const timeSlots: TimeSlot[] = useMemo(() => {
+    if (settingsCollection) {
+      const settingsDoc = settingsCollection.find(d => d.id === `timetable_${user?.uid}`);
+      if (settingsDoc) {
+        return settingsDoc.slots || [];
+      }
+    }
+    return [];
+  }, [settingsCollection, user]);
+
+  const teacherAvailabilityNow = useMemo(() => {
+    const availabilityMap = new Map<string, TeacherAvailabilityStatus>();
+    const now = new Date();
+    (teachers || []).forEach(teacher => {
+        availabilityMap.set(teacher.id, getTeacherAvailabilityStatus(teacher, now, timeSlots));
+    });
+    return availabilityMap;
+  }, [teachers, timeSlots]);
+
+
+ const handleCreateTeacher = async (newTeacherData: Omit<Teacher, 'id' | 'userId' | 'avatar' | 'schedule'>) => {
+    if (!firestore || !user) return;
+    const newDocRef = doc(collection(firestore, 'teachers'));
+    const fallback = newTeacherData.name.split(' ').map((n) => n[0]).join('').toUpperCase();
+    const newTeacher = { ...newTeacherData, id: newDocRef.id, userId: user.uid, avatar: { fallback }, schedule: {}, absences: [] };
+    const batch = writeBatch(firestore);
+    batch.set(newDocRef, newTeacher);
+    await commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: newTeacher });
+
+    toast({
       title: "פרופיל מורה נוצר",
       description: `הפרופיל של ${newTeacherData.name} נוסף למערכת.`,
     });
   };
 
-  const handleUpdateTeacher = (updatedTeacherData: Omit<Teacher, 'avatar' | 'userId' | 'schedule'>) => {
-    onEditTeacher(updatedTeacherData);
+  const handleUpdateTeacher = async (updatedTeacherData: Omit<Teacher, 'avatar' | 'userId' | 'schedule'>) => {
+    if (!firestore || !user) return;
+    const teacherRef = doc(firestore, 'teachers', updatedTeacherData.id);
+    const batch = writeBatch(firestore);
+    batch.update(teacherRef, { ...updatedTeacherData });
+    await commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: updatedTeacherData });
+    
     setTeacherToEdit(null);
      toast({
       title: "פרופיל עודכן",
@@ -69,19 +105,148 @@ export default function TeacherList({
     });
   };
 
-  const handleDeleteTeacher = () => {
-    if (!teacherToDelete) return;
+ const handleDeleteTeacher = async () => {
+    if (!firestore || !user || !teacherToDelete) return;
     
-    onDeleteTeacher(teacherToDelete.id);
+    const teacherId = teacherToDelete.id;
+    const batch = writeBatch(firestore);
+    try {
+        const teacherRef = doc(firestore, 'teachers', teacherId);
+        const teacherSnap = await getDoc(teacherRef);
+        if (!teacherSnap.exists()) return;
 
-    toast({
-      variant: 'destructive',
-      title: "המורה נמחק",
-      description: `הפרופיל של ${teacherToDelete.name} וכל השיבוצים שלו הוסרו מהמערכת.`,
-    });
+        // Clear schedule for the teacher being deleted
+        batch.update(teacherRef, { schedule: {} });
 
-    setTeacherToDelete(null);
-  };
+        // Remove teacher from any class schedules
+        const classesQuerySnapshot = await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)));
+        
+        classesQuerySnapshot.forEach(classDoc => {
+          const schoolClass = { id: classDoc.id, ...classDoc.data() } as SchoolClass;
+          let classWasModified = false;
+          const newSchedule = { ...schoolClass.schedule };
+
+          Object.keys(newSchedule).forEach(day => {
+            if (newSchedule[day]) {
+              Object.keys(newSchedule[day] as object).forEach(time => {
+                const lesson = newSchedule[day]?.[time];
+                if (lesson && lesson.teacherId === teacherId) {
+                  (newSchedule[day] as any)[time] = null; 
+                  classWasModified = true;
+                }
+              });
+            }
+          });
+
+          if (classWasModified) {
+            const classRef = doc(firestore, 'classes', schoolClass.id);
+            batch.update(classRef, { schedule: newSchedule });
+          }
+        });
+
+        // Finally, delete the teacher document
+        batch.delete(teacherRef);
+
+        await commitBatchWithContext(batch, {
+            operation: 'delete',
+            path: `teachers/${teacherId} and related classes`
+        });
+
+        toast({
+            variant: 'destructive',
+            title: "המורה נמחק",
+            description: `הפרופיל של ${teacherToDelete.name} וכל השיבוצים שלו הוסרו מהמערכת.`,
+        });
+
+    } catch (e) {
+      if (!(e instanceof FirestorePermissionError)) {
+          const permissionError = new FirestorePermissionError({
+            operation: 'delete',
+            path: `teachers/${teacherId} and related classes`,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+          throw permissionError;
+      }
+      throw e;
+    } finally {
+        setTeacherToDelete(null);
+    }
+  }
+
+
+ const handleUpdateTeacherSchedule = async (
+    teacherId: string,
+    newSchedule: ClassSchedule
+) => {
+    if (!firestore || !user) return;
+
+    const batch = writeBatch(firestore);
+    try {
+        const teacherRef = doc(firestore, 'teachers', teacherId);
+        const teacherSnap = await getDoc(teacherRef);
+        if (!teacherSnap.exists()) return;
+        const oldSchedule = teacherSnap.data().schedule || {};
+
+        batch.update(teacherRef, { schedule: newSchedule });
+
+        const allRelevantClassIds = new Set<string>();
+        for (const schedule of [oldSchedule, newSchedule]) {
+            Object.values(schedule || {}).forEach(day => 
+                Object.values(day || {}).forEach(lesson => 
+                    lesson?.classId && allRelevantClassIds.add(lesson.classId)
+                )
+            )
+        }
+        
+        for (const classId of allRelevantClassIds) {
+            const classRef = doc(firestore, 'classes', classId);
+            const classSnap = await getDoc(classRef);
+            if (!classSnap.exists()) continue;
+
+            const classData = classSnap.data() as SchoolClass;
+            const updatedClassSchedule = JSON.parse(JSON.stringify(classData.schedule || {}));
+
+            const daysOfWeek = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
+            daysOfWeek.forEach(day => {
+                (timeSlots || []).forEach(slot => {
+                    const time = slot.start;
+                    const oldLesson = oldSchedule[day]?.[time];
+                    const newLesson = newSchedule[day]?.[time];
+
+                    if (oldLesson?.classId === classId && (!newLesson || newLesson.classId !== classId)) {
+                        if (updatedClassSchedule[day]?.[time]?.teacherId === teacherId) {
+                            (updatedClassSchedule[day] as any)[time] = null;
+                        }
+                    }
+                    if (newLesson?.classId === classId) {
+                        updatedClassSchedule[day] = updatedClassSchedule[day] || {};
+                        updatedClassSchedule[day][time] = { ...(newLesson as any), teacherId: teacherId };
+                    }
+                });
+            });
+            batch.update(classRef, { schedule: updatedClassSchedule });
+        }
+        
+        await commitBatchWithContext(batch, {
+            operation: 'update',
+            path: `teachers/${teacherId}`,
+            data: { schedule: newSchedule }
+        });
+
+    } catch (e) {
+      if (!(e instanceof FirestorePermissionError)) {
+        const permissionError = new FirestorePermissionError({
+            operation: 'update',
+            path: `teachers/${teacherId}`,
+            requestResourceData: { schedule: newSchedule },
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw permissionError;
+      }
+      throw e;
+    }
+}
+
 
   const openCreateDialog = () => {
     setTeacherToEdit(null);
@@ -101,6 +266,10 @@ export default function TeacherList({
   const filteredTeachers = (teachers || []).filter(teacher =>
     teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (teachersLoading) {
+      return <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+  }
 
   return (
     <Card className="mt-6 border-none shadow-none">
@@ -195,8 +364,7 @@ export default function TeacherList({
         teacher={teacherToViewSchedule}
         allClasses={allClasses}
         timeSlots={timeSlots}
-        onUpdateSchedule={onUpdateTeacherSchedule}
-        allTeachers={teachers}
+        onUpdateSchedule={handleUpdateTeacherSchedule}
       />
     </Card>
   );

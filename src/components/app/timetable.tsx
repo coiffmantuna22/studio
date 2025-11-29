@@ -8,13 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { daysOfWeek } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { Coffee, UserCheck, UserX } from 'lucide-react';
+import { Coffee, UserCheck } from 'lucide-react';
 import { isSameDay, startOfDay, getDay, addDays } from 'date-fns';
+import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { Loader2 } from 'lucide-react';
 
-interface TimetableProps {
-  allTeachers: Teacher[];
-  timeSlots: TimeSlot[];
-}
+interface TimetableProps {}
 
 const parseTimeToNumber = (time: string) => {
     if (!time || !time.includes(':')) return 0;
@@ -31,12 +32,32 @@ const getStartOfWeek = (date: Date): Date => {
     return startOfDay(new Date(date.setDate(diff)));
 }
 
-export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
+export default function Timetable({}: TimetableProps) {
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
+  const { data: allTeachers, isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
+  
+  const settingsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null, [user, firestore]);
+  const { data: settingsCollection, isLoading: settingsLoading } = useCollection(settingsQuery);
+
+  const timeSlots: TimeSlot[] = useMemo(() => {
+    if (settingsCollection) {
+      const settingsDoc = settingsCollection.find(d => d.id === `timetable_${user?.uid}`);
+      if (settingsDoc) {
+        return settingsDoc.slots || [];
+      }
+    }
+    return [];
+  }, [settingsCollection, user]);
+
+
   const timetableData = useMemo(() => {
     const data: Record<string, Record<string, {name: string, isAbsent: boolean}[]>> = {};
     const weekStartDate = getStartOfWeek(new Date());
 
-    daysOfWeek.forEach((day, dayIndex) => {
+    daysOfWeek.forEach((day) => {
       data[day] = {};
       timeSlots.forEach(slot => {
         if (slot.type !== 'break') {
@@ -91,6 +112,10 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
 
     return data;
   }, [allTeachers, timeSlots]);
+
+  if (teachersLoading || settingsLoading) {
+      return <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+  }
 
   return (
     <Card className="mt-6 border-none shadow-none">
@@ -148,5 +173,3 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
     </Card>
   );
 }
-
-    

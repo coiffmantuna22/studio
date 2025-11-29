@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select"
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { X, Book, Home, BookOpen, Coffee } from 'lucide-react';
+import { X, Book, Home, Coffee } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Combobox } from '../ui/combobox';
 import { Badge } from '../ui/badge';
@@ -33,7 +33,6 @@ interface TeacherScheduleDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   teacher: Teacher | null;
-  allTeachers: Teacher[];
   allClasses: SchoolClass[];
   timeSlots: TimeSlot[];
   onUpdateSchedule: (teacherId: string, schedule: ClassSchedule) => void;
