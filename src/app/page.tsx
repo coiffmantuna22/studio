@@ -15,6 +15,7 @@ import { useCollection } from 'react-firebase-hooks/firestore';
 import { collection, doc, writeBatch, WriteBatch } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { errorEmitter, FirestorePermissionError } from '@/firebase';
+import { Button } from '@/components/ui/button';
 
 function commitBatchWithContext(batch: WriteBatch, context: { operation: 'create' | 'update' | 'delete', path: string, data?: any }) {
   batch.commit().catch(error => {
@@ -78,33 +79,35 @@ export default function Home() {
   }, [settingsCollection]);
 
   // Seed data for new user
+  const seedData = () => {
+    if (!firestore || !user) return;
+    const batch = writeBatch(firestore);
+    
+    initialTeachers.forEach(teacher => {
+      const teacherRef = doc(collection(firestore, 'users', user.uid, 'teachers'));
+      batch.set(teacherRef, { ...teacher, id: teacherRef.id });
+    });
+
+    defaultClasses.forEach(sClass => {
+        const classRef = doc(collection(firestore, 'users', user.uid, 'classes'));
+        batch.set(classRef, { ...sClass, id: classRef.id });
+    });
+    
+    const settingsRef = doc(firestore, 'users', user.uid, 'settings', 'timetable');
+    const timetableData = { slots: initialTimeSlots };
+    batch.set(settingsRef, timetableData);
+    
+    commitBatchWithContext(batch, {
+      operation: 'create',
+      path: `users/${user.uid}/settings/timetable`,
+      data: timetableData
+    });
+  };
+
   useEffect(() => {
     if (user && !teachersLoading && !classesLoading && !settingsLoading && teachersCollection?.empty && classesCollection?.empty && settingsCollection?.empty) {
-      const seedData = () => {
-        if (!firestore) return;
-        const batch = writeBatch(firestore);
-        
-        initialTeachers.forEach(teacher => {
-          const teacherRef = doc(collection(firestore, 'users', user.uid, 'teachers'));
-          batch.set(teacherRef, { ...teacher, id: teacherRef.id });
-        });
-
-        defaultClasses.forEach(sClass => {
-           const classRef = doc(collection(firestore, 'users', user.uid, 'classes'));
-           batch.set(classRef, { ...sClass, id: classRef.id });
-        });
-        
-        const settingsRef = doc(firestore, 'users', user.uid, 'settings', 'timetable');
-        const timetableData = { slots: initialTimeSlots };
-        batch.set(settingsRef, timetableData);
-        
-        commitBatchWithContext(batch, {
-          operation: 'create',
-          path: `users/${user.uid}/settings/timetable`,
-          data: timetableData
-        });
-      };
-      seedData();
+      // Data is not seeded yet for this new user.
+      // The UI will show the settings page.
     }
   }, [user, firestore, teachersLoading, classesLoading, settingsLoading, teachersCollection, classesCollection, settingsCollection]);
 
@@ -184,6 +187,12 @@ export default function Home() {
   
   const handleTimetableSettingsUpdate = (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
+      
+      // If this is the first time setting the slots, seed the rest of the data.
+      if (timeSlots.length === 0) {
+        seedData();
+      }
+
       const settingsRef = doc(firestore, 'users', user.uid, 'settings', 'timetable');
       const batch = writeBatch(firestore);
       batch.set(settingsRef, { slots: newTimeSlots });
@@ -207,7 +216,13 @@ export default function Home() {
                <SettingsTab
                   timeSlots={timeSlots}
                   onUpdate={handleTimetableSettingsUpdate}
-               />
+               >
+                 <div className='flex justify-start pt-6'>
+                    <Button variant="outline" onClick={seedData}>
+                        השתמש בהגדרות ברירת מחדל
+                    </Button>
+                </div>
+               </SettingsTab>
             </main>
          </div>
       );

@@ -44,9 +44,10 @@ type FormValues = z.infer<typeof formSchema>;
 interface SettingsTabProps {
     timeSlots: TimeSlot[];
     onUpdate: (newTimeSlots: TimeSlot[]) => void;
+    children?: React.ReactNode;
 }
 
-export default function SettingsTab({ timeSlots, onUpdate }: SettingsTabProps) {
+export default function SettingsTab({ timeSlots, onUpdate, children }: SettingsTabProps) {
     const { toast } = useToast();
     
     const form = useForm<FormValues>({
@@ -149,8 +150,9 @@ export default function SettingsTab({ timeSlots, onUpdate }: SettingsTabProps) {
                     הוסף משבצת זמן
                 </Button>
             </CardContent>
-            <CardFooter>
+            <CardFooter className='flex-row-reverse justify-between'>
                  <Button type="submit">שמור הגדרות</Button>
+                 {children}
             </CardFooter>
         </form>
       </Form>
