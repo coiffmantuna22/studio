@@ -139,6 +139,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
                             value={subject}
                             onChange={(newSubject) => {
                                 setSubject(newSubject);
+                                // If the currently selected teacher cannot teach the new subject, clear the teacher selection.
                                 const currentTeacher = allTeachers.find(t => t.id === teacherId);
                                 if (currentTeacher && !currentTeacher.subjects.includes(newSubject)) {
                                     setTeacherId(null);
@@ -393,3 +394,4 @@ export default function ClassTimetableDialog({
     </Dialog>
   );
 }
+

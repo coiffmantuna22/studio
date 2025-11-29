@@ -164,7 +164,7 @@ export default function TeacherScheduleDialog({
         if (!newSchedule[day]) newSchedule[day] = {};
         
         if(lesson === null){
-            if(newSchedule[day]) {
+            if(newSchedule[day] && newSchedule[day][time]) {
               delete newSchedule[day][time];
             }
         } else {

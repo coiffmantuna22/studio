@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -12,6 +13,17 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 const timeSlotSchema = z.object({
   start: z.string().regex(/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/, "פורמט לא חוקי"),
@@ -22,19 +34,20 @@ const timeSlotSchema = z.object({
 const formSchema = z.object({
   slots: z.array(timeSlotSchema),
 }).refine(data => {
-    for(let i = 0; i < data.slots.length; i++) {
-        const start = new Date(`1970-01-01T${data.slots[i].start}:00`);
-        const end = new Date(`1970-01-01T${data.slots[i].end}:00`);
+    const sortedSlots = [...data.slots].sort((a, b) => a.start.localeCompare(b.start));
+    for(let i = 0; i < sortedSlots.length; i++) {
+        const start = new Date(`1970-01-01T${sortedSlots[i].start}:00`);
+        const end = new Date(`1970-01-01T${sortedSlots[i].end}:00`);
         if (start >= end) return false; // End must be after start
 
         if (i > 0) {
-            const prevEnd = new Date(`1970-01-01T${data.slots[i-1].end}:00`);
+            const prevEnd = new Date(`1970-01-01T${sortedSlots[i-1].end}:00`);
             if (start < prevEnd) return false; // Slots must not overlap
         }
     }
     return true;
 }, {
-    message: 'כל משבצת חייבת להתחיל אחרי שהקודמת מסתיימת, ושעת הסיום חייבת להיות אחרי שעת ההתחלה.',
+    message: 'כל משבצת חייבת להתחיל אחרי שהקודמת מסתיימת, ושעת הסיום חייבת להיות אחרי שעת ההתחלה. יש למיין את המשבצות לפי שעת התחלה.',
     path: ['slots'],
 });
 
@@ -44,10 +57,10 @@ type FormValues = z.infer<typeof formSchema>;
 interface SettingsTabProps {
     timeSlots: TimeSlot[];
     onUpdate: (newTimeSlots: TimeSlot[]) => void;
-    children?: React.ReactNode;
+    isInitialSetup?: boolean;
 }
 
-export default function SettingsTab({ timeSlots, onUpdate, children }: SettingsTabProps) {
+export default function SettingsTab({ timeSlots, onUpdate, isInitialSetup = false }: SettingsTabProps) {
     const { toast } = useToast();
     
     const form = useForm<FormValues>({
@@ -67,17 +80,29 @@ export default function SettingsTab({ timeSlots, onUpdate, children }: SettingsT
         const finalSlots = sortedSlots.map((slot, index) => ({ ...slot, id: String(index + 1) }));
         
         onUpdate(finalSlots);
-        toast({
-            title: 'הגדרות נשמרו',
-            description: 'מערכת השעות עודכנה בהצלחה.',
-        });
+
+        if (!isInitialSetup) {
+          toast({
+              title: 'הגדרות נשמרו',
+              description: 'מערכת השעות עודכנה בהצלחה.',
+          });
+        }
     };
 
     const addSlot = () => {
-        const lastSlot = fields[fields.length - 1];
+        const lastSlot = fields.length > 0 ? [...fields].sort((a, b) => a.start.localeCompare(b.start))[fields.length - 1] : null;
         const newStart = lastSlot ? lastSlot.end : '08:00';
-        const newEnd = lastSlot ? `${(parseInt(lastSlot.end.split(':')[0]) + 1).toString().padStart(2, '0')}:00` : '09:00';
+        const newEndMinute = (parseInt(newStart.split(':')[1]) + 45) % 60;
+        const newEndHour = parseInt(newStart.split(':')[0]) + Math.floor((parseInt(newStart.split(':')[1]) + 45) / 60);
+        const newEnd = `${newEndHour.toString().padStart(2, '0')}:${newEndMinute.toString().padStart(2, '0')}`;
+
         append({ start: newStart, end: newEnd, type: 'lesson' });
+    }
+
+    const handleSort = () => {
+        const currentSlots = form.getValues('slots');
+        const sortedSlots = [...currentSlots].sort((a, b) => a.start.localeCompare(b.start));
+        form.setValue('slots', sortedSlots);
     }
 
   return (
@@ -85,7 +110,10 @@ export default function SettingsTab({ timeSlots, onUpdate, children }: SettingsT
       <CardHeader>
         <CardTitle>הגדרות מערכת שעות</CardTitle>
         <CardDescription>
-            כאן ניתן להתאים את שעות הלימוד וההפסקות בבית הספר. השינויים יחולו על כל מערכות השעות באפליקציה.
+            {isInitialSetup 
+                ? 'ברוך הבא! כדי להתחיל, הגדר את שעות הלימוד וההפסקות בבית הספר. לאחר השמירה הראשונית, המערכת תייצר עבורך נתוני דמה להתנסות.'
+                : 'כאן ניתן להתאים את שעות הלימוד וההפסקות בבית הספר. השינויים יחולו על כל מערכות השעות באפליקציה.'
+            }
         </CardDescription>
       </CardHeader>
       <Form {...form}>
@@ -145,14 +173,36 @@ export default function SettingsTab({ timeSlots, onUpdate, children }: SettingsT
                         </div>
                     ))}
                 </div>
-                <Button type="button" variant="outline" onClick={addSlot}>
-                    <Plus className="ml-2 h-4 w-4" />
-                    הוסף משבצת זמן
-                </Button>
+                <div className='flex gap-2'>
+                    <Button type="button" variant="outline" onClick={addSlot}>
+                        <Plus className="ml-2 h-4 w-4" />
+                        הוסף משבצת זמן
+                    </Button>
+                     <Button type="button" variant="secondary" onClick={handleSort}>
+                        מיין לפי שעה
+                    </Button>
+                </div>
             </CardContent>
             <CardFooter className='justify-between'>
-                 <Button type="submit">שמור הגדרות</Button>
-                 {children}
+                 <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button type='button' onClick={() => form.handleSubmit(onSubmit)()}>שמור הגדרות</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>אישור שמירת שינויים</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {isInitialSetup 
+                        ? 'פעולה זו תקבע את מבנה מערכת השעות ותייצר נתוני דמה ראשוניים. האם להמשיך?'
+                        : 'שינוי מבנה מערכת השעות עשוי להשפיע על שיבוצים קיימים. האם אתה בטוח שברצונך לשמור את השינויים?'}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>ביטול</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => form.handleSubmit(onSubmit)()}>שמור</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
             </CardFooter>
         </form>
       </Form>

@@ -89,12 +89,12 @@ export default function Home() {
             daysOfWeek.forEach(day => {
                 newSchedule[day] = {};
                 defaultClasses.forEach(sc => {
-                    const lesson = sc.schedule[day]?.[teacher.id];
                      if (sc.schedule[day]) {
                         Object.keys(sc.schedule[day]).forEach(time => {
                             const lesson = sc.schedule[day]?.[time];
                             if(lesson && lesson.teacherId === teacher.id) {
-                                newSchedule[day]![time] = { ...lesson, classId: sc.id };
+                                const newClassRef = classRefMap.get(sc.id)!;
+                                newSchedule[day]![time] = { ...lesson, classId: newClassRef.id };
                             }
                         })
                     }
@@ -128,7 +128,7 @@ export default function Home() {
 
 
         synchronizedTeachers.forEach(teacher => {
-            const teacherRef = teacherRefMap.get(teacher.id)!;
+            const teacherRef = teacherRefMap.get(teacher.id.toString())!;
             transaction.set(teacherRef, teacher);
         });
 
@@ -168,10 +168,10 @@ export default function Home() {
     if (!firestore || !user) return;
     
     await runTransaction(firestore, async (transaction) => {
-      // 1. Get all classes
+      // 1. Get all classes for the current user
       const classesQuerySnapshot = await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)));
       
-      // 2. For each class, remove the teacher from its schedule
+      // 2. For each class, remove any lessons taught by the deleted teacher
       classesQuerySnapshot.forEach(classDoc => {
         const schoolClass = { id: classDoc.id, ...classDoc.data() } as SchoolClass;
         let classWasModified = false;
@@ -182,20 +182,22 @@ export default function Home() {
             Object.keys(newSchedule[day]).forEach(time => {
               const lesson = newSchedule[day]?.[time];
               if (lesson && lesson.teacherId === teacherId) {
-                newSchedule[day][time] = null; // Unassign teacher
+                // Set lesson to null to unassign teacher from this slot
+                newSchedule[day][time] = null; 
                 classWasModified = true;
               }
             });
           }
         });
 
+        // 3. If the class schedule was changed, update it in the transaction
         if (classWasModified) {
           const classRef = doc(firestore, 'classes', schoolClass.id);
           transaction.update(classRef, { schedule: newSchedule });
         }
       });
 
-      // 3. Delete the teacher doc
+      // 4. Finally, delete the teacher document itself
       const teacherRef = doc(firestore, 'teachers', teacherId);
       transaction.delete(teacherRef);
     });
@@ -355,10 +357,10 @@ export default function Home() {
       const isInitialSetup = timeSlots.length === 0 && teachers.length === 0 && schoolClasses.length === 0;
 
       const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
-      const batch = writeBatch(firestore);
       const timetableData = { slots: newTimeSlots, userId: user.uid };
+
+      const batch = writeBatch(firestore);
       batch.set(settingsRef, timetableData, { merge: true });
-      
       await commitBatchWithContext(batch, { operation: 'update', path: settingsRef.path, data: timetableData, firestore });
 
       if (isInitialSetup) {
@@ -398,13 +400,8 @@ export default function Home() {
                <SettingsTab
                   timeSlots={[]}
                   onUpdate={handleTimetableSettingsUpdate}
-               >
-                 <div className='flex justify-start pt-6'>
-                    <Button variant="outline" onClick={seedData}>
-                        השתמש בהגדרות ברירת מחדל
-                    </Button>
-                </div>
-               </SettingsTab>
+                  isInitialSetup={isNewUser}
+               />
             </main>
          </div>
       );
@@ -456,3 +453,4 @@ export default function Home() {
     </div>
   );
 }
+
