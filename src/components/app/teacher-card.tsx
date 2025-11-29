@@ -89,7 +89,7 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
               <CalendarClock className="ml-2 h-4 w-4" />
               צפה במערכת
             </DropdownMenuItem>
-             <DropdownMenuItem onClick={onMarkAbsent}>
+             <DropdownMenuItem onClick={onMarkAbsent} className="text-amber-600 focus:text-amber-700 dark:text-amber-500 dark:focus:text-amber-600">
               <UserX className="ml-2 h-4 w-4" />
               סמן היעדרות
             </DropdownMenuItem>
@@ -137,7 +137,7 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
             <CalendarClock className="ml-2 h-4 w-4" />
             צפה במערכת
           </Button>
-          <Button variant="destructive" className="w-full" onClick={onMarkAbsent}>
+          <Button variant="secondary" className="w-full text-amber-600 dark:text-amber-500" onClick={onMarkAbsent}>
             <UserX className="ml-2 h-4 w-4" />
             סמן היעדרות
           </Button>
