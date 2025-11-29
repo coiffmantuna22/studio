@@ -120,7 +120,7 @@ export default function ClassList({ initialClasses, allTeachers, timeSlots, onAd
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>ביטול</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteClass(schoolClass.id)}>
+                          <AlertDialogAction variant="destructive" onClick={() => handleDeleteClass(schoolClass.id)}>
                             מחק
                           </AlertDialogAction>
                         </AlertDialogFooter>

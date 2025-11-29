@@ -13,7 +13,7 @@ export default function Header() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <BookOpenCheck className="h-7 w-7 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight text-foreground font-headline">
+            <h1 className="text-xl font-bold tracking-tight text-foreground font-headline">
               מורה מחליף
             </h1>
           </div>

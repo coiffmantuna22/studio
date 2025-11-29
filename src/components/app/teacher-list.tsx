@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Teacher, SchoolClass, AffectedLesson, TimeSlot, AbsenceDay, ClassSchedule } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Plus, Search } from 'lucide-react';
@@ -24,6 +24,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import TeacherScheduleDialog from './teacher-schedule-dialog';
+import { isTeacherAvailable } from '@/lib/substitute-finder';
+import { parse } from 'date-fns';
 
 interface TeacherListProps {
   teachers: Teacher[];
@@ -197,6 +199,25 @@ export default function TeacherList({
     teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const teacherAvailabilityNow = useMemo(() => {
+    const now = new Date();
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const currentSlot = timeSlots.find(slot => currentTime >= slot.start && currentTime < slot.end);
+
+    const availabilityMap = new Map<string, boolean>();
+
+    if (currentSlot && currentSlot.type === 'lesson') {
+        teachers.forEach(teacher => {
+            const isAvailable = isTeacherAvailable(teacher, now, currentSlot.start, timeSlots);
+            availabilityMap.set(teacher.id, isAvailable);
+        });
+    } else {
+         teachers.forEach(teacher => availabilityMap.set(teacher.id, false));
+    }
+    return availabilityMap;
+
+  }, [teachers, timeSlots]);
+
 
   return (
     <Card className="mt-6 border-border/80 rounded-2xl">
@@ -237,6 +258,7 @@ export default function TeacherList({
                         onEdit={() => openEditDialog(teacher)}
                         onDelete={() => setTeacherToDelete(teacher)}
                         onViewSchedule={() => setTeacherToViewSchedule(teacher)}
+                        isAvailableNow={teacherAvailabilityNow.get(teacher.id) || false}
                     />
                     ))}
                 </div>
@@ -304,7 +326,7 @@ export default function TeacherList({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>ביטול</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTeacher}>
+            <AlertDialogAction variant="destructive" onClick={handleDeleteTeacher}>
               מחק
             </AlertDialogAction>
           </AlertDialogFooter>

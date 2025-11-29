@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { MoreVertical } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface TeacherCardProps {
   teacher: Teacher;
@@ -28,6 +29,7 @@ interface TeacherCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onViewSchedule: () => void;
+  isAvailableNow: boolean;
 }
 
 const formatAvailability = (availability: Teacher['availability']) => {
@@ -43,11 +45,14 @@ const formatAvailability = (availability: Teacher['availability']) => {
   return presentDays.join(', ');
 }
 
-export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, onViewSchedule }: TeacherCardProps) {
+export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, onViewSchedule, isAvailableNow }: TeacherCardProps) {
   return (
     <Card className="flex flex-col transition-all hover:shadow-md">
       <CardHeader className="flex flex-row items-start gap-4">
-        <Avatar className="h-12 w-12">
+        <Avatar className={cn(
+            "h-12 w-12 border-2",
+            isAvailableNow ? 'border-green-500' : 'border-transparent'
+        )}>
           <AvatarFallback>{teacher.avatar.fallback}</AvatarFallback>
         </Avatar>
         <div className="flex-1">

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -370,7 +371,7 @@ export default function MarkAbsentDialog({
                     מחפש מחליפים...
                   </>
                 ) : (
-                  'מצא מחליפים'
+                  'הצג המלצות'
                 )}
               </Button>
             </DialogFooter>

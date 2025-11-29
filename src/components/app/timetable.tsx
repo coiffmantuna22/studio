@@ -92,7 +92,7 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
       <CardHeader>
         <CardTitle className="text-xl">זמינות מורים להחלפה</CardTitle>
         <CardDescription>
-          מורים פנויים לפי שעה (נוכחים בבית הספר אך לא מלמדים). מורים שסומנו כנעדרים יסומנו באדום.
+          הטבלה מציגה מורים הנוכחים בבית הספר אך אינם משובצים לשיעור.
         </CardDescription>
       </CardHeader>
       <CardContent>
