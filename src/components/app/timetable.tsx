@@ -284,34 +284,21 @@ export default function Timetable({}: TimetableProps) {
   }, [allTeachers, timeSlots, allSubstitutions, availabilityFilter]);
 
 
- const openAssignDialog = (substitute: {id: string, name: string}, day: string, time: string) => {
+  const openAssignDialog = (substitute: {id: string, name: string}, day: string, time: string) => {
     const weekStartDate = getStartOfWeek(new Date());
     const dayIndex = daysOfWeek.indexOf(day);
     const date = addDays(weekStartDate, dayIndex);
-    
+
     const lessonsToCover: any[] = [];
-    
-    (allTeachers || []).forEach(absentTeacher => {
-        const isAbsentNow = (absentTeacher.absences || []).some(absence =>
-            isSameDay(startOfDay(new Date(absence.date as string)), date) &&
-            (absence.isAllDay || (time >= absence.startTime && time < absence.endTime))
-        );
+    const key = `${day}-${time}`;
+    const uncoveredForSlot = uncoveredLessons.get(key) || [];
 
-        if (isAbsentNow) {
-            const lesson = absentTeacher.schedule?.[day]?.[time];
-            if (lesson && lesson.classId) {
-                const schoolClass = (allClasses || []).find(c => c.id === lesson.classId);
-                if (schoolClass) {
-                    const isCovered = (allSubstitutions || []).some(sub => 
-                        isSameDay(startOfDay(new Date(sub.date)), date) &&
-                        sub.time === time &&
-                        sub.classId === schoolClass.id
-                    );
-
-                    if (!isCovered) {
-                        lessonsToCover.push({ date, time, absentTeacher, lesson, schoolClass });
-                    }
-                }
+    uncoveredForSlot.forEach(uncovered => {
+        const { teacher: absentTeacher, lesson } = uncovered;
+        if (lesson && lesson.classId) {
+            const schoolClass = (allClasses || []).find(c => c.id === lesson.classId);
+            if (schoolClass) {
+                lessonsToCover.push({ date, time, absentTeacher, lesson, schoolClass });
             }
         }
     });
@@ -371,7 +358,7 @@ export default function Timetable({}: TimetableProps) {
           <RadioGroup 
               dir='rtl'
               defaultValue="in_school" 
-              className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6"
+              className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-6"
               onValueChange={setAvailabilityFilter}
               value={availabilityFilter}
             >
@@ -423,12 +410,15 @@ export default function Timetable({}: TimetableProps) {
                                 return (
                                 <td key={`${day}-${slot.start}`} className={cn("p-2 align-top h-24 border-r", slot.type === 'break' && 'bg-muted/30')}>
                                 {slot.type === 'break' ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
-                                    <div className="flex flex-col items-center gap-1.5 justify-center h-full">
+                                    <div className="flex flex-col items-stretch gap-1.5 justify-start h-full">
                                         {uncoveredInSlot && uncoveredInSlot.map(({ teacher }, index) => (
-                                            <Badge key={`${teacher.id}-${index}`} variant={'destructive'} className="font-normal">
-                                                <UserX className="h-3 w-3 ml-1" />
-                                                דרוש מחליף ({teacher.name})
-                                            </Badge>
+                                            <div key={`${teacher.id}-${index}`} className="text-center p-2 rounded-md bg-destructive/10 text-destructive border border-destructive/20">
+                                                <div className='font-bold text-xs flex items-center justify-center gap-1.5'>
+                                                    <UserX className="h-3.5 w-3.5" />
+                                                    דרוש מחליף
+                                                </div>
+                                                <div className='text-xs opacity-80'>({teacher.name})</div>
+                                            </div>
                                         ))}
                                          {substitutionsInSlot.map(sub => (
                                             <Badge key={sub.id} variant={'secondary'} className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 font-normal">
@@ -436,20 +426,24 @@ export default function Timetable({}: TimetableProps) {
                                                 {sub.substituteTeacherName}
                                             </Badge>
                                         ))}
-                                        {availableSubs.map(teacher => (
-                                           <Button 
-                                             key={teacher.id} 
-                                             variant={teacher.isInSchool ? 'secondary' : 'outline'} 
-                                             size="sm" 
-                                             className="h-auto px-2 py-1 font-normal"
-                                             onClick={() => openAssignDialog(teacher, day, slot.start)}
-                                            >
-                                               {!teacher.isInSchool && <Home className="h-3 w-3 ml-1 text-muted-foreground"/>}
-                                                {teacher.name}
-                                           </Button>
-                                        ))}
+                                        <div className='flex flex-wrap items-center justify-center gap-1.5 mt-auto'>
+                                            {availableSubs.map(teacher => (
+                                            <Button 
+                                                key={teacher.id} 
+                                                variant={teacher.isInSchool ? 'secondary' : 'outline'} 
+                                                size="sm" 
+                                                className="h-auto px-2 py-1 font-normal text-xs"
+                                                onClick={() => openAssignDialog(teacher, day, slot.start)}
+                                                >
+                                                {!teacher.isInSchool && <Home className="h-3 w-3 ml-1 text-muted-foreground"/>}
+                                                    {teacher.name}
+                                            </Button>
+                                            ))}
+                                        </div>
                                         {availableSubs.length === 0 && !uncoveredInSlot && substitutionsInSlot.length === 0 && (
-                                            <span className="text-muted-foreground text-xs opacity-70">--</span>
+                                            <div className="flex items-center justify-center h-full">
+                                                <span className="text-muted-foreground text-xs opacity-70">--</span>
+                                            </div>
                                         )}
                                     </div>
                                 )}
@@ -475,3 +469,5 @@ export default function Timetable({}: TimetableProps) {
     </>
   );
 }
+
+    
