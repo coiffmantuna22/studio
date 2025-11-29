@@ -167,7 +167,7 @@ export default function Home() {
     if (!firestore || !user) return;
     const teacherRef = doc(firestore, 'teachers', updatedTeacher.id);
     const batch = writeBatch(firestore);
-    batch.update(teacherRef, updatedTeacher as any);
+    batch.update(teacherRef, {...updatedTeacher, userId: user.uid });
     await commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: updatedTeacher });
   }
 
@@ -197,7 +197,7 @@ export default function Home() {
 
           if (classWasModified) {
             const classRef = doc(firestore, 'classes', schoolClass.id);
-            transaction.update(classRef, { schedule: newSchedule });
+            transaction.update(classRef, { schedule: newSchedule, userId: user.uid });
           }
         });
 
@@ -258,7 +258,7 @@ export default function Home() {
                         }
                     });
                 });
-                transaction.update(teacherRef, { schedule: newSchedule });
+                transaction.update(teacherRef, { schedule: newSchedule, userId: user.uid });
             }
         }
         transaction.delete(classRef);
@@ -287,7 +287,7 @@ export default function Home() {
           const teacherSnap = await transaction.get(teacherRef);
           if (!teacherSnap.exists()) return;
           const oldSchedule = teacherSnap.data().schedule || {};
-          transaction.update(teacherRef, { schedule: newSchedule });
+          transaction.update(teacherRef, { schedule: newSchedule, userId: user.uid });
           
           const allRelevantClassIds = new Set<string>();
           [oldSchedule, newSchedule].forEach(schedule => Object.values(schedule).forEach(day => Object.values(day).forEach(lesson => lesson?.classId && allRelevantClassIds.add(lesson.classId))));
@@ -317,7 +317,7 @@ export default function Home() {
                       }
                   });
               });
-              transaction.update(classRef, { schedule: updatedClassSchedule });
+              transaction.update(classRef, { schedule: updatedClassSchedule, userId: user.uid });
           }
 
         } else { // entityType === 'class'
@@ -326,7 +326,7 @@ export default function Home() {
           if (!classSnap.exists()) return;
           const oldSchedule = classSnap.data().schedule || {};
 
-          transaction.update(classRef, { schedule: newSchedule });
+          transaction.update(classRef, { schedule: newSchedule, userId: user.uid });
 
           const allRelevantTeacherIds = new Set<string>();
           [oldSchedule, newSchedule].forEach(schedule => Object.values(schedule).forEach(day => Object.values(day).forEach(lesson => lesson?.teacherId && allRelevantTeacherIds.add(lesson.teacherId))));
@@ -356,7 +356,7 @@ export default function Home() {
                       }
                   });
               });
-              transaction.update(teacherRef, { schedule: updatedTeacherSchedule });
+              transaction.update(teacherRef, { schedule: updatedTeacherSchedule, userId: user.uid });
           }
         }
       });
@@ -364,7 +364,7 @@ export default function Home() {
         const permissionError = new FirestorePermissionError({
             operation: 'update',
             path: `${entityType === 'teacher' ? 'teachers' : 'classes'}/${entityId}`,
-            requestResourceData: { schedule: newSchedule },
+            requestResourceData: { schedule: newSchedule, userId: user.uid },
         });
         errorEmitter.emit('permission-error', permissionError);
         throw permissionError;
@@ -401,7 +401,7 @@ export default function Home() {
 
     const batch = writeBatch(firestore);
     batch.update(teacherRef, { absences: absenceData });
-    await commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: { absences: absenceData } });
+    await commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: { absences: absenceData, userId: user.uid } });
   }
 
   const isDataLoading = isUserLoading || teachersLoading || classesLoading || settingsLoading;

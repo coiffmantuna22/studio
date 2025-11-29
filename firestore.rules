@@ -26,8 +26,8 @@ service cloud.firestore {
      * Checks if the incoming resource data contains the correct owner userId.
      * Used for document creation.
      */
-    function isCreatingOwnResource(userId) {
-      return request.resource.data.userId == userId;
+    function isCreatingOwnResource() {
+      return request.resource.data.userId == request.auth.uid;
     }
 
     // -------------------------------------------------------------------------
@@ -36,20 +36,20 @@ service cloud.firestore {
 
     match /teachers/{teacherId} {
       allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && isCreatingOwnResource(request.auth.uid);
-      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow create: if isSignedIn() && isCreatingOwnResource();
+      allow update, delete: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
     
     match /classes/{classId} {
       allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && isCreatingOwnResource(request.auth.uid);
-      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow create: if isSignedIn() && isCreatingOwnResource();
+      allow update, delete: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
     
     match /settings/{settingId} {
       allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && isCreatingOwnResource(request.auth.uid);
-      allow update: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow create: if isSignedIn() && isCreatingOwnResource();
+      allow update: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
   }
 }
