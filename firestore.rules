@@ -63,13 +63,5 @@ service cloud.firestore {
     match /settings {
         allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
     }
-
-    match /substitutions/{substitutionId} {
-      allow read, update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isCreatingOwnResource();
-    }
-    match /substitutions {
-        allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
-    }
   }
 }

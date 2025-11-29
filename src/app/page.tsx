@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Header from '@/components/app/header';
-import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay, SubstitutionRecord } from '@/lib/types';
+import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay } from '@/lib/types';
 import { isSameDay, startOfDay, getDay, format } from 'date-fns';
 import { he } from 'date-fns/locale';
 
@@ -19,19 +19,16 @@ const ClassList = dynamic(() => import('@/components/app/class-list'), {
 const SettingsTab = dynamic(() => import('@/components/app/settings-tab'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
 });
-const StatisticsTab = dynamic(() => import('@/components/app/statistics-tab'), {
-  loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
-});
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { collection, doc, writeBatch, query, where, getDocs, getDoc, limit, orderBy } from 'firebase/firestore';
+import { collection, doc, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { Loader2, AlertTriangle, ListChecks } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
 import { Button } from '@/components/ui/button';
 import { daysOfWeek } from '@/lib/constants';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getTeacherAvailabilityStatus, findSubstitute, isTeacherAvailable } from '@/lib/substitute-finder';
+import { getTeacherAvailabilityStatus, findSubstitute } from '@/lib/substitute-finder';
 import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
 import RecommendationDialog from '@/components/app/recommendation-dialog';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -101,7 +98,6 @@ export default function Home() {
   const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
   const classesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'classes'), where('userId', '==', user.uid)) : null, [user, firestore]);
   const settingsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null, [user, firestore]);
-  const substitutionsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'substitutions'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'), limit(100)) : null, [user, firestore]);
 
   const { data: teachers = [], isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
   const { data: schoolClasses = [], isLoading: classesLoading } = useCollection<SchoolClass>(classesQuery);
@@ -554,11 +550,10 @@ const handleScheduleUpdate = async (
 
         <div className="space-y-6">
              <div className="w-full">
-              <div className="grid w-full grid-cols-2 sm:grid-cols-5 max-w-4xl mx-auto h-auto p-1 bg-muted/50 backdrop-blur-sm rounded-full mb-8">
+              <div className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-3xl mx-auto h-auto p-1 bg-muted/50 backdrop-blur-sm rounded-full mb-8">
                 <Button variant="ghost" onClick={() => setActiveTab("teachers")} className={`rounded-full py-2.5 transition-all ${activeTab === "teachers" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>פרופילי מורים</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("classes")} className={`rounded-full py-2.5 transition-all ${activeTab === "classes" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>כיתות לימוד</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("timetable")} className={`rounded-full py-2.5 transition-all ${activeTab === "timetable" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>זמינות מחליפים</Button>
-                <Button variant="ghost" onClick={() => setActiveTab("statistics")} className={`rounded-full py-2.5 transition-all ${activeTab === "statistics" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>סטטיסטיקה</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("settings")} className={`rounded-full py-2.5 transition-all ${activeTab === "settings" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>הגדרות</Button>
               </div>
 
@@ -594,12 +589,6 @@ const handleScheduleUpdate = async (
               {activeTab === "timetable" && (
                 <div className="mt-0">
                   <Timetable allTeachers={teachers || []} timeSlots={timeSlots} />
-                </div>
-              )}
-
-              {activeTab === "statistics" && (
-                <div className="mt-0">
-                  <StatisticsTab substitutions={substitutionsQuery} />
                 </div>
               )}
 
