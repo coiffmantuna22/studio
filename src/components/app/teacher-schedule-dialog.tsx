@@ -48,6 +48,7 @@ interface EditSlotPopoverProps {
     onSave: (day: string, time: string, lesson: Lesson | null) => void;
     teacher: Teacher;
     allClasses: SchoolClass[];
+    isAbsent: boolean;
 }
 
 const getStartOfWeek = (date: Date): Date => {
@@ -66,7 +67,7 @@ const parseTimeToNumber = (time: string) => {
 };
 
 
-function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses }: EditSlotPopoverProps) {
+function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses, isAbsent }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [subject, setSubject] = useState(lesson?.subject || '');
     const [classId, setClassId] = useState(lesson?.classId || null);
@@ -104,7 +105,9 @@ function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses }: Edi
             <PopoverTrigger asChild>
                 <div className={cn(
                     "w-full h-full p-2 flex flex-col justify-center items-center text-center cursor-pointer min-h-[6rem] transition-colors rounded-md",
-                    lesson ? 'bg-primary/10 hover:bg-primary/20' : 'bg-card hover:bg-muted'
+                    isAbsent && 'bg-destructive/10',
+                    lesson ? 'bg-primary/10 hover:bg-primary/20' : 'bg-card hover:bg-muted',
+                    isAbsent && lesson && 'bg-destructive/20 hover:bg-destructive/30'
                 )}>
                     {lesson && currentClass ? (
                         <>
@@ -269,7 +272,7 @@ export default function TeacherScheduleDialog({
                                 const isBreak = slot.type === 'break';
                                 const isAbsent = isSlotAbsent(day, slot.start);
                                 return (
-                                <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30', isAbsent && 'bg-destructive/10')}>
+                                <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30')}>
                                     {!isBreak ? (
                                         <EditSlotPopover 
                                             day={day} 
@@ -278,9 +281,10 @@ export default function TeacherScheduleDialog({
                                             onSave={handleSaveSlot}
                                             teacher={teacher}
                                             allClasses={allClasses}
+                                            isAbsent={isAbsent}
                                         />
                                     ) : (
-                                        <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-center">
+                                        <div className={cn("p-1.5 h-full min-h-[6rem] flex flex-col justify-center", isAbsent && 'bg-destructive/10')}>
                                             <Coffee className='w-5 h-5 mx-auto text-muted-foreground' />
                                         </div>
                                     )}
