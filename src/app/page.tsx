@@ -101,8 +101,10 @@ export default function Home() {
         const todaysTeacherAbsences = (teacher.absences || []).filter(absence => {
           try {
             const absenceDate = typeof absence.date === 'string' ? new Date(absence.date) : absence.date;
+            // Ensure both dates are compared at the start of the day
             return isSameDay(startOfDay(absenceDate), today);
           } catch (e) {
+            console.error("Error parsing absence date:", absence.date);
             return false;
           }
         });
