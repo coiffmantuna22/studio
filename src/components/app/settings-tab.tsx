@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 
 const timeSlotSchema = z.object({
+  id: z.string().optional(),
   start: z.string().regex(/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/, "פורמט לא חוקי"),
   end: z.string().regex(/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/, "פורמט לא חוקי"),
   type: z.enum(['lesson', 'break']),
@@ -47,7 +48,7 @@ const formSchema = z.object({
     }
     return true;
 }, {
-    message: 'כל משבצת חייבת להתחיל אחרי שהקודמת מסתיימת, ושעת הסיום חייבת להיות אחרי שעת ההתחלה. יש למיין את המשבצות לפי שעת התחלה.',
+    message: 'כל משבצת חייבת להתחיל אחרי שהקודמת מסתיימת, ושעת הסיום חייבת להיות אחרי שעת ההתחלה. ייתכן שתצטרך למיין את המשבצות.',
     path: ['slots'],
 });
 
@@ -103,6 +104,7 @@ export default function SettingsTab({ timeSlots, onUpdate, isInitialSetup = fals
         const currentSlots = form.getValues('slots');
         const sortedSlots = [...currentSlots].sort((a, b) => a.start.localeCompare(b.start));
         form.setValue('slots', sortedSlots);
+        form.trigger('slots'); // Re-run validation after sorting
     }
 
   return (
@@ -119,9 +121,6 @@ export default function SettingsTab({ timeSlots, onUpdate, isInitialSetup = fals
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-6">
-                 {form.formState.errors.slots && (
-                    <p className="text-sm font-medium text-destructive">{form.formState.errors.slots.message}</p>
-                )}
                 <div className="space-y-4">
                     {fields.map((field, index) => (
                         <div key={field.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end p-4 border rounded-lg">
@@ -173,6 +172,9 @@ export default function SettingsTab({ timeSlots, onUpdate, isInitialSetup = fals
                         </div>
                     ))}
                 </div>
+                 {form.formState.errors.slots && (
+                    <p className="text-sm font-medium text-destructive">{form.formState.errors.slots.message || form.formState.errors.slots?.root?.message}</p>
+                )}
                 <div className='flex flex-wrap gap-2'>
                     <Button type="button" variant="outline" onClick={addSlot}>
                         <Plus className="ml-2 h-4 w-4" />
@@ -183,10 +185,10 @@ export default function SettingsTab({ timeSlots, onUpdate, isInitialSetup = fals
                     </Button>
                 </div>
             </CardContent>
-            <CardFooter className='justify-between'>
+            <CardFooter>
                  <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button type='button' onClick={() => form.handleSubmit(onSubmit)()}>שמור הגדרות</Button>
+                    <Button type='button' disabled={!form.formState.isValid && !isInitialSetup}>שמור הגדרות</Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>

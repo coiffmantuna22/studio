@@ -96,7 +96,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
 
     const handleSave = () => {
         if (subject && teacherId) {
-            onSave(day, time, { subject, teacherId });
+            onSave(day, time, { subject, teacherId, classId: schoolClass.id });
         } else {
              onSave(day, time, null);
         }
@@ -141,7 +141,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
                                 setSubject(newSubject);
                                 // If the currently selected teacher cannot teach the new subject, clear the teacher selection.
                                 const currentTeacher = allTeachers.find(t => t.id === teacherId);
-                                if (currentTeacher && !currentTeacher.subjects.includes(newSubject)) {
+                                if (currentTeacher && newSubject && !currentTeacher.subjects.includes(newSubject)) {
                                     setTeacherId(null);
                                 }
                             }}
@@ -203,7 +203,7 @@ export default function ClassTimetableDialog({
         
         if(lesson === null){
             if(newSchedule[day]) {
-              delete newSchedule[day][time];
+              newSchedule[day][time] = null;
             }
         } else {
              newSchedule[day][time] = lesson;
@@ -394,4 +394,3 @@ export default function ClassTimetableDialog({
     </Dialog>
   );
 }
-

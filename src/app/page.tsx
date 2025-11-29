@@ -128,17 +128,15 @@ export default function Home() {
 
         // Now, populate teacher schedules based on class schedules
         synchronizedTeachers.forEach(teacher => {
-             const newTeacherRef = teacherRefMap.get(teacher.id)!;
-             const teacherId = newTeacherRef.id;
-             teacher.id = teacherId; // Make sure the ID is the new one
-
+             const originalTeacherId = Array.from(teacherRefMap.entries()).find(([, ref]) => ref.id === teacher.id)?.[0] || teacher.id;
              const newTeacherSchedule: ClassSchedule = {};
               daysOfWeek.forEach(day => {
                 newTeacherSchedule[day] = {};
                 synchronizedClasses.forEach(sc => {
                     if (sc.schedule[day]) {
                         Object.entries(sc.schedule[day]).forEach(([time, lesson]) => {
-                            if(lesson && lesson.teacherId === teacher.id) {
+                             const originalLessonTeacherRef = teacherRefMap.get(lesson?.teacherId || '');
+                             if(lesson && originalLessonTeacherRef?.id === teacher.id) {
                                 newTeacherSchedule[day]![time] = { ...lesson, classId: sc.id };
                             }
                         })
@@ -150,13 +148,20 @@ export default function Home() {
 
 
         synchronizedTeachers.forEach(teacher => {
-            const teacherRef = teacherRefMap.get(teacher.id.toString())!;
-            transaction.set(teacherRef, teacher);
+            // Find original ID to get correct ref
+            const originalId = Array.from(teacherRefMap.entries()).find(([, ref]) => ref.id === teacher.id)?.[0];
+            if (originalId) {
+                const teacherRef = teacherRefMap.get(originalId)!;
+                transaction.set(teacherRef, teacher);
+            }
         });
 
         synchronizedClasses.forEach(sClass => {
-            const classRef = classRefMap.get(sClass.id)!;
-            transaction.set(classRef, sClass);
+             const originalId = Array.from(classRefMap.entries()).find(([, ref]) => ref.id === sClass.id)?.[0];
+             if(originalId){
+                const classRef = classRefMap.get(originalId)!;
+                transaction.set(classRef, sClass);
+             }
         });
         
         const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
@@ -320,7 +325,7 @@ export default function Home() {
                     // If teacher was added to this slot for this class
                     if (newLesson?.classId === classId) {
                         updatedClassSchedule[day] = updatedClassSchedule[day] || {};
-                        updatedClassSchedule[day][time] = { ...newLesson, teacherId: entityId };
+                        updatedClassSchedule[day][time] = { ...(newLesson as Lesson), teacherId: entityId };
                     }
                 });
             });
@@ -363,7 +368,7 @@ export default function Home() {
                     // If lesson with this teacher was added
                     if (newLesson?.teacherId === teacherId) {
                         updatedTeacherSchedule[day] = updatedTeacherSchedule[day] || {};
-                        updatedTeacherSchedule[day][time] = { ...newLesson, classId: entityId };
+                        updatedTeacherSchedule[day][time] = { ...(newLesson as Lesson), classId: entityId };
                     }
                 });
             });

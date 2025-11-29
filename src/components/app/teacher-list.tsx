@@ -90,6 +90,7 @@ export default function TeacherList({
     onDeleteTeacher(teacherToDelete.id);
 
     toast({
+      variant: 'destructive',
       title: "המורה נמחק",
       description: `הפרופיל של ${teacherToDelete.name} וכל השיבוצים שלו הוסרו מהמערכת.`,
     });
