@@ -40,27 +40,28 @@ service cloud.firestore {
     }
 
     match /teachers/{teacherId} {
-      allow read, list: if isSignedIn();
+      allow read, list: if isSignedIn() && request.query.where.userId == request.auth.uid;
       allow create: if isSignedIn() && isCreatingOwnResource();
       allow update, delete: if isSignedIn() && isOwner(get(/databases/$(database)/documents/teachers/$(teacherId)).data.userId);
     }
     
     match /classes/{classId} {
-      allow read, list: if isSignedIn();
+      allow read, list: if isSignedIn() && request.query.where.userId == request.auth.uid;
       allow create: if isSignedIn() && isCreatingOwnResource();
       allow update, delete: if isSignedIn() && isOwner(get(/databases/$(database)/documents/classes/$(classId)).data.userId);
     }
     
     match /settings/{settingId} {
-      allow read, list: if isSignedIn();
+      allow read, list: if isSignedIn() && request.query.where.userId == request.auth.uid;
       allow create: if isSignedIn() && isCreatingOwnResource();
       allow update: if isSignedIn() && isOwner(get(/databases/$(database)/documents/settings/$(settingId)).data.userId);
     }
 
     match /substitutions/{substitutionId} {
-      allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && isCreatingOwnResource();
-      allow update, delete: if isSignedIn() && isOwner(get(/databases/$(database)/documents/substitutions/$(substitutionId)).data.userId);
+      allow read, create, update, delete: if isSignedIn() && isOwner(resource.data.userId);
+    }
+    match /substitutions {
+        allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
     }
   }
 }
