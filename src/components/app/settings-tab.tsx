@@ -173,7 +173,7 @@ export default function SettingsTab({ timeSlots, onUpdate, isInitialSetup = fals
                         </div>
                     ))}
                 </div>
-                <div className='flex gap-2'>
+                <div className='flex flex-wrap gap-2'>
                     <Button type="button" variant="outline" onClick={addSlot}>
                         <Plus className="ml-2 h-4 w-4" />
                         הוסף משבצת זמן

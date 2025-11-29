@@ -88,17 +88,17 @@ export default function Home() {
             const newSchedule: ClassSchedule = {};
             daysOfWeek.forEach(day => {
                 newSchedule[day] = {};
-                defaultClasses.forEach(sc => {
-                     if (sc.schedule[day]) {
-                        Object.keys(sc.schedule[day]).forEach(time => {
-                            const lesson = sc.schedule[day]?.[time];
-                            if(lesson && lesson.teacherId === teacher.id) {
-                                const newClassRef = classRefMap.get(sc.id)!;
-                                newSchedule[day]![time] = { ...lesson, classId: newClassRef.id };
+                if (teacher.schedule?.[day]) {
+                    Object.keys(teacher.schedule[day]).forEach(time => {
+                        const lesson = teacher.schedule[day]?.[time];
+                        if(lesson && lesson.classId) {
+                            const newClassRef = classRefMap.get(lesson.classId);
+                            if (newClassRef) {
+                                newSchedule[day]![time] = { ...lesson, classId: newClassRef.id, teacherId: '' }; // teacherId will be set later
                             }
-                        })
-                    }
-                })
+                        }
+                    })
+                }
             })
             
             const newTeacherRef = teacherRefMap.get(teacher.id)!;
@@ -125,6 +125,28 @@ export default function Home() {
             const newClassRef = classRefMap.get(sc.id)!;
             return { ...sc, id: newClassRef.id, userId: user.uid, schedule: newSchedule };
         });
+
+        // Now, populate teacher schedules based on class schedules
+        synchronizedTeachers.forEach(teacher => {
+             const newTeacherRef = teacherRefMap.get(teacher.id)!;
+             const teacherId = newTeacherRef.id;
+             teacher.id = teacherId; // Make sure the ID is the new one
+
+             const newTeacherSchedule: ClassSchedule = {};
+              daysOfWeek.forEach(day => {
+                newTeacherSchedule[day] = {};
+                synchronizedClasses.forEach(sc => {
+                    if (sc.schedule[day]) {
+                        Object.entries(sc.schedule[day]).forEach(([time, lesson]) => {
+                            if(lesson && lesson.teacherId === teacher.id) {
+                                newTeacherSchedule[day]![time] = { ...lesson, classId: sc.id };
+                            }
+                        })
+                    }
+                })
+            });
+            teacher.schedule = newTeacherSchedule;
+        })
 
 
         synchronizedTeachers.forEach(teacher => {
@@ -413,7 +435,7 @@ export default function Home() {
       <main className="flex-1 p-4 sm:p-6 md:p-8">
         <Tabs defaultValue="teachers" className="w-full">
           <div className='flex justify-center'>
-            <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-2xl">
               <TabsTrigger value="teachers">פרופילי מורים</TabsTrigger>
               <TabsTrigger value="classes">כיתות לימוד</TabsTrigger>
               <TabsTrigger value="timetable">זמינות מחליפים</TabsTrigger>
@@ -453,4 +475,3 @@ export default function Home() {
     </div>
   );
 }
-

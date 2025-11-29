@@ -229,7 +229,7 @@ export default function MarkAbsentDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>סימון היעדרות עבור {teacher.name}</DialogTitle>
           <DialogDescription>בחר את תאריכי ושעות ההיעדרות כדי למצוא מחליף. יוצגו המלצות לכל השבוע הקרוב.</DialogDescription>
@@ -381,5 +381,3 @@ export default function MarkAbsentDialog({
     </Dialog>
   );
 }
-
-    

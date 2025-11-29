@@ -169,7 +169,7 @@ export default function ClassList({ initialClasses, allTeachers, timeSlots, onAd
         onOpenChange={(isOpen) => !isOpen && setClassToEditSchedule(null)}
         schoolClass={classToEditSchedule}
         allTeachers={allTeachers}
-        onUpdateSchedule={onUpdateSchedule}
+        onUpdateSchedule={handleUpdateSchedule}
         isEditing={true}
         allClasses={initialClasses}
         timeSlots={timeSlots}

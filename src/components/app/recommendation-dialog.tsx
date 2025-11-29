@@ -61,7 +61,7 @@ export default function RecommendationDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg md:max-w-3xl">
+      <DialogContent className="max-w-lg md:max-w-2xl">
         <DialogHeader>
           <DialogTitle>המלצות שיבוץ עבור היעדרות של {absentTeacher.name}</DialogTitle>
           <DialogDescription>
@@ -92,7 +92,7 @@ export default function RecommendationDialog({
                                 <span className='text-sm text-muted-foreground font-normal mt-1 sm:mt-0'>{res.lesson.subject} בשעה {res.time}</span>
                             </div>
                             <Separator className="my-2" />
-                            <div className='grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-4 text-center'>
+                            <div className='grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4 text-center'>
                                 <div className='flex flex-col items-center'>
                                     <span className="text-sm text-muted-foreground">מחליף מוצע</span>
                                     <p className="font-bold text-primary flex items-center gap-2 mt-1">
@@ -138,5 +138,3 @@ export default function RecommendationDialog({
     </Dialog>
   );
 }
-
-    
