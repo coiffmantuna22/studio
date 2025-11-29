@@ -1,5 +1,6 @@
 
 
+
 export interface DayAvailability {
   day: string;
   slots: { start: string; end: string }[];
