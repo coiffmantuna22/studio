@@ -65,10 +65,10 @@ const AvailabilityBadge = ({ status }: { status: TeacherAvailabilityStatus }) =>
 
 export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, onViewSchedule, availabilityStatus }: TeacherCardProps) {
   return (
-    <Card className="flex flex-col transition-all hover:shadow-md">
+    <Card className="flex flex-col transition-all hover:shadow-lg hover:scale-105 duration-300 ease-in-out">
       <CardHeader className="flex flex-row items-start gap-4">
-        <Avatar className="h-12 w-12 border-2 border-transparent">
-          <AvatarFallback>{teacher.avatar.fallback}</AvatarFallback>
+        <Avatar className="h-12 w-12 border-2 border-primary/20">
+          <AvatarFallback className='bg-primary/10 text-primary font-bold'>{teacher.avatar.fallback}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <CardTitle>{teacher.name}</CardTitle>
