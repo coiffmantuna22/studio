@@ -56,18 +56,18 @@ export default function Timetable({ allTeachers }: TimetableProps) {
         <ScrollArea className="w-full whitespace-nowrap rounded-md border">
             <div className="relative">
                 <table className="w-full text-sm text-center table-fixed">
-                    <thead className='bg-muted/50'>
-                        <tr>
-                        <th className="sticky right-0 bg-muted/50 p-2 w-24 z-10 font-semibold">שעה</th>
+                    <thead>
+                        <tr className="bg-muted/40">
+                        <th className="sticky right-0 top-0 bg-muted/40 p-2 w-28 z-20">שעה</th>
                         {daysOfWeek.map(day => (
-                            <th key={day} className="p-2 min-w-[150px] font-semibold">{day}</th>
+                            <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[150px]">{day}</th>
                         ))}
                         </tr>
                     </thead>
                     <tbody>
                         {timeSlots.map(time => (
                         <tr key={time} className="border-t">
-                            <td className="sticky right-0 font-semibold bg-card p-2 w-24 z-10">{time}</td>
+                            <td className="sticky right-0 font-semibold bg-card p-2 w-28 z-10">{time}</td>
                             {daysOfWeek.map(day => (
                             <td key={`${day}-${time}`} className="p-2 align-top h-24 border-l">
                                 <div className="flex flex-wrap gap-1.5 justify-center">
