@@ -21,18 +21,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { X, Book, User, BookOpen } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Combobox } from '../ui/combobox';
+import { isTeacherAvailable, isTeacherAlreadyScheduled } from '@/lib/substitute-finder';
+import { startOfToday } from 'date-fns';
 
 interface ClassTimetableDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   schoolClass: SchoolClass | null;
   allTeachers: Teacher[];
+  allClasses: SchoolClass[];
   isEditing: boolean;
   onUpdateSchedule?: (classId: string, schedule: ClassSchedule) => void;
 }
@@ -43,10 +45,11 @@ interface EditSlotPopoverProps {
     lesson: Lesson | null;
     onSave: (day: string, time: string, lesson: Lesson | null) => void;
     allTeachers: Teacher[];
+    allClasses: SchoolClass[];
     schoolClass: SchoolClass;
 }
 
-function EditSlotPopover({ day, time, lesson, onSave, allTeachers, schoolClass }: EditSlotPopoverProps) {
+function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, schoolClass }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [subject, setSubject] = useState(lesson?.subject || '');
     const [teacherId, setTeacherId] = useState(lesson?.teacherId || null);
@@ -58,10 +61,33 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, schoolClass }
         }
     }, [lesson, isOpen]);
 
-    const availableTeachersForSubject = useMemo(() => {
-        if (!subject) return allTeachers;
-        return allTeachers.filter(t => t.subjects.includes(subject));
-    }, [subject, allTeachers]);
+    const availableTeachersForSlot = useMemo(() => {
+        // Mock date for availability check. The exact date doesn't matter, only the day of the week.
+        const dayIndex = daysOfWeek.indexOf(day);
+        // Create a date that falls on the correct day of the week.
+        const today = startOfToday();
+        const todayIndex = today.getDay();
+        const date = new Date(today.setDate(today.getDate() - todayIndex + dayIndex));
+        
+        return allTeachers.filter(t => {
+            // Teacher must be generally available at this time
+            const isGenerallyAvailable = isTeacherAvailable(t, date, time);
+            
+            // Teacher must not be scheduled in another class at the same time
+            const isScheduledElsewhere = isTeacherAlreadyScheduled(t.id, date, time, allClasses, schoolClass.id);
+
+            // The current teacher of the lesson is always considered available for editing purposes.
+            const isCurrentTeacher = t.id === lesson?.teacherId;
+            
+            return (isGenerallyAvailable && !isScheduledElsewhere) || isCurrentTeacher;
+        });
+    }, [day, time, allTeachers, allClasses, schoolClass.id, lesson?.teacherId]);
+
+
+    const qualifiedTeachersForSlot = useMemo(() => {
+        if (!subject) return availableTeachersForSlot;
+        return availableTeachersForSlot.filter(t => t.subjects.includes(subject));
+    }, [subject, availableTeachersForSlot]);
     
     const allSubjects = useMemo(() => {
         const subjects = new Set<string>();
@@ -113,7 +139,14 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, schoolClass }
                         <Combobox
                             items={allSubjects}
                             value={subject}
-                            onChange={setSubject}
+                            onChange={(newSubject) => {
+                                setSubject(newSubject);
+                                // Reset teacher if they can't teach the new subject
+                                const currentTeacher = allTeachers.find(t => t.id === teacherId);
+                                if (currentTeacher && !currentTeacher.subjects.includes(newSubject)) {
+                                    setTeacherId(null);
+                                }
+                            }}
                             placeholder="בחר או צור מקצוע..."
                             searchPlaceholder="חיפוש מקצוע..."
                             noItemsMessage="לא נמצאו מקצועות."
@@ -126,7 +159,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, schoolClass }
                                 <SelectValue placeholder="בחר מורה" />
                             </SelectTrigger>
                             <SelectContent>
-                                {availableTeachersForSubject.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                {qualifiedTeachersForSlot.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
@@ -150,6 +183,7 @@ export default function ClassTimetableDialog({
   onOpenChange,
   schoolClass,
   allTeachers,
+  allClasses,
   isEditing,
   onUpdateSchedule
 }: ClassTimetableDialogProps) {
@@ -172,7 +206,10 @@ export default function ClassTimetableDialog({
         if (!newSchedule[day]) newSchedule[day] = {};
         
         if(lesson === null){
-            delete newSchedule[day][time];
+            // Using delete is fine here as we are working with a new object
+            if(newSchedule[day]) {
+              delete newSchedule[day][time];
+            }
         } else {
              newSchedule[day][time] = lesson;
         }
@@ -227,10 +264,11 @@ export default function ClassTimetableDialog({
                                     lesson={lesson}
                                     onSave={handleSaveSlot}
                                     allTeachers={allTeachers}
+                                    allClasses={allClasses}
                                     schoolClass={schoolClass}
                                 />
                             ) : (
-                                <div className="p-1.5 h-full">
+                                <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-center">
                                 {lesson && teacher ? (
                                     <div className="bg-secondary/50 rounded-md p-2 text-right h-full flex flex-col justify-center">
                                       <div className="flex items-center gap-2">
@@ -243,9 +281,10 @@ export default function ClassTimetableDialog({
                                       </div>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center justify-center h-full min-h-[6rem]">
+                                    <div className="flex items-center justify-center h-full">
                                         <span className="text-muted-foreground text-xs">--</span>
                                     </div>
+
                                 )}
                                 </div>
                             )}

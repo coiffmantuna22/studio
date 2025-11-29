@@ -137,6 +137,7 @@ export default function ClassList({ initialClasses, allTeachers, onClassesUpdate
         schoolClass={classToView}
         allTeachers={allTeachers}
         isEditing={false}
+        allClasses={initialClasses}
       />
 
       <ClassTimetableDialog
@@ -146,6 +147,7 @@ export default function ClassList({ initialClasses, allTeachers, onClassesUpdate
         allTeachers={allTeachers}
         onUpdateSchedule={handleUpdateSchedule}
         isEditing={true}
+        allClasses={initialClasses}
       />
 
     </Card>

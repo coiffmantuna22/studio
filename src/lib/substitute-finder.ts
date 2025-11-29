@@ -16,7 +16,7 @@ const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי"
 
 const parseTimeToNumber = (time: string) => parseInt(time.split(':')[0], 10);
 
-function isTeacherAvailable(teacher: Teacher, date: Date, time: string): boolean {
+export function isTeacherAvailable(teacher: Teacher, date: Date, time: string): boolean {
   const dayOfWeek = dayMap[getDay(date)];
   const lessonHour = parseTimeToNumber(time);
 
@@ -32,10 +32,13 @@ function isTeacherAvailable(teacher: Teacher, date: Date, time: string): boolean
   });
 }
 
-function isTeacherAlreadyScheduled(teacherId: string, date: Date, time: string, allClasses: SchoolClass[]): boolean {
+export function isTeacherAlreadyScheduled(teacherId: string, date: Date, time: string, allClasses: SchoolClass[], ignoreClassId?: string): boolean {
     const dayOfWeek = dayMap[getDay(date)];
     
     return allClasses.some(schoolClass => {
+        // If we're checking for a specific class's timetable, we should ignore that class itself.
+        if (schoolClass.id === ignoreClassId) return false;
+
         const lesson = schoolClass.schedule[dayOfWeek]?.[time];
         return lesson?.teacherId === teacherId;
     });
@@ -69,12 +72,9 @@ export async function findSubstitute(
   
   // 3. Separate teachers who are free vs. already scheduled
   const freeTeachers: Teacher[] = [];
-  const busyTeachers: Teacher[] = [];
-
+  
   availableQualifiedTeachers.forEach(teacher => {
-    if (isTeacherAlreadyScheduled(teacher.id, lessonDetails.date, lessonDetails.time, allClasses)) {
-        busyTeachers.push(teacher);
-    } else {
+    if (!isTeacherAlreadyScheduled(teacher.id, lessonDetails.date, lessonDetails.time, allClasses)) {
         freeTeachers.push(teacher);
     }
   });
