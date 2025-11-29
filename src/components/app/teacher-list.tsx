@@ -169,15 +169,15 @@ export default function TeacherList({
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button onClick={openCreateDialog} className='shrink-0'>
-                    <Plus className="mr-2 h-4 w-4" />
+                    <Plus className="ml-2 h-4 w-4" />
                     יצירת פרופיל
                 </Button>
                 <div className="relative flex-grow">
-                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         type="search"
                         placeholder="חיפוש מורה..."
-                        className="w-full pr-9"
+                        className="w-full pl-9"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />

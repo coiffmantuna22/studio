@@ -96,10 +96,7 @@ export default function SettingsTab({ timeSlots, onUpdate, children }: SettingsT
                 )}
                 <div className="space-y-4">
                     {fields.map((field, index) => (
-                        <div key={field.id} className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr_auto] gap-4 items-end p-4 border rounded-lg">
-                             <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                             </Button>
+                        <div key={field.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end p-4 border rounded-lg">
                             <FormField
                                 control={form.control}
                                 name={`slots.${index}.start`}
@@ -142,11 +139,14 @@ export default function SettingsTab({ timeSlots, onUpdate, children }: SettingsT
                                     </FormItem>
                                 )}
                             />
+                             <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                             </Button>
                         </div>
                     ))}
                 </div>
                 <Button type="button" variant="outline" onClick={addSlot}>
-                    <Plus className="mr-2 h-4 w-4" />
+                    <Plus className="ml-2 h-4 w-4" />
                     הוסף משבצת זמן
                 </Button>
             </CardContent>

@@ -123,22 +123,16 @@ export default function WeeklyScheduleSelector({ value, onChange, timeSlots }: W
 
   return (
     <div className="flex flex-col gap-2" dir="rtl">
-      <div className="grid grid-cols-[auto_1fr] gap-x-2">
-         <div className="w-24"></div>
+      <div className="grid grid-cols-[1fr_auto] gap-x-2">
         <div className="grid text-center text-xs text-muted-foreground" style={{gridTemplateColumns: `repeat(${totalSlots}, minmax(0, 1fr))`}}>
           {timeSlots.map(time => (
             <div key={time.id}>{time.start}</div>
           ))}
         </div>
+        <div className="w-24"></div>
       </div>
       {daysOfWeek.map(day => (
-        <div key={day} className="grid grid-cols-[auto_1fr] items-center gap-x-2">
-            <div className="flex items-center justify-end gap-2 w-24">
-                <span className="font-semibold text-sm">{day}</span>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => clearDay(day)}>
-                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground"/>
-                </Button>
-            </div>
+        <div key={day} className="grid grid-cols-[1fr_auto] items-center gap-x-2">
             <div className="grid gap-px bg-border rounded-md overflow-hidden" style={{gridTemplateColumns: `repeat(${totalSlots}, minmax(0, 1fr))`}} dir="ltr">
                 {timeSlots.map((slot, index) => {
                 const isSelected = selectedSlots[day]?.includes(index);
@@ -157,6 +151,12 @@ export default function WeeklyScheduleSelector({ value, onChange, timeSlots }: W
                     />
                 );
                 })}
+            </div>
+            <div className="flex items-center justify-end gap-2 w-24">
+                <span className="font-semibold text-sm">{day}</span>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => clearDay(day)}>
+                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground"/>
+                </Button>
             </div>
         </div>
       ))}

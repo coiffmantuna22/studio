@@ -161,7 +161,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
                      <Separator />
                     <div className="flex justify-between items-center">
                          <Button variant="ghost" size="sm" onClick={handleClear} className="text-destructive hover:text-destructive">
-                            <X className="w-4 h-4 mr-2"/>
+                            <X className="w-4 h-4 ml-2"/>
                             נקה שיבוץ
                         </Button>
                         <Button size="sm" onClick={handleSave} disabled={!(subject && teacherId)}>שמור</Button>
@@ -233,7 +233,7 @@ export default function ClassTimetableDialog({
             <table className="w-full text-sm text-center table-fixed">
               <thead className='bg-muted/40'>
                 <tr className='bg-muted/40'>
-                  <th className="sticky right-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
+                  <th className="sticky left-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
                   {daysOfWeek.map(day => (
                     <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">{day}</th>
                   ))}
@@ -242,7 +242,7 @@ export default function ClassTimetableDialog({
               <tbody>
                 {timeSlots.map(slot => (
                   <tr key={slot.id} className="border-t">
-                    <td className="sticky right-0 font-semibold bg-card p-2 w-40 z-10 text-center">
+                    <td className="sticky left-0 font-semibold bg-card p-2 w-40 z-10 text-center">
                         <div>{slot.start} - {slot.end}</div>
                         {slot.type === 'break' && <Badge variant="outline" className='mt-1'>הפסקה</Badge>}
                     </td>
@@ -251,7 +251,7 @@ export default function ClassTimetableDialog({
                       const teacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
                       const isBreak = slot.type === 'break';
                       return (
-                        <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-l", isBreak && 'bg-muted/30')}>
+                        <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30')}>
                             {isEditing && !isBreak ? (
                                 <EditSlotPopover 
                                     day={day} 

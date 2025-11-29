@@ -235,7 +235,7 @@ export default function MarkAbsentDialog({
                             !field.value?.from && "text-muted-foreground"
                           )}
                         >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          <CalendarIcon className="ml-2 h-4 w-4" />
                           {field.value?.from ? (
                             field.value.to ? (
                               <>
@@ -268,7 +268,7 @@ export default function MarkAbsentDialog({
             />
             
             {fields.length > 0 && (
-                <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
+                <div className="space-y-4 max-h-60 overflow-y-auto pl-2">
                     {fields.map((field, index) => {
                        const isAllDay = form.watch(`absenceDays.${index}.isAllDay`);
                         return (
@@ -350,7 +350,7 @@ export default function MarkAbsentDialog({
               <Button type="submit" disabled={isSubmitting || fields.length === 0}>
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                     מחפש מחליפים...
                   </>
                 ) : (

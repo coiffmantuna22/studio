@@ -48,6 +48,11 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     setError(null);
+    if (!auth) {
+        setError('שגיאת אימות. נסה לרענן את הדף.');
+        setIsLoading(false);
+        return;
+    }
     try {
       await signInWithEmailAndPassword(auth, data.email, data.password);
       toast({ title: 'התחברת בהצלחה!' });
@@ -88,7 +93,7 @@ export default function LoginPage() {
             </div>
             {error && <p className="text-sm font-medium text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'התחבר'}
+              {isLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : 'התחבר'}
             </Button>
           </form>
         </CardContent>
