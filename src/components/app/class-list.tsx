@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -305,7 +304,7 @@ export default function ClassList({}: ClassListProps) {
       <CreateClassDialog
         isOpen={isCreateClassOpen}
         onOpenChange={setCreateClassOpen}
-        onAddClass={onAddClass}
+        onAddClass={handleAddClass}
       />
       
       <ClassTimetableDialog
