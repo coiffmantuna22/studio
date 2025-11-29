@@ -81,7 +81,6 @@ export default function TeacherList({
   const handleDeleteTeacher = () => {
     if (!teacherToDelete) return;
     
-    // Create a deep copy to avoid direct state mutation
     const updatedClasses = JSON.parse(JSON.stringify(allClasses)) as SchoolClass[];
     
     updatedClasses.forEach((schoolClass) => {
@@ -90,8 +89,7 @@ export default function TeacherList({
             Object.keys(schoolClass.schedule[day]).forEach(time => {
                 const lesson = schoolClass.schedule[day][time];
                 if (lesson && lesson.teacherId === teacherToDelete.id) {
-                    // Set lesson to null instead of deleting the property
-                    schoolClass.schedule[day][time] = null;
+                    delete schoolClass.schedule[day][time];
                 }
             });
         }
