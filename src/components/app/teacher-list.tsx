@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import type { Teacher, SchoolClass, TimeSlot, ClassSchedule, TeacherAvailabilityStatus } from '@/lib/types';
+import type { Teacher, SchoolClass, TimeSlot, TeacherAvailabilityStatus } from '@/lib/types';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Plus, Search } from 'lucide-react';
 import TeacherCard from './teacher-card';
@@ -29,8 +29,8 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { getTeacherAvailabilityStatus } from '@/lib/substitute-finder';
 import { Loader2 } from 'lucide-react';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Label } from '../ui/label';
+import type { ClassSchedule } from '@/lib/types';
+
 
 interface TeacherListProps {
   onMarkAbsent: (teacher: Teacher) => void;
@@ -48,7 +48,6 @@ export default function TeacherList({
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const [teacherToViewSchedule, setTeacherToViewSchedule] = useState<Teacher | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [availabilityFilter, setAvailabilityFilter] = useState('all');
 
 
   const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
@@ -268,18 +267,10 @@ export default function TeacherList({
   };
 
   const filteredTeachers = useMemo(() => {
-    return (teachers || [])
-      .filter(teacher => {
-        const matchesSearch = teacher.name.toLowerCase().includes(searchTerm.toLowerCase());
-        if (!matchesSearch) return false;
-
-        if (availabilityFilter === 'available') {
-          return teacherAvailabilityNow.get(teacher.id) === 'available';
-        }
-        
-        return true;
-      });
-  }, [teachers, searchTerm, availabilityFilter, teacherAvailabilityNow]);
+    return (teachers || []).filter(teacher => 
+        teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [teachers, searchTerm]);
 
   if (teachersLoading) {
       return <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -309,24 +300,6 @@ export default function TeacherList({
                     />
                 </div>
             </div>
-        </div>
-        <div className="mt-4 pt-4 border-t">
-          <RadioGroup 
-              defaultValue="all" 
-              className="flex items-center gap-4"
-              onValueChange={setAvailabilityFilter}
-              value={availabilityFilter}
-            >
-              <Label className="font-normal text-sm">סנן לפי:</Label>
-              <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="all" id="filter-all" />
-                  <Label htmlFor="filter-all" className="font-normal">כל המורים</Label>
-              </div>
-              <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="available" id="filter-available" />
-                  <Label htmlFor="filter-available" className="font-normal">פנויים כעת</Label>
-              </div>
-          </RadioGroup>
         </div>
       </CardHeader>
 
@@ -366,7 +339,7 @@ export default function TeacherList({
                  <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-12 text-center">
                     <h3 className="text-lg font-semibold text-foreground">לא נמצאו מורים תואמים</h3>
                     <p className="mt-2 text-sm text-muted-foreground">
-                        נסה מונח חיפוש אחר או שנה את אפשרויות הסינון.
+                        נסה מונח חיפוש אחר.
                     </p>
                 </div>
             )
@@ -401,4 +374,5 @@ export default function TeacherList({
     </Card>
   );
 }
+
 
