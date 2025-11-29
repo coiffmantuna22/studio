@@ -169,7 +169,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
                             <X className="w-4 h-4 ml-2"/>
                             נקה שיבוץ
                         </Button>
-                        <Button size="sm" onClick={handleSave} disabled={!subject || !teacherId}>שמור</Button>
+                        <Button size="sm" onClick={handleSave} disabled={!(subject && teacherId)}>שמור</Button>
                     </div>
                 </div>
             </PopoverContent>

@@ -1,7 +1,7 @@
 'use client';
 
 import type { Teacher, AffectedLesson } from '@/lib/types';
-import { format, getDay } from 'date-fns';
+import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,7 +27,6 @@ import { Badge } from '../ui/badge';
 interface RecommendationDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  allTeachers: Teacher[];
   recommendationResult: {
     results: AffectedLesson[];
     absentTeacher: Teacher;
@@ -38,7 +37,6 @@ interface RecommendationDialogProps {
 export default function RecommendationDialog({
   isOpen,
   onOpenChange,
-  allTeachers,
   recommendationResult,
   onTimetablesUpdate,
 }: RecommendationDialogProps) {

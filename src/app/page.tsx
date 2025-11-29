@@ -13,19 +13,6 @@ export default function Home() {
   const [teachers, setTeachers] = useState<Teacher[]>(initialTeachers);
   const [schoolClasses, setSchoolClasses] = useState<SchoolClass[]>(defaultClasses);
 
-  const handleTimetablesUpdate = (updatedSchedules: { classId: string; schedule: any }[]) => {
-      setSchoolClasses(prevClasses => {
-          const newClasses = [...prevClasses];
-          updatedSchedules.forEach(({ classId, schedule }) => {
-              const classIndex = newClasses.findIndex(c => c.id === classId);
-              if (classIndex !== -1) {
-                  newClasses[classIndex] = { ...newClasses[classIndex], schedule };
-              }
-          });
-          return newClasses;
-      });
-  };
-
   const handleTeachersUpdate = (updatedTeachers: Teacher[]) => {
     setTeachers(updatedTeachers);
   };
@@ -51,7 +38,7 @@ export default function Home() {
               initialTeachers={teachers} 
               allClasses={schoolClasses} 
               onTeachersUpdate={handleTeachersUpdate} 
-              onTimetablesUpdate={handleTimetablesUpdate} 
+              onClassesUpdate={handleClassesUpdate}
             />
           </TabsContent>
            <TabsContent value="classes">

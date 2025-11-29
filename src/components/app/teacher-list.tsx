@@ -17,14 +17,14 @@ interface TeacherListProps {
   initialTeachers: Teacher[];
   allClasses: SchoolClass[];
   onTeachersUpdate: (teachers: Teacher[]) => void;
-  onTimetablesUpdate: (updatedSchedules: { classId: string; schedule: any }[]) => void;
+  onClassesUpdate: (classes: SchoolClass[]) => void;
 }
 
 export default function TeacherList({ 
   initialTeachers, 
   allClasses, 
   onTeachersUpdate,
-  onTimetablesUpdate
+  onClassesUpdate
 }: TeacherListProps) {
   const { toast } = useToast();
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
@@ -101,48 +101,33 @@ export default function TeacherList({
   const handleFinalUpdateTimetables = () => {
       if (!recommendation) return;
 
-      // Create a deep copy of the current class schedules to modify
-      const tempSchedules: Record<string, any> = {};
-      allClasses.forEach(c => {
-          tempSchedules[c.id] = JSON.parse(JSON.stringify(c.schedule));
-      });
-      
+      const updatedClasses = JSON.parse(JSON.stringify(allClasses));
       let lessonsUpdatedCount = 0;
 
-      // Iterate through the recommendations and update the temporary schedules
       recommendation.results.forEach(res => {
           const substituteId = getSubstituteTeacherId(res.recommendation);
           if (substituteId) {
-              lessonsUpdatedCount++;
-              const dayOfWeek = dayMap[getDay(res.date)];
-              if (tempSchedules[res.classId]) {
-                  if (!tempSchedules[res.classId][dayOfWeek]) {
-                    tempSchedules[res.classId][dayOfWeek] = {};
+              const classToUpdate = updatedClasses.find((c: SchoolClass) => c.id === res.classId);
+              if (classToUpdate) {
+                  lessonsUpdatedCount++;
+                  const dayOfWeek = dayMap[getDay(res.date)];
+                  if (classToUpdate.schedule[dayOfWeek]) {
+                      classToUpdate.schedule[dayOfWeek][res.time] = {
+                          subject: res.lesson.subject,
+                          teacherId: substituteId,
+                      };
                   }
-                  tempSchedules[res.classId][dayOfWeek][res.time] = {
-                      subject: res.lesson.subject,
-                      teacherId: substituteId,
-                  };
               }
           }
       });
       
-      // Prepare the final list of updated schedules to pass to the parent
-      const updatedSchedules = Object.keys(tempSchedules).map(classId => ({
-          classId,
-          schedule: tempSchedules[classId]
-      }));
+      onClassesUpdate(updatedClasses);
 
-      // Call the parent handler to update the state
-      onTimetablesUpdate(updatedSchedules);
-
-      // Show a confirmation toast
       toast({
           title: "מערכת השעות עודכנה",
           description: `${lessonsUpdatedCount} שיעורים עודכנו עם מחליפים.`,
       });
 
-      // Close the recommendation dialog
       setRecommendation(null);
   };
 
@@ -152,7 +137,7 @@ export default function TeacherList({
 
 
   return (
-    <Card className="mt-6 border-border/80 border rounded-2xl">
+    <Card className="mt-6 border border-border/80 rounded-2xl">
       <CardHeader>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
             <div>

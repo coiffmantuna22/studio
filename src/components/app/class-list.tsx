@@ -63,7 +63,7 @@ export default function ClassList({ initialClasses, allTeachers, onClassesUpdate
 
 
   return (
-    <Card className="mt-6 border-border/80 border rounded-2xl">
+    <Card className="mt-6 border border-border/80 rounded-2xl">
       <CardHeader>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
           <div>
