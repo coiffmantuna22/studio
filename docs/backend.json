@@ -1,0 +1,242 @@
+{
+  "entities": {
+    "TeacherProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TeacherProfile",
+      "type": "object",
+      "description": "Represents a teacher's profile with their details and preferences.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the teacher profile."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The teacher's first name."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The teacher's last name."
+        },
+        "email": {
+          "type": "string",
+          "description": "The teacher's email address.",
+          "format": "email"
+        },
+        "subjectsTaught": {
+          "type": "array",
+          "description": "List of subjects the teacher is qualified to teach.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "calendar": {
+          "type": "string",
+          "description": "The Teacher's calendar identifier. (Relationship: TeacherProfile 1:1 Calendar)"
+        },
+        "unavailableDates": {
+          "type": "array",
+          "description": "List of dates the teacher is unavailable.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "subjectsTaught",
+        "calendar"
+      ]
+    },
+    "AbsenceRecord": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AbsenceRecord",
+      "type": "object",
+      "description": "Represents a record of a teacher's absence.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the absence record."
+        },
+        "teacherId": {
+          "type": "string",
+          "description": "Reference to TeacherProfile. (Relationship: TeacherProfile 1:N AbsenceRecord)"
+        },
+        "startDate": {
+          "type": "string",
+          "description": "The start date of the absence.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "The end date of the absence.",
+          "format": "date-time"
+        },
+        "reason": {
+          "type": "string",
+          "description": "The reason for the absence."
+        }
+      },
+      "required": [
+        "id",
+        "teacherId",
+        "startDate",
+        "endDate",
+        "reason"
+      ]
+    },
+    "Recommendation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Recommendation",
+      "type": "object",
+      "description": "Represents a recommendation for a substitute teacher.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the recommendation."
+        },
+        "absenceRecordId": {
+          "type": "string",
+          "description": "Reference to AbsenceRecord. (Relationship: AbsenceRecord 1:1 Recommendation)"
+        },
+        "substituteTeacherId": {
+          "type": "string",
+          "description": "Reference to TeacherProfile. (Relationship: TeacherProfile 1:N Recommendation, representing the substitute teacher)"
+        },
+        "reasoning": {
+          "type": "string",
+          "description": "Explanation for why this substitute teacher was recommended."
+        },
+        "confidenceScore": {
+          "type": "number",
+          "description": "A score indicating the confidence in the recommendation (0-1)."
+        }
+      },
+      "required": [
+        "id",
+        "absenceRecordId",
+        "substituteTeacherId",
+        "reasoning",
+        "confidenceScore"
+      ]
+    },
+    "Calendar": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Calendar",
+      "type": "object",
+      "description": "Represents the calendar and availabilty of the teacher",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the calendar."
+        },
+        "teacherId": {
+          "type": "string",
+          "description": "Reference to TeacherProfile. (Relationship: TeacherProfile 1:1 Calendar)"
+        },
+        "availability": {
+          "type": "array",
+          "description": "Array of available time slots for this teacher. Each item is an array of start-end times e.g. ['08:00', '16:00']",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "teacherId",
+        "availability"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/teacherProfiles/{teacherProfileId}",
+        "definition": {
+          "entityName": "TeacherProfile",
+          "schema": {
+            "$ref": "#/backend/entities/TeacherProfile"
+          },
+          "description": "Stores teacher profiles. Includes fields for name, email, subjects taught, and a reference to the calendar.  The teacherProfileId is also used as the Firebase Auth UID. All data in the profile is considered private.",
+          "params": [
+            {
+              "name": "teacherProfileId",
+              "description": "The unique identifier for the teacher profile, also used as the Firebase Auth UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/teacherProfiles/{teacherProfileId}/absenceRecords/{absenceRecordId}",
+        "definition": {
+          "entityName": "AbsenceRecord",
+          "schema": {
+            "$ref": "#/backend/entities/AbsenceRecord"
+          },
+          "description": "Stores absence records for each teacher.  The teacherProfileId is denormalized to maintain authorization independence.  Allows listing absence records for a specific teacher.",
+          "params": [
+            {
+              "name": "teacherProfileId",
+              "description": "The unique identifier for the teacher profile."
+            },
+            {
+              "name": "absenceRecordId",
+              "description": "The unique identifier for the absence record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/teacherProfiles/{teacherProfileId}/calendars/{calendarId}",
+        "definition": {
+          "entityName": "Calendar",
+          "schema": {
+            "$ref": "#/backend/entities/Calendar"
+          },
+          "description": "Stores calendar information for each teacher. The teacherProfileId is denormalized to maintain authorization independence.",
+          "params": [
+            {
+              "name": "teacherProfileId",
+              "description": "The unique identifier for the teacher profile."
+            },
+            {
+              "name": "calendarId",
+              "description": "The unique identifier for the calendar."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/absenceRecords/{absenceRecordId}/recommendations/{recommendationId}",
+        "definition": {
+          "entityName": "Recommendation",
+          "schema": {
+            "$ref": "#/backend/entities/Recommendation"
+          },
+          "description": "Stores recommendations for substitute teachers for a specific absence record. The absenceRecordId is used as a parent key.",
+          "params": [
+            {
+              "name": "absenceRecordId",
+              "description": "The unique identifier for the absence record."
+            },
+            {
+              "name": "recommendationId",
+              "description": "The unique identifier for the recommendation."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to manage teacher profiles, absence records, and substitute teacher recommendations for the SubFinder application. It emphasizes authorization independence and clear security rules.  \n\n**Authorization Independence:**  Authorization independence is achieved by denormalizing data to avoid `get()` calls in security rules. Specifically, the `TeacherProfile` ID is duplicated into subcollections like `absenceRecords` and `calendars`, eliminating the need to fetch the teacher profile to authorize operations on these subcollections.  \n\n**QAPs Support:**\n*   **Teacher Profiles:** Stored in `/teacherProfiles/{teacherProfileId}`.  This segregation facilitates secure listing of profiles. Security rules can easily enforce read access based on role or ownership without filtering.\n*   **Absence Records:** Stored as subcollections under `/teacherProfiles/{teacherProfileId}/absenceRecords/{absenceRecordId}`.  This structure allows admins to easily list all absence records or all absence records belonging to a specific teacher, enabling secure and efficient queries.\n*   **Calendars:**  Stored as subcollections under `/teacherProfiles/{teacherProfileId}/calendars/{calendarId}`. This allows retrieval of specific calendars, or all calendars, and supports secure access rules.\n*   **Recommendations:** Stored as subcollections under `/absenceRecords/{absenceRecordId}/recommendations/{recommendationId}`.  This structure facilitates secure listing of recommendations for a specific absence record."
+  }
+}

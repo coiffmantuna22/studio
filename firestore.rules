@@ -1,0 +1,150 @@
+/**
+ * # Firestore Security Rules
+ *
+ * ## Core Philosophy
+ * This ruleset enforces a strict user-ownership model. The system is designed for teachers who manage their own data. Each authenticated user (a "teacher") has exclusive access to their own profile and related documents like absence records and calendars. Access is granted based on the user's unique ID (UID) matching the `teacherProfileId` in the document path.
+ *
+ * ## Data Structure
+ * The primary data is hierarchically organized under the `/teacherProfiles/{teacherProfileId}` path, where `{teacherProfileId}` is the same as the user's Firebase Authentication UID. This creates a secure, user-scoped data tree.
+ *
+ * An exception is the `/absenceRecords/{absenceRecordId}/recommendations` path. To secure this, the rules must perform a cross-collection lookup (`get()`) to the parent `/absenceRecords` document to verify ownership via a `teacherId` field. This structure necessitates a root-level `/absenceRecords` collection existing alongside the nested `/teacherProfiles/{...}/absenceRecords` collection.
+ *
+ * ## Key Security Decisions
+ * - **Strict Ownership**: All data within a user's data tree (`/teacherProfiles/{userId}/...`) is accessible only to that user.
+ * - **No User Enumeration**: Listing the top-level `/teacherProfiles` or `/absenceRecords` collections is explicitly disallowed to prevent users from discovering each other.
+ * - **Read-Only Recommendations**: Recommendations are considered system-generated. Users can read recommendations related to their own absences but cannot create, modify, or delete them.
+ * - **Relational Integrity**: Rules enforce that when a document is created within a user's data tree (e.g., an absence record), its internal `teacherId` field must match the user's UID from the path, ensuring data consistency. Key identifiers like `id` and `teacherId` are immutable once created.
+ *
+ * ## Denormalization for Authorization
+ * The ruleset relies on denormalized owner IDs (`teacherId`) on documents to perform fast and secure authorization checks without needing costly and complex lookups on related documents, except where the data structure requires it (e.g., for recommendations).
+ *
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------------
+    // Helper Functions
+    // -------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the authenticated user's UID matches the provided userId.
+     * This is the primary ownership check.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks if the user is the owner of an existing document.
+     * Used for safe update and delete operations.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Validates that the user is the owner of the parent absence record.
+     * Requires a 'get' call to the parent document to check its 'teacherId' field.
+     */
+    function isTeacherOfAbsenceRecord(absenceRecordId) {
+      let absenceDoc = get(/databases/$(database)/documents/absenceRecords/$(absenceRecordId));
+      return absenceDoc != null && isOwner(absenceDoc.data.teacherId);
+    }
+    
+    /**
+     * Validates immutability for a given field on update.
+     */
+    function isImmutable(field) {
+        return request.resource.data[field] == resource.data[field];
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules
+    // -------------------------------------------------------------------------
+
+    /**
+     * @description A teacher can create their own profile, which is private to them.
+     * @path /teacherProfiles/{teacherProfileId}
+     * @allow (create) An authenticated user 'user123' can create their own profile at `/teacherProfiles/user123`.
+     * @deny (list) No user can list the `/teacherProfiles` collection to prevent user enumeration.
+     * @deny (get) User 'user456' cannot read the profile at `/teacherProfiles/user123`.
+     * @principle Enforces self-creation and strict document ownership for a user's root document.
+     */
+    match /teacherProfiles/{teacherProfileId} {
+      allow get: if isOwner(teacherProfileId);
+      allow list: if false;
+      allow create: if isOwner(teacherProfileId) && request.resource.data.id == teacherProfileId;
+      allow update: if isExistingOwner(teacherProfileId) && isImmutable('id');
+      allow delete: if isExistingOwner(teacherProfileId);
+    }
+
+    /**
+     * @description A teacher can manage their own absence records within their profile.
+     * @path /teacherProfiles/{teacherProfileId}/absenceRecords/{absenceRecordId}
+     * @allow (create) User 'user123' can create an absence record at `/teacherProfiles/user123/absenceRecords/rec-abc`.
+     * @allow (list) User 'user123' can list all documents at `/teacherProfiles/user123/absenceRecords`.
+     * @deny (get) User 'user456' cannot get an absence record from `/teacherProfiles/user123/absenceRecords/rec-abc`.
+     * @principle Restricts access to a user's own data tree, ensuring data privacy.
+     */
+    match /teacherProfiles/{teacherProfileId}/absenceRecords/{absenceRecordId} {
+      allow get, list: if isOwner(teacherProfileId);
+      allow create: if isOwner(teacherProfileId) && request.resource.data.teacherId == teacherProfileId;
+      allow update: if isExistingOwner(teacherProfileId) && isImmutable('teacherId');
+      allow delete: if isExistingOwner(teacherProfileId);
+    }
+
+    /**
+     * @description A teacher can manage their own calendar entries within their profile.
+     * @path /teacherProfiles/{teacherProfileId}/calendars/{calendarId}
+     * @allow (update) User 'user123' can update their calendar at `/teacherProfiles/user123/calendars/cal-abc`.
+     * @allow (list) User 'user123' can list their calendars at `/teacherProfiles/user123/calendars`.
+     * @deny (delete) User 'user456' cannot delete a calendar from `/teacherProfiles/user123/calendars/cal-abc`.
+     * @principle Restricts access to a user's own data tree, ensuring data privacy.
+     */
+    match /teacherProfiles/{teacherProfileId}/calendars/{calendarId} {
+      allow get, list: if isOwner(teacherProfileId);
+      allow create: if isOwner(teacherProfileId) && request.resource.data.teacherId == teacherProfileId;
+      allow update: if isExistingOwner(teacherProfileId) && isImmutable('teacherId');
+      allow delete: if isExistingOwner(teacherProfileId);
+    }
+
+    /**
+     * @description Secures the root-level absence records collection, which is required to exist for the `recommendations` subcollection.
+     * @path /absenceRecords/{absenceRecordId}
+     * @allow (get) User 'user123' can get `/absenceRecords/rec-abc` if the document's `teacherId` field is 'user123'.
+     * @deny (list) No user can list the `/absenceRecords` collection for privacy and performance.
+     * @deny (update) User 'user456' cannot update `/absenceRecords/rec-abc`.
+     * @principle Enforces document ownership for writes using a denormalized `teacherId` field within the document.
+     */
+    match /absenceRecords/{absenceRecordId} {
+      allow get: if isSignedIn() && isOwner(resource.data.teacherId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(request.resource.data.teacherId);
+      allow update: if isSignedIn() && isExistingOwner(resource.data.teacherId) && isImmutable('teacherId');
+      allow delete: if isSignedIn() && isExistingOwner(resource.data.teacherId);
+    }
+
+    /**
+     * @description Allows a teacher to view substitute recommendations for their own absence records. Recommendations are read-only.
+     * @path /absenceRecords/{absenceRecordId}/recommendations/{recommendationId}
+     * @allow (get) User 'user123' can read a recommendation if they are the owner of the parent absence record 'rec-abc'.
+     * @deny (create) No user can create a recommendation; this is assumed to be a system-level action.
+     * @deny (get) User 'user456' cannot read a recommendation for an absence they do not own.
+     * @principle Uses a cross-collection `get()` to check permissions on a parent document before granting access to a subcollection.
+     */
+    match /absenceRecords/{absenceRecordId}/recommendations/{recommendationId} {
+      allow get, list: if isTeacherOfAbsenceRecord(absenceRecordId);
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
