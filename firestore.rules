@@ -40,21 +40,30 @@ service cloud.firestore {
     }
 
     match /teachers/{teacherId} {
-      allow read, list: if isSignedIn() && request.query.where.userId == request.auth.uid;
+      allow read: if isSignedIn() && isOwner(get(/databases/$(database)/documents/teachers/$(teacherId)).data.userId);
       allow create: if isSignedIn() && isCreatingOwnResource();
       allow update, delete: if isSignedIn() && isOwner(get(/databases/$(database)/documents/teachers/$(teacherId)).data.userId);
     }
+    match /teachers {
+      allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
+    }
     
     match /classes/{classId} {
-      allow read, list: if isSignedIn() && request.query.where.userId == request.auth.uid;
+      allow read: if isSignedIn() && isOwner(get(/databases/$(database)/documents/classes/$(classId)).data.userId);
       allow create: if isSignedIn() && isCreatingOwnResource();
       allow update, delete: if isSignedIn() && isOwner(get(/databases/$(database)/documents/classes/$(classId)).data.userId);
     }
+     match /classes {
+      allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
+    }
     
     match /settings/{settingId} {
-      allow read, list: if isSignedIn() && request.query.where.userId == request.auth.uid;
+      allow read: if isSignedIn() && isOwner(get(/databases/$(database)/documents/settings/$(settingId)).data.userId);
       allow create: if isSignedIn() && isCreatingOwnResource();
       allow update: if isSignedIn() && isOwner(get(/databases/$(database)/documents/settings/$(settingId)).data.userId);
+    }
+    match /settings {
+        allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
     }
 
     match /substitutions/{substitutionId} {
