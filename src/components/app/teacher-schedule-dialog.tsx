@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import type { SchoolClass, Teacher, Lesson, ClassSchedule, TimeSlot } from '@/lib/types';
+import type { SchoolClass, Teacher, Lesson, ClassSchedule, TimeSlot, AbsenceDay } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,12 +24,14 @@ import {
 } from "@/components/ui/select"
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { X, Book, Home, Coffee } from 'lucide-react';
+import { X, Book, Home, Coffee, UserX } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Combobox } from '../ui/combobox';
 import { Badge } from '../ui/badge';
 import { startOfDay, addDays, getDay, format, isSameDay } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { Switch } from '../ui/switch';
+import { Label } from '../ui/label';
 
 
 interface TeacherScheduleDialogProps {
@@ -39,6 +41,7 @@ interface TeacherScheduleDialogProps {
   allClasses: SchoolClass[];
   timeSlots: TimeSlot[];
   onUpdateSchedule: (teacherId: string, schedule: ClassSchedule) => void;
+  onUpdateAbsences: (teacherId: string, absences: AbsenceDay[]) => void;
 }
 
 interface EditSlotPopoverProps {
@@ -49,6 +52,7 @@ interface EditSlotPopoverProps {
     teacher: Teacher;
     allClasses: SchoolClass[];
     isAbsent: boolean;
+    onToggleAbsence: (isAbsent: boolean) => void;
 }
 
 const getStartOfWeek = (date: Date): Date => {
@@ -67,7 +71,7 @@ const parseTimeToNumber = (time: string) => {
 };
 
 
-function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses, isAbsent }: EditSlotPopoverProps) {
+function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses, isAbsent, onToggleAbsence }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [subject, setSubject] = useState(lesson?.subject || '');
     const [classId, setClassId] = useState(lesson?.classId || null);
@@ -115,6 +119,7 @@ function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses, isAbs
                             <p className="text-xs text-muted-foreground mt-1">{currentClass?.name}</p>
                         </>
                     ) : <span className="text-muted-foreground text-xs">ריקה</span>}
+                     {isAbsent && <Badge variant="destructive" className="mt-2">נעדר/ת</Badge>}
                 </div>
             </PopoverTrigger>
             <PopoverContent className="w-80">
@@ -123,7 +128,17 @@ function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses, isAbs
                          <h4 className="font-semibold">עריכת שיבוץ</h4>
                          <p className='text-sm text-muted-foreground'>{teacher.name} - {day}, {time}</p>
                     </div>
+
+                    <div className="flex items-center space-x-2 space-x-reverse justify-center p-2 bg-muted/50 rounded-md">
+                        <Label htmlFor={`absence-toggle-${day}-${time}`} className='font-normal'>סמן כנעדר/ת</Label>
+                        <Switch
+                            id={`absence-toggle-${day}-${time}`}
+                            checked={isAbsent}
+                            onCheckedChange={onToggleAbsence}
+                        />
+                    </div>
                     <Separator />
+
                     <div className="space-y-2">
                         <label className="text-sm font-medium flex items-center gap-2"><Book className='w-4 h-4 text-muted-foreground'/>מקצוע</label>
                         <Combobox
@@ -166,14 +181,18 @@ export default function TeacherScheduleDialog({
   teacher,
   allClasses,
   timeSlots,
-  onUpdateSchedule
+  onUpdateSchedule,
+  onUpdateAbsences
 }: TeacherScheduleDialogProps) {
   
   const [localSchedule, setLocalSchedule] = useState<ClassSchedule>({});
+  const [localAbsences, setLocalAbsences] = useState<AbsenceDay[]>([]);
+
 
   useEffect(() => {
     if(teacher) {
         setLocalSchedule(JSON.parse(JSON.stringify(teacher.schedule || {})));
+        setLocalAbsences(JSON.parse(JSON.stringify(teacher.absences || [])));
     }
   }, [teacher]);
   
@@ -200,17 +219,41 @@ export default function TeacherScheduleDialog({
 
   const handleSaveChanges = () => {
     onUpdateSchedule(teacher.id, localSchedule);
+    onUpdateAbsences(teacher.id, localAbsences);
     onOpenChange(false);
   }
 
+  const handleToggleAbsence = (day: string, slot: TimeSlot, isMarkingAsAbsent: boolean) => {
+    const dayIndex = daysOfWeek.indexOf(day);
+    const date = addDays(weekStartDate, dayIndex);
+    const absenceId = `absence-${date.toISOString()}-${slot.start}`;
+
+    if (isMarkingAsAbsent) {
+        // Add absence if it doesn't already exist
+        if (!localAbsences.some(a => a.id === absenceId)) {
+            const newAbsence: AbsenceDay = {
+                id: absenceId,
+                date: date.toISOString(),
+                isAllDay: false,
+                startTime: slot.start,
+                endTime: slot.end,
+            };
+            setLocalAbsences(prev => [...prev, newAbsence]);
+        }
+    } else {
+        // Remove absence
+        setLocalAbsences(prev => prev.filter(a => a.id !== absenceId));
+    }
+};
+
   const isSlotAbsent = (day: string, slotTime: string): boolean => {
-    if (!teacher.absences || teacher.absences.length === 0) {
+    if (localAbsences.length === 0) {
       return false;
     }
     const dayIndex = daysOfWeek.indexOf(day);
     const date = addDays(weekStartDate, dayIndex);
 
-    const todaysAbsences = teacher.absences.filter(absence => {
+    const todaysAbsences = localAbsences.filter(absence => {
         try {
             return isSameDay(startOfDay(new Date(absence.date)), startOfDay(date))
         } catch (e) {
@@ -238,7 +281,7 @@ export default function TeacherScheduleDialog({
             מערכת שעות: {teacher.name}
           </DialogTitle>
           <DialogDescription>
-            כאן ניתן לצפות ולערוך את מערכת השעות האישית של המורה.
+            כאן ניתן לצפות ולערוך את מערכת השעות האישית של המורה, ולסמן היעדרויות.
           </DialogDescription>
         </DialogHeader>
 
@@ -282,10 +325,12 @@ export default function TeacherScheduleDialog({
                                             teacher={teacher}
                                             allClasses={allClasses}
                                             isAbsent={isAbsent}
+                                            onToggleAbsence={(markAbsent) => handleToggleAbsence(day, slot, markAbsent)}
                                         />
                                     ) : (
                                         <div className={cn("p-1.5 h-full min-h-[6rem] flex flex-col justify-center", isAbsent && 'bg-destructive/10')}>
                                             <Coffee className='w-5 h-5 mx-auto text-muted-foreground' />
+                                            {isAbsent && <Badge variant="destructive" className="mt-2">נעדר/ת</Badge>}
                                         </div>
                                     )}
                                 </td>

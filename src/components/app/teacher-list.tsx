@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import type { Teacher, SchoolClass, TimeSlot, TeacherAvailabilityStatus } from '@/lib/types';
+import type { Teacher, SchoolClass, TimeSlot, TeacherAvailabilityStatus, AbsenceDay } from '@/lib/types';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Plus, Search } from 'lucide-react';
 import TeacherCard from './teacher-card';
@@ -249,6 +249,18 @@ export default function TeacherList({
     }
 }
 
+  const handleUpdateTeacherAbsences = async (teacherId: string, newAbsences: AbsenceDay[]) => {
+      if (!firestore) return;
+      const teacherRef = doc(firestore, 'teachers', teacherId);
+      const batch = writeBatch(firestore);
+      batch.update(teacherRef, { absences: newAbsences });
+      await commitBatchWithContext(batch, {
+          operation: 'update',
+          path: teacherRef.path,
+          data: { absences: '...' }
+      });
+  };
+
 
   const openCreateDialog = () => {
     setTeacherToEdit(null);
@@ -367,6 +379,7 @@ export default function TeacherList({
         allClasses={allClasses}
         timeSlots={timeSlots}
         onUpdateSchedule={handleUpdateTeacherSchedule}
+        onUpdateAbsences={handleUpdateTeacherAbsences}
       />
     </Card>
   );

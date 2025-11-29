@@ -2,6 +2,7 @@
 
 
 
+
 export interface DayAvailability {
   day: string;
   slots: { start: string; end: string }[];
@@ -22,6 +23,7 @@ export interface Teacher {
 }
 
 export interface AbsenceDay {
+  id: string;
   date: Date | string;
   isAllDay: boolean;
   startTime: string;
