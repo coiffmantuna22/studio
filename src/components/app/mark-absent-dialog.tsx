@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { format, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
 import { ScrollArea } from '../ui/scroll-area';
+import { DialogClose } from '../ui/dialog';
 
 const timeRegex = /^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/;
 
@@ -91,12 +92,15 @@ export default function MarkAbsentDialog({
       setIsSubmitting(false);
     } else {
        if (isEditMode && existingAbsences) {
-            const absencesToEdit = existingAbsences.map(abs => ({
-                date: typeof abs.date === 'string' ? new Date(abs.date) : abs.date,
+            const absencesToEdit = existingAbsences.map(abs => {
+              const date = typeof abs.date === 'string' ? startOfDay(new Date(abs.date)) : startOfDay(abs.date);
+              return {
+                date,
                 isAllDay: abs.isAllDay,
                 startTime: abs.startTime,
                 endTime: abs.endTime
-            }));
+              };
+            });
             replace(absencesToEdit);
        } else {
             replace([{ date: startOfDay(new Date()), isAllDay: true, startTime: '08:00', endTime: '16:00' }]);
