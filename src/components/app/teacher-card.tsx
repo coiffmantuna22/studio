@@ -66,7 +66,7 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
   const isMobile = useIsMobile();
   
   return (
-    <Card className="flex flex-col transition-all hover:shadow-lg">
+    <Card className="flex flex-col transition-all hover:shadow-lg dark:border-border/60">
       <CardHeader className="flex flex-row items-start gap-4">
         <Avatar className="h-12 w-12 border-2 border-primary/20">
           <AvatarFallback className='bg-primary/10 text-primary font-bold'>{teacher.avatar.fallback}</AvatarFallback>
