@@ -222,11 +222,11 @@ export default function MarkAbsentDialog({
                         <Button
                           variant={"outline"}
                           className={cn(
-                            "w-full justify-start text-left font-normal",
+                            "w-full justify-start text-right font-normal",
                             !field.value?.from && "text-muted-foreground"
                           )}
                         >
-                          <CalendarIcon className="ml-2 h-4 w-4" />
+                          <CalendarIcon className="mr-2 h-4 w-4" />
                           {field.value?.from ? (
                             field.value.to ? (
                               <>
@@ -269,7 +269,7 @@ export default function MarkAbsentDialog({
                               control={form.control}
                               name={`absenceDays.${index}.isAllDay`}
                               render={({ field }) => (
-                                <FormItem className="flex flex-row items-center space-x-2 space-y-0 mr-auto">
+                                <FormItem className="flex flex-row-reverse items-center space-x-2 space-y-0 space-x-reverse">
                                   <FormControl>
                                     <Checkbox
                                       checked={field.value}
@@ -341,7 +341,7 @@ export default function MarkAbsentDialog({
               <Button type="submit" disabled={isSubmitting || fields.length === 0}>
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     מחפש מחליפים...
                   </>
                 ) : (

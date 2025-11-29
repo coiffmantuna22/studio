@@ -54,7 +54,7 @@ export default function RecommendationDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-lg md:max-w-2xl">
         <DialogHeader>
           <DialogTitle>המלצות שיבוץ עבור היעדרות של {absentTeacher.name}</DialogTitle>
           <DialogDescription>
@@ -77,15 +77,15 @@ export default function RecommendationDialog({
                     <div className="space-y-4 p-2">
                     {lessons.map((res, resIndex) => (
                         <div key={resIndex} className="p-3 border rounded-lg bg-card">
-                            <div className="font-semibold flex items-center justify-between">
+                            <div className="font-semibold flex flex-col sm:flex-row items-start sm:items-center justify-between">
                                 <div className='flex items-center gap-2'>
                                     <BookOpen className="h-4 w-4 text-muted-foreground" />
                                     <span>{res.lesson.subject}</span>
                                 </div>
-                                <span className='text-sm text-muted-foreground font-normal'>{format(res.date, "EEEE, d MMM", {locale: he})} בשעה {res.time}</span>
+                                <span className='text-sm text-muted-foreground font-normal mt-1 sm:mt-0'>{format(res.date, "EEEE, d MMM", {locale: he})} בשעה {res.time}</span>
                             </div>
                             <Separator className="my-2" />
-                            <div className='grid grid-cols-[1fr_auto_1fr] items-center gap-4 text-center'>
+                            <div className='grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-4 text-center'>
                                 <div className='flex flex-col items-center'>
                                     <span className="text-sm text-muted-foreground">מחליף מוצע</span>
                                     <p className="font-bold text-primary flex items-center gap-2 mt-1">
@@ -93,7 +93,7 @@ export default function RecommendationDialog({
                                         {res.recommendation || 'לא נמצא'}
                                     </p>
                                 </div>
-                                <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+                                <ArrowLeftRight className="h-4 w-4 text-muted-foreground mx-auto my-2 sm:my-0" />
                                  <div className='flex flex-col items-center'>
                                     <span className="text-sm text-muted-foreground">מורה נוכחי</span>
                                     <p className="font-bold text-destructive flex items-center gap-2 mt-1">
@@ -103,7 +103,7 @@ export default function RecommendationDialog({
                             </div>
 
                              {res.reasoning && (
-                                <div className="mt-3 p-2 rounded-md bg-secondary/50 text-secondary-foreground text-xs flex items-start gap-2">
+                                <div className="mt-3 p-2 rounded-md bg-secondary/50 text-secondary-foreground text-xs flex items-start gap-2 text-right">
                                      <Lightbulb className="h-4 w-4 shrink-0 mt-0.5" />
                                      <span>{res.reasoning}</span>
                                 </div>

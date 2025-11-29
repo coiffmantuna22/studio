@@ -199,19 +199,19 @@ export default function TeacherList({
                 <CardTitle className="text-xl">פרופילי מורים</CardTitle>
                 <CardDescription>ניהול מורים מחליפים וסימון היעדרויות.</CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-grow">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         type="search"
                         placeholder="חיפוש מורה..."
-                        className="pl-9 w-full"
+                        className="pr-9 w-full"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
                 </div>
                 <Button onClick={openCreateDialog} className='shrink-0'>
-                    <Plus className="ml-2 h-4 w-4" />
+                    <Plus className="mr-2 h-4 w-4" />
                     יצירת פרופיל
                 </Button>
             </div>

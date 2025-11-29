@@ -34,7 +34,7 @@ export default function SubjectInput({ value, onChange, placeholder }: SubjectIn
             {subject}
             <button
               type="button"
-              className="mr-1 p-0.5 rounded-full hover:bg-muted-foreground/20"
+              className="ml-1 p-0.5 rounded-full hover:bg-muted-foreground/20"
               onClick={() => removeSubject(subject)}
             >
               <X className="h-3 w-3" />
