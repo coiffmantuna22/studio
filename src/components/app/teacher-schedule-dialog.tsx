@@ -192,7 +192,7 @@ export default function TeacherScheduleDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-grow relative">
+        <div className="flex-grow relative overflow-auto">
             <ScrollArea className="absolute inset-0">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-center table-fixed min-w-[900px]">
@@ -242,7 +242,7 @@ export default function TeacherScheduleDialog({
             </ScrollArea>
         </div>
         
-        <DialogFooter className="shrink-0 pt-4">
+        <DialogFooter className="shrink-0 pt-4 border-t mt-4">
           <Button onClick={handleSaveChanges}>שמור שינויים</Button>
           <DialogClose asChild>
             <Button type="button" variant="secondary">

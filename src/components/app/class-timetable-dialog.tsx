@@ -292,7 +292,7 @@ export default function ClassTimetableDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='flex-grow overflow-hidden'>
+        <div className="flex-grow overflow-auto">
             <Tabs defaultValue="all" className="w-full h-full flex flex-col" dir='rtl'>
                 <div className='flex justify-center shrink-0'>
                 <TabsList>
@@ -304,7 +304,7 @@ export default function ClassTimetableDialog({
                 </div>
                 
                 <div className='flex-grow mt-4 relative'>
-                    <ScrollArea className='absolute inset-0' viewportClassName="pb-4">
+                    <ScrollArea className='absolute inset-0'>
                         <TabsContent value="all">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-center table-fixed min-w-[900px]">
@@ -382,7 +382,7 @@ export default function ClassTimetableDialog({
             </Tabs>
         </div>
         
-        <DialogFooter className="shrink-0 pt-4">
+        <DialogFooter className="shrink-0 pt-4 border-t mt-4">
           {isEditing && <Button onClick={handleSaveChanges}>שמור שינויים</Button>}
           <DialogClose asChild>
             <Button type="button" variant="secondary">
