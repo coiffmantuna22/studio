@@ -1,3 +1,5 @@
+
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -7,12 +9,11 @@ import Timetable from '@/components/app/timetable';
 import ClassList from '@/components/app/class-list';
 import SettingsTab from '@/components/app/settings-tab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { initialTeachers, initialClasses as defaultClasses, initialTimeSlots } from '@/lib/data';
 import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus } from '@/lib/types';
-import { useUser, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useUser, useFirestore, FirestorePermissionError, errorEmitter } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, doc, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
-import { useCollection } from 'react-firebase-hooks/firestore';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { Loader2, UserX, AlertTriangle } from 'lucide-react';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
 import { Button } from '@/components/ui/button';
@@ -92,88 +93,71 @@ export default function Home() {
     if (!firestore || !user) return;
     try {
       const batch = writeBatch(firestore);
+      
+      const teacherDocs = (await getDocs(query(collection(firestore, 'teachers'), where('userId', '==', user.uid)))).docs;
+      const classDocs = (await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)))).docs;
 
-      const teacherRefMap = new Map<string, DocumentReference>();
-      initialTeachers.forEach(t => {
+      const initialTeachers: Omit<Teacher, 'id' | 'schedule'>[] = [];
+      const initialClasses: SchoolClass[] = [];
+
+      const teacherIdMap: { [key: string]: string } = {};
+
+      initialTeachers.forEach((t, index) => {
         const tempRef = doc(collection(firestore, 'teachers'));
-        teacherRefMap.set(t.id, tempRef);
-      });
+        const oldId = `T${index + 1}`;
+        teacherIdMap[oldId] = tempRef.id;
 
-      const classRefMap = new Map<string, DocumentReference>();
-      defaultClasses.forEach(c => {
-        const tempRef = doc(collection(firestore, 'classes'));
-        classRefMap.set(c.id, tempRef);
-      });
-
-      const synchronizedClasses = defaultClasses.map(sc => {
-        const newSchedule: ClassSchedule = {};
-        daysOfWeek.forEach(day => {
-          newSchedule[day] = {};
-          if (sc.schedule[day]) {
-            Object.keys(sc.schedule[day]).forEach(time => {
-              const lesson = sc.schedule[day]![time];
-              if (lesson) {
-                const originalTeacherId = lesson.teacherId;
-                const newTeacherRef = teacherRefMap.get(originalTeacherId);
-                if (newTeacherRef) {
-                  newSchedule[day]![time] = { ...lesson, teacherId: newTeacherRef.id };
-                }
-              }
-            });
-          }
-        });
-        const newClassRef = classRefMap.get(sc.id)!;
-        return { ...sc, id: newClassRef.id, userId: user.uid, schedule: newSchedule };
-      });
-
-      const synchronizedTeachers = initialTeachers.map(teacher => {
-        const originalId = teacher.id;
-        const newTeacherRef = teacherRefMap.get(originalId)!;
-        const newTeacher = {
-          ...teacher,
-          id: newTeacherRef.id,
+        const newTeacher: Teacher = {
+          ...t,
+          id: tempRef.id,
           userId: user.uid,
-          schedule: {}
+          schedule: {},
         };
-        delete (newTeacher as any).schedule;
-        return newTeacher;
+        batch.set(tempRef, newTeacher);
       });
       
-      synchronizedTeachers.forEach(teacher => {
-        const newTeacherSchedule: ClassSchedule = {};
-        daysOfWeek.forEach(day => {
-          newTeacherSchedule[day] = {};
-          synchronizedClasses.forEach(sc => {
-            if (sc.schedule[day]) {
-              Object.entries(sc.schedule[day]).forEach(([time, lesson]) => {
-                if (lesson && lesson.teacherId === teacher.id) {
-                  newTeacherSchedule[day]![time] = { ...lesson, classId: sc.id };
+      initialClasses.forEach(c => {
+         const tempRef = doc(collection(firestore, 'classes'));
+         const newSchedule: ClassSchedule = {};
+         
+         Object.entries(c.schedule).forEach(([day, daySchedule]) => {
+           newSchedule[day] = {};
+           Object.entries(daySchedule).forEach(([time, lesson]) => {
+             if (lesson) {
+                const newTeacherId = teacherIdMap[lesson.teacherId];
+                if (newTeacherId) {
+                  newSchedule[day][time] = { ...lesson, teacherId: newTeacherId, classId: tempRef.id };
                 }
-              })
-            }
-          })
-        });
-        teacher.schedule = newTeacherSchedule;
+             }
+           });
+         });
+         
+         const newClass: SchoolClass = { ...c, id: tempRef.id, userId: user.uid, schedule: newSchedule };
+         batch.set(tempRef, newClass);
       });
 
-      synchronizedTeachers.forEach(teacher => {
-          const originalTeacherId = Array.from(teacherRefMap.entries()).find(([, ref]) => ref.id === teacher.id)?.[0];
-          if(originalTeacherId) {
-             const teacherRef = teacherRefMap.get(originalTeacherId)!;
-             batch.set(teacherRef, teacher);
-          }
+      const teacherSchedulePromises = Object.entries(teacherIdMap).map(async ([oldId, newId]) => {
+          const teacherRef = doc(firestore, 'teachers', newId);
+          const newTeacherSchedule: ClassSchedule = {};
+
+          initialClasses.forEach(c => {
+              Object.entries(c.schedule).forEach(([day, daySchedule]) => {
+                  Object.entries(daySchedule).forEach(([time, lesson]) => {
+                      if (lesson && lesson.teacherId === oldId) {
+                          if (!newTeacherSchedule[day]) newTeacherSchedule[day] = {};
+                          const classId = (Object.entries(teacherIdMap).find(([o, n]) => o === lesson.teacherId) || [])[1] || c.id;
+                          newTeacherSchedule[day][time] = { ...lesson, classId: classId };
+                      }
+                  });
+              });
+          });
+          batch.update(teacherRef, { schedule: newTeacherSchedule });
       });
 
-      synchronizedClasses.forEach(sClass => {
-        const originalId = Array.from(classRefMap.entries()).find(([, ref]) => ref.id === sClass.id)?.[0];
-        if (originalId) {
-          const classRef = classRefMap.get(originalId)!;
-          batch.set(classRef, sClass);
-        }
-      });
+      await Promise.all(teacherSchedulePromises);
 
       const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
-      const timetableData = { slots: initialTimeSlots, userId: user.uid };
+      const timetableData = { slots: [], userId: user.uid };
       batch.set(settingsRef, timetableData);
       
       await commitBatchWithContext(batch, {
@@ -287,7 +271,7 @@ export default function Home() {
         const schoolClass = classSnap.data() as SchoolClass;
 
         const teacherIds = new Set<string>();
-        Object.values(schoolClass.schedule).forEach(daySchedule => {
+        Object.values(schoolClass.schedule || {}).forEach(daySchedule => {
             Object.values(daySchedule).forEach(lesson => {
                 if (lesson) teacherIds.add(lesson.teacherId);
             });
@@ -340,13 +324,19 @@ const handleScheduleUpdate = async (
             const teacherRef = doc(firestore, 'teachers', entityId);
             const teacherSnap = await getDoc(teacherRef);
             if (!teacherSnap.exists()) return;
-
             const oldSchedule = teacherSnap.data().schedule || {};
+
             batch.update(teacherRef, { schedule: newSchedule });
 
             const allRelevantClassIds = new Set<string>();
-            [oldSchedule, newSchedule].forEach(schedule => Object.values(schedule).forEach(day => Object.values(day || {}).forEach(lesson => lesson?.classId && allRelevantClassIds.add(lesson.classId))));
-
+            for (const schedule of [oldSchedule, newSchedule]) {
+                Object.values(schedule).forEach(day => 
+                    Object.values(day || {}).forEach(lesson => 
+                        lesson?.classId && allRelevantClassIds.add(lesson.classId)
+                    )
+                )
+            }
+            
             for (const classId of allRelevantClassIds) {
                 const classRef = doc(firestore, 'classes', classId);
                 const classSnap = await getDoc(classRef);
@@ -361,11 +351,13 @@ const handleScheduleUpdate = async (
                         const oldLesson = oldSchedule[day]?.[time];
                         const newLesson = newSchedule[day]?.[time];
 
-                        if (oldLesson?.classId === classId && newLesson?.classId !== classId) {
+                        // Case 1: Lesson was removed for this teacher in this slot
+                        if (oldLesson?.classId === classId && (!newLesson || newLesson.classId !== classId)) {
                             if (updatedClassSchedule[day]?.[time]?.teacherId === entityId) {
                                 updatedClassSchedule[day][time] = null;
                             }
                         }
+                        // Case 2: Lesson was added for this teacher in this slot
                         if (newLesson?.classId === classId) {
                             updatedClassSchedule[day] = updatedClassSchedule[day] || {};
                             updatedClassSchedule[day][time] = { ...(newLesson as Lesson), teacherId: entityId };
@@ -384,7 +376,13 @@ const handleScheduleUpdate = async (
             batch.update(classRef, { schedule: newSchedule });
 
             const allRelevantTeacherIds = new Set<string>();
-            [oldSchedule, newSchedule].forEach(schedule => Object.values(schedule).forEach(day => Object.values(day || {}).forEach(lesson => lesson?.teacherId && allRelevantTeacherIds.add(lesson.teacherId))));
+            for (const schedule of [oldSchedule, newSchedule]) {
+                Object.values(schedule).forEach(day => 
+                    Object.values(day || {}).forEach(lesson => 
+                        lesson?.teacherId && allRelevantTeacherIds.add(lesson.teacherId)
+                    )
+                )
+            }
 
             for (const teacherId of allRelevantTeacherIds) {
                 const teacherRef = doc(firestore, 'teachers', teacherId);
@@ -400,11 +398,13 @@ const handleScheduleUpdate = async (
                         const oldLesson = oldSchedule[day]?.[time];
                         const newLesson = newSchedule[day]?.[time];
 
-                        if (oldLesson?.teacherId === teacherId && newLesson?.teacherId !== teacherId) {
-                            if (updatedTeacherSchedule[day]?.[time]?.classId === entityId) {
+                        // Case 1: Lesson was removed for this class for this teacher
+                        if (oldLesson?.teacherId === teacherId && (!newLesson || newLesson.teacherId !== teacherId)) {
+                             if (updatedTeacherSchedule[day]?.[time]?.classId === entityId) {
                                 updatedTeacherSchedule[day][time] = null;
                             }
                         }
+                        // Case 2: Lesson was added for this class for this teacher
                         if (newLesson?.teacherId === teacherId) {
                             updatedTeacherSchedule[day] = updatedTeacherSchedule[day] || {};
                             updatedTeacherSchedule[day][time] = { ...(newLesson as Lesson), classId: entityId };
@@ -422,16 +422,16 @@ const handleScheduleUpdate = async (
         });
 
     } catch (e) {
-        if (!(e instanceof FirestorePermissionError)) {
-            const permissionError = new FirestorePermissionError({
-                operation: 'update',
-                path: `${entityType === 'teacher' ? 'teachers' : 'classes'}/${entityId}`,
-                requestResourceData: { schedule: newSchedule },
-            });
-            errorEmitter.emit('permission-error', permissionError);
-            throw permissionError;
-        }
-        throw e;
+      if (!(e instanceof FirestorePermissionError)) {
+        const permissionError = new FirestorePermissionError({
+            operation: 'update',
+            path: `${entityType === 'teacher' ? 'teachers' : 'classes'}/${entityId}`,
+            requestResourceData: { schedule: newSchedule },
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw permissionError;
+      }
+      throw e;
     }
 }
   
@@ -585,7 +585,7 @@ const handleScheduleUpdate = async (
         allClasses={schoolClasses}
         timeSlots={timeSlots}
         onShowRecommendation={(results, absentTeacher, absenceDays) => {
-            const updatedClasses = JSON.parse(JSON.stringify(allClasses));
+            const updatedClasses = JSON.parse(JSON.stringify(schoolClasses));
             results.forEach(res => {
                 if (res.recommendationId) {
                     const classToUpdate = updatedClasses.find((c: SchoolClass) => c.id === res.classId);
