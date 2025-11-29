@@ -5,16 +5,18 @@ import dynamic from 'next/dynamic';
 import Header from '@/components/app/header';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { format, isSameDay, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
-import type { Teacher, AbsenceDay, TimeSlot } from '@/lib/types';
+import type { Teacher, AbsenceDay, TimeSlot, AffectedLesson, SchoolClass } from '@/lib/types';
 import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
 import RecommendationDialog from '@/components/app/recommendation-dialog';
+import { commitBatchWithContext } from '@/lib/firestore-utils';
+import { findSubstitute } from '@/lib/substitute-finder';
 
 const TeacherList = dynamic(() => import('@/components/app/teacher-list'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
@@ -42,8 +44,9 @@ export default function Home() {
     absentTeacher: Teacher;
     absenceDays: any[];
   } | null>(null);
-   const [absenceToReview, setAbsenceToReview] = useState<{ teacher: Teacher; absences: AbsenceDay[] } | null>(null);
-
+  
+  const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
+  const { data: teachers = [], isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
 
   const settingsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null, [user, firestore]);
   const { data: settingsCollection, isLoading: settingsLoading } = useCollection(settingsQuery);
@@ -58,18 +61,28 @@ export default function Home() {
     return [];
   }, [settingsCollection, user]);
 
-  const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
-  const { data: teachers = [], isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
-
-
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
 
-
-  const isInitialSetup = !isUserLoading && !settingsLoading && user && timeSlots.length === 0;
+  const todaysAbsences = useMemo(() => {
+    const today = startOfDay(new Date());
+    return (teachers || [])
+      .map(teacher => {
+        const absences = (teacher.absences || []).filter(absence => {
+          if (typeof absence.date !== 'string') return false;
+          try {
+            return isSameDay(startOfDay(new Date(absence.date)), today);
+          } catch (e) {
+            return false;
+          }
+        });
+        return { teacher, absences };
+      })
+      .filter(item => item.absences.length > 0);
+  }, [teachers]);
 
   const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
@@ -86,6 +99,75 @@ export default function Home() {
         console.error("Failed to update timetable settings.", e);
       }
   }
+  
+  const parseTimeToNumber = (time: string) => {
+    if (!time || typeof time !== 'string' || !time.includes(':')) return 0;
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours + minutes / 60;
+  };
+
+
+  const getAffectedLessons = (
+    absentTeacher: Teacher,
+    absenceDays: AbsenceDay[],
+    allClasses: SchoolClass[],
+    allTeachers: Teacher[],
+    timeSlots: TimeSlot[]
+  ): Promise<AffectedLesson[]> => {
+      const affected: AffectedLesson[] = [];
+      const promises: Promise<any>[] = [];
+      const substitutePool = allTeachers.filter(t => t.id !== absentTeacher.id);
+  
+      absenceDays.forEach(absence => {
+          const date = startOfDay(new Date(absence.date));
+          const dayOfWeek = format(date, 'EEEE', { locale: he });
+  
+          allClasses.forEach(schoolClass => {
+              const daySchedule = schoolClass.schedule?.[dayOfWeek];
+              if (daySchedule) {
+                  Object.entries(daySchedule).forEach(([time, lesson]) => {
+                      if (lesson?.teacherId === absentTeacher.id) {
+                          const lessonStart = parseTimeToNumber(time);
+                          const lessonSlot = timeSlots.find(ts => ts.start === time);
+                          if (!lessonSlot) return;
+
+                          const lessonEnd = parseTimeToNumber(lessonSlot.end);
+  
+                          const isAffected = absence.isAllDay || 
+                              (
+                                  lessonEnd > parseTimeToNumber(absence.startTime) && 
+                                  lessonStart < parseTimeToNumber(absence.endTime)
+                              );
+  
+                          if (isAffected) {
+                              const promise = findSubstitute(
+                                  { subject: lesson.subject, date, time },
+                                  substitutePool,
+                                  allClasses,
+                                  timeSlots
+                              ).then(subResult => {
+                                affected.push({
+                                      classId: schoolClass.id,
+                                      className: schoolClass.name,
+                                      date,
+                                      time,
+                                      lesson,
+                                      recommendation: subResult.recommendation,
+                                      recommendationId: subResult.recommendationId,
+                                      reasoning: subResult.reasoning,
+                                      substituteOptions: subResult.substituteOptions,
+                                  });
+                              });
+                              promises.push(promise);
+                          }
+                      }
+                  });
+              }
+          });
+      });
+  
+      return Promise.all(promises).then(() => affected);
+  }
 
   const handleMarkAbsent = async (absentTeacher: Teacher, absenceDays: AbsenceDay[]) => {
     if (!firestore || !user) return;
@@ -96,7 +178,14 @@ export default function Home() {
     // Filter out old absences for the same days and add the new ones.
     const newAbsenceDates = absenceDays.map(d => startOfDay(new Date(d.date)).getTime());
     const updatedAbsences = (absentTeacher.absences || []).filter(
-      (existing) => !newAbsenceDates.includes(startOfDay(new Date(existing.date)).getTime())
+      (existing) => {
+         if (typeof existing.date !== 'string') return true;
+         try {
+            return !newAbsenceDates.includes(startOfDay(new Date(existing.date)).getTime())
+         } catch(e) {
+            return true;
+         }
+      }
     );
 
     const newAbsenceData = absenceDays.map(d => ({
@@ -116,38 +205,30 @@ export default function Home() {
      const schoolClassesSnap = await getDocs(classesQuery);
      const schoolClasses = schoolClassesSnap.docs.map(d => ({...d.data(), id: d.id})) as any[];
 
-    const affected = getAffectedLessons(absentTeacher, newAbsenceData, schoolClasses, timeSlots);
+    const affected = await getAffectedLessons(absentTeacher, newAbsenceData, schoolClasses, teachers, timeSlots);
     if(affected.length > 0) {
-       setAbsenceToReview({teacher: absentTeacher, absences: newAbsenceData})
+       setRecommendation({
+         results: affected,
+         absentTeacher,
+         absenceDays: newAbsenceData
+       })
     } else {
         setRecommendation(null);
     }
   };
 
-  const todaysAbsences = useMemo(() => {
-    const today = startOfDay(new Date());
-    return (teachers || [])
-      .map(teacher => {
-        const absences = (teacher.absences || []).filter(absence => {
-          if (typeof absence.date !== 'string') return false;
-          try {
-            return isSameDay(startOfDay(new Date(absence.date)), today);
-          } catch (e) {
-            return false;
-          }
-        });
-        return { teacher, absences };
-      })
-      .filter(item => item.absences.length > 0);
-  }, [teachers]);
 
-  if (isUserLoading || settingsLoading) {
+  const isLoading = isUserLoading || teachersLoading || settingsLoading;
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
+  
+  const isInitialSetup = !isUserLoading && !settingsLoading && user && timeSlots.length === 0;
 
   if (isInitialSetup) {
       return (
@@ -182,14 +263,16 @@ export default function Home() {
                   {todaysAbsences.map(({ teacher, absences }) => {
                       const absenceTime = absences.map(a => {
                           const dayName = format(new Date(a.date), 'EEEE', { locale: he });
-                          return a.isAllDay ? `${dayName}, יום שלם` : `${dayName}, ${a.startTime}-${a.endTime}`;
+                          return a.isAllDay ? `יום שלם` : `${a.startTime}-${a.endTime}`;
                       }).join('; ');
                       
                       return (
-                          <div key={teacher.id} className="flex flex-col justify-between p-4 bg-secondary/30 rounded-xl border border-border">
-                              <div className="mb-3">
+                          <div key={teacher.id} className="flex flex-col justify-between p-4 bg-secondary/30 rounded-xl border">
+                              <div>
                                 <span className="font-semibold text-lg block">{teacher.name}</span>
-                                <p className="text-sm text-muted-foreground mt-1">{absenceTime}</p>
+                              </div>
+                              <div className="mt-2 text-sm text-center text-destructive-foreground bg-destructive/80 rounded-md px-2 py-1 font-medium">
+                                <p>{absenceTime}</p>
                               </div>
                           </div>
                       );
@@ -224,7 +307,7 @@ export default function Home() {
 
               {activeTab === "timetable" && (
                 <div className="mt-0">
-                  <Timetable />
+                  <Timetable/>
                 </div>
               )}
 
