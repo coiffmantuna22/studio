@@ -7,7 +7,7 @@ export interface DayAvailability {
 
 export interface Teacher {
   id: string;
-  userId?: string; 
+  userId: string; 
   name: string;
   subjects: string[];
   availability: DayAvailability[];
@@ -40,7 +40,7 @@ export type ClassSchedule = {
 
 export interface SchoolClass {
   id: string;
-  userId?: string; 
+  userId: string; 
   name: string;
   schedule: ClassSchedule;
 }

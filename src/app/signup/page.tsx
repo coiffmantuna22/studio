@@ -17,13 +17,12 @@ import {
 } from '@/components/ui/card';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, writeBatch } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
-import { writeBatch } from 'firebase/firestore';
 
 const signupSchema = z
   .object({
@@ -75,11 +74,11 @@ export default function SignupPage() {
         createdAt: new Date().toISOString(),
       };
       batch.set(userRef, newUserProfile);
-
+      
       const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
       const timetableData = { slots: [], userId: user.uid };
       batch.set(settingsRef, timetableData);
-      
+
       await commitBatchWithContext(batch, {
           operation: 'create',
           path: `user_data_creation/${user.uid}`

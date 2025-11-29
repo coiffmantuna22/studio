@@ -12,7 +12,7 @@ import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, doc, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { Loader2, UserX, AlertTriangle, ListChecks } from 'lucide-react';
+import { Loader2, AlertTriangle, ListChecks } from 'lucide-react';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
 import { Button } from '@/components/ui/button';
 import { daysOfWeek } from '@/lib/constants';
@@ -23,6 +23,7 @@ import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
 import RecommendationDialog from '@/components/app/recommendation-dialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { initialClasses, initialTeachers } from '@/lib/data';
 
 const getAffectedLessons = (
   absentTeacher: Teacher,
@@ -121,6 +122,30 @@ export default function Home() {
       const classDocs = (await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)))).docs;
       
       if (teacherDocs.length > 0 || classDocs.length > 0) return;
+
+      initialTeachers.forEach(teacherData => {
+          const newDocRef = doc(collection(firestore, 'teachers'));
+          const fallback = teacherData.name.split(' ').map(n => n[0]).join('').toUpperCase();
+          const newTeacher: Teacher = { 
+              ...teacherData, 
+              id: newDocRef.id, 
+              userId: user.uid, 
+              avatar: { fallback },
+              schedule: {},
+              absences: []
+          };
+          batch.set(newDocRef, newTeacher);
+      });
+
+      initialClasses.forEach(classData => {
+          const newDocRef = doc(collection(firestore, 'classes'));
+          const newClass: SchoolClass = {
+              ...classData,
+              id: newDocRef.id,
+              userId: user.uid
+          };
+          batch.set(newDocRef, newClass);
+      });
       
       await commitBatchWithContext(batch, {
           operation: 'create',
