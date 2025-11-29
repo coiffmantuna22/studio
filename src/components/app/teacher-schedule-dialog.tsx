@@ -182,7 +182,7 @@ export default function TeacherScheduleDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl w-full h-[90vh] flex flex-col">
+      <DialogContent className="max-w-7xl w-full flex flex-col max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>
             מערכת שעות: {teacher.name}
@@ -194,52 +194,55 @@ export default function TeacherScheduleDialog({
 
         <div className="flex-grow relative">
             <ScrollArea className="absolute inset-0">
-                <table className="w-full text-sm text-center table-fixed">
-                    <thead className='bg-muted/40'>
-                    <tr className='bg-muted/40'>
-                        <th className="sticky left-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
-                        {daysOfWeek.map(day => (
-                        <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">{day}</th>
-                        ))}
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {timeSlots.map(slot => (
-                        <tr key={slot.id} className="border-t">
-                        <td className="sticky left-0 font-semibold bg-card p-2 w-40 z-10 text-center">
-                            <div>{slot.start} - {slot.end}</div>
-                            {slot.type === 'break' && <Badge variant="outline" className='mt-1'>הפסקה</Badge>}
-                        </td>
-                        {daysOfWeek.map(day => {
-                            const lesson = localSchedule?.[day]?.[slot.start] || null;
-                            const isBreak = slot.type === 'break';
-                            return (
-                            <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30')}>
-                                {!isBreak ? (
-                                    <EditSlotPopover 
-                                        day={day} 
-                                        time={slot.start}
-                                        lesson={lesson}
-                                        onSave={handleSaveSlot}
-                                        teacher={teacher}
-                                        allClasses={allClasses}
-                                    />
-                                ) : (
-                                    <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-center">
-                                        <Coffee className='w-5 h-5 mx-auto text-muted-foreground' />
-                                    </div>
-                                )}
-                            </td>
-                            )
-                        })}
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-center table-fixed min-w-[900px]">
+                        <thead className='bg-muted/40'>
+                        <tr className='bg-muted/40'>
+                            <th className="sticky left-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
+                            {daysOfWeek.map(day => (
+                            <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">{day}</th>
+                            ))}
                         </tr>
-                    ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                        {timeSlots.map(slot => (
+                            <tr key={slot.id} className="border-t">
+                            <td className="sticky left-0 font-semibold bg-card p-2 w-40 z-10 text-center">
+                                <div>{slot.start} - {slot.end}</div>
+                                {slot.type === 'break' && <Badge variant="outline" className='mt-1'>הפסקה</Badge>}
+                            </td>
+                            {daysOfWeek.map(day => {
+                                const lesson = localSchedule?.[day]?.[slot.start] || null;
+                                const isBreak = slot.type === 'break';
+                                return (
+                                <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30')}>
+                                    {!isBreak ? (
+                                        <EditSlotPopover 
+                                            day={day} 
+                                            time={slot.start}
+                                            lesson={lesson}
+                                            onSave={handleSaveSlot}
+                                            teacher={teacher}
+                                            allClasses={allClasses}
+                                        />
+                                    ) : (
+                                        <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-center">
+                                            <Coffee className='w-5 h-5 mx-auto text-muted-foreground' />
+                                        </div>
+                                    )}
+                                </td>
+                                )
+                            })}
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                </div>
+                <ScrollBar orientation="horizontal" />
             </ScrollArea>
         </div>
         
-        <DialogFooter className="shrink-0">
+        <DialogFooter className="shrink-0 pt-4">
           <Button onClick={handleSaveChanges}>שמור שינויים</Button>
           <DialogClose asChild>
             <Button type="button" variant="secondary">
