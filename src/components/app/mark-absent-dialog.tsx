@@ -84,7 +84,7 @@ const getAffectedLessons = (
     const absenceStart = day.isAllDay ? 0 : parseInt(day.startTime.split(':')[0]);
     const absenceEnd = day.isAllDay ? 24 : parseInt(day.endTime.split(':')[0]);
 
-    allClasses.forEach(schoolClass => {
+    (allClasses || []).forEach(schoolClass => {
       const classDaySchedule = schoolClass.schedule[dayOfWeek];
       if (classDaySchedule) {
         Object.entries(classDaySchedule).forEach(([time, lesson]) => {
@@ -142,9 +142,9 @@ export default function MarkAbsentDialog({
   useEffect(() => {
     if (dateRange?.from) {
       const end = dateRange.to || dateRange.from;
-      const days = eachDayOfInterval({ start: dateRange.from, end: end });
+      const days = eachDayOfInterval({ start: startOfDay(dateRange.from), end: startOfDay(end) });
       const newAbsenceDays = days.map(day => ({
-        date: startOfDay(day),
+        date: day,
         isAllDay: true,
         startTime: '08:00',
         endTime: '16:00',
@@ -173,9 +173,6 @@ export default function MarkAbsentDialog({
     setIsSubmitting(true);
     try {
       const substituteProfiles = allTeachers.filter((t) => t.id !== teacher.id);
-      
-      const today = startOfDay(new Date());
-      const endOfWeek = addDays(today, 6 - getDay(today));
       
       const affectedLessons = getAffectedLessons(teacher, values.absenceDays, allClasses, timeSlots);
 

@@ -24,7 +24,6 @@ import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
 import RecommendationDialog from '@/components/app/recommendation-dialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { initialClasses, initialTeachers } from '@/lib/data';
 
 
 export default function Home() {
@@ -87,67 +86,10 @@ export default function Home() {
 
       const teacherIdMap: { [key: string]: string } = {};
 
-      initialTeachers.forEach((t, index) => {
-        const tempRef = doc(collection(firestore, 'teachers'));
-        const oldId = `T${index + 1}`;
-        teacherIdMap[oldId] = tempRef.id;
-
-        const fallback = t.name.split(' ').map((n) => n[0]).join('').toUpperCase();
-        const newTeacher: Teacher = {
-          ...t,
-          id: tempRef.id,
-          userId: user.uid,
-          schedule: {},
-          avatar: { fallback },
-        };
-        batch.set(tempRef, newTeacher);
-      });
       
       const classIdMap: { [key: string]: string } = {};
 
-      initialClasses.forEach(c => {
-         const tempRef = doc(collection(firestore, 'classes'));
-         classIdMap[c.id] = tempRef.id;
-
-         const newSchedule: ClassSchedule = {};
-         
-         Object.entries(c.schedule || {}).forEach(([day, daySchedule]) => {
-           newSchedule[day] = {};
-           Object.entries(daySchedule).forEach(([time, lesson]) => {
-             if (lesson) {
-                const newTeacherId = teacherIdMap[lesson.teacherId];
-                if (newTeacherId) {
-                  newSchedule[day][time] = { ...lesson, teacherId: newTeacherId, classId: tempRef.id };
-                }
-             }
-           });
-         });
-         
-         const newClass: SchoolClass = { ...c, id: tempRef.id, userId: user.uid, schedule: newSchedule };
-         batch.set(tempRef, newClass);
-      });
-
-      const teacherSchedulePromises = Object.entries(teacherIdMap).map(async ([oldId, newId]) => {
-          const teacherRef = doc(firestore, 'teachers', newId);
-          const newTeacherSchedule: ClassSchedule = {};
-
-          initialClasses.forEach(c => {
-              Object.entries(c.schedule || {}).forEach(([day, daySchedule]) => {
-                  Object.entries(daySchedule).forEach(([time, lesson]) => {
-                      if (lesson && lesson.teacherId === oldId) {
-                          if (!newTeacherSchedule[day]) newTeacherSchedule[day] = {};
-                          const newClassId = classIdMap[lesson.classId];
-                          if(newClassId) {
-                            newTeacherSchedule[day][time] = { ...lesson, classId: newClassId };
-                          }
-                      }
-                  });
-              });
-          });
-          batch.update(teacherRef, { schedule: newTeacherSchedule });
-      });
-
-      await Promise.all(teacherSchedulePromises);
+      
 
       const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
       const timetableData = { slots: [], userId: user.uid };
@@ -464,8 +406,8 @@ const handleScheduleUpdate = async (
     const allTeacherSchedulesToUpdate = new Map<string, ClassSchedule>();
     
     // Prime the maps with current schedules
-    schoolClasses.forEach(c => allClassSchedulesToUpdate.set(c.id, JSON.parse(JSON.stringify(c.schedule))));
-    teachers.forEach(t => allTeacherSchedulesToUpdate.set(t.id, JSON.parse(JSON.stringify(t.schedule || {}))));
+    (schoolClasses || []).forEach(c => allClassSchedulesToUpdate.set(c.id, JSON.parse(JSON.stringify(c.schedule))));
+    (teachers || []).forEach(t => allTeacherSchedulesToUpdate.set(t.id, JSON.parse(JSON.stringify(t.schedule || {}))));
 
 
     for (const assignment of assignments) {
@@ -509,7 +451,15 @@ const handleScheduleUpdate = async (
   const todaysAbsences = useMemo(() => {
     const today = startOfDay(new Date());
     return (teachers || []).filter(teacher => 
-        teacher.absences?.some(absence => isSameDay(new Date(absence.date), today))
+        teacher.absences?.some(absence => {
+            // Ensure absence.date is a valid date string before parsing
+            if (typeof absence.date !== 'string') return false;
+            try {
+                return isSameDay(new Date(absence.date), today);
+            } catch (e) {
+                return false;
+            }
+        })
     );
   }, [teachers]);
 
