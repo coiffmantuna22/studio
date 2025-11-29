@@ -28,7 +28,7 @@ import { X, Book, Home, Coffee } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Combobox } from '../ui/combobox';
 import { Badge } from '../ui/badge';
-import { startOfDay, addDays, getDay, format } from 'date-fns';
+import { startOfDay, addDays, getDay, format, isSameDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 
 
@@ -58,6 +58,13 @@ const getStartOfWeek = (date: Date): Date => {
     const diff = date.getDate() - day;
     return startOfDay(new Date(new Date(date).setDate(diff)));
 }
+
+const parseTimeToNumber = (time: string) => {
+    if (!time || !time.includes(':')) return 0;
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours + minutes / 60;
+};
+
 
 function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
@@ -193,6 +200,33 @@ export default function TeacherScheduleDialog({
     onOpenChange(false);
   }
 
+  const isSlotAbsent = (day: string, slotTime: string): boolean => {
+    if (!teacher.absences || teacher.absences.length === 0) {
+      return false;
+    }
+    const dayIndex = daysOfWeek.indexOf(day);
+    const date = addDays(weekStartDate, dayIndex);
+
+    const todaysAbsences = teacher.absences.filter(absence => {
+        try {
+            return isSameDay(startOfDay(new Date(absence.date)), startOfDay(date))
+        } catch (e) {
+            return false;
+        }
+    });
+    
+    if (todaysAbsences.length === 0) return false;
+
+    const slotStartNum = parseTimeToNumber(slotTime);
+
+    return todaysAbsences.some(absence => {
+      if (absence.isAllDay) return true;
+      const absenceStart = parseTimeToNumber(absence.startTime);
+      const absenceEnd = parseTimeToNumber(absence.endTime);
+      return slotStartNum >= absenceStart && slotStartNum < absenceEnd;
+    });
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-7xl w-full flex flex-col max-h-[90vh]">
@@ -233,8 +267,9 @@ export default function TeacherScheduleDialog({
                             {daysOfWeek.map(day => {
                                 const lesson = localSchedule?.[day]?.[slot.start] || null;
                                 const isBreak = slot.type === 'break';
+                                const isAbsent = isSlotAbsent(day, slot.start);
                                 return (
-                                <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30')}>
+                                <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30', isAbsent && 'bg-destructive/10')}>
                                     {!isBreak ? (
                                         <EditSlotPopover 
                                             day={day} 
