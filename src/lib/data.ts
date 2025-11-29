@@ -1,4 +1,3 @@
-
 import type { Teacher, SchoolClass, TimeSlot } from './types';
 import { daysOfWeek } from './constants';
 

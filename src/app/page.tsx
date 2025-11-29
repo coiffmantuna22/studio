@@ -34,8 +34,8 @@ const getAffectedLessons = (
   const affected: Omit<AffectedLesson, 'recommendation' | 'recommendationId' | 'reasoning' | 'substituteOptions'>[] = [];
   const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
-  absenceDays.forEach(day => {
-    const dayOfWeek = dayMap[getDay(new Date(day.date))];
+  (absenceDays || []).forEach(day => {
+    const dayOfWeek = dayMap[getDay(startOfDay(new Date(day.date)))];
     const absenceStart = day.isAllDay ? 0 : parseInt(day.startTime.split(':')[0], 10);
     const absenceEnd = day.isAllDay ? 24 : parseInt(day.endTime.split(':')[0], 10);
 
@@ -49,7 +49,7 @@ const getAffectedLessons = (
           const lessonStartHour = parseInt(lessonSlot.start.split(':')[0], 10);
           const lessonEndHour = parseInt(lessonSlot.end.split(':')[0], 10);
           
-          if (lesson && lesson.teacherId === absentTeacher.id && isSameDay(new Date(day.date), new Date(day.date)) && Math.max(lessonStartHour, absenceStart) < Math.min(lessonEndHour, absenceEnd)) {
+          if (lesson && lesson.teacherId === absentTeacher.id && isSameDay(startOfDay(new Date(day.date)), startOfDay(new Date(day.date))) && Math.max(lessonStartHour, absenceStart) < Math.min(lessonEndHour, absenceEnd)) {
              affected.push({
               classId: schoolClass.id,
               className: schoolClass.name,
@@ -169,13 +169,13 @@ export default function Home() {
     if (!firestore || !user) return;
     const newDocRef = doc(collection(firestore, 'teachers'));
     const fallback = newTeacherData.name.split(' ').map((n) => n[0]).join('').toUpperCase();
-    const newTeacher = { ...newTeacherData, id: newDocRef.id, userId: user.uid, avatar: { fallback }, schedule: {} };
+    const newTeacher = { ...newTeacherData, id: newDocRef.id, userId: user.uid, avatar: { fallback }, schedule: {}, absences: [] };
     const batch = writeBatch(firestore);
     batch.set(newDocRef, newTeacher);
     await commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: newTeacher });
   };
 
-  const handleEditTeacher = async (updatedTeacher: Omit<Teacher, 'avatar' | 'userId' | 'schedule'>) => {
+  const handleEditTeacher = async (updatedTeacher: Omit<Teacher, 'avatar' | 'userId' | 'schedule' | 'absences'>) => {
     if (!firestore || !user) return;
     const teacherRef = doc(firestore, 'teachers', updatedTeacher.id);
     const batch = writeBatch(firestore);
@@ -242,8 +242,8 @@ export default function Home() {
       userId: user.uid,
     };
     const batch = writeBatch(firestore);
-    batch.set(newDocRef, newClass);
-    await commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: newClass });
+    batch.set(newDocRef, { ...newClass, id: newDocRef.id });
+    await commitBatchWithContext(batch, { operation: 'create', path: newDocRef.path, data: { ...newClass, id: newDocRef.id } });
   };
 
   const handleDeleteClass = async (classId: string) => {
@@ -446,47 +446,8 @@ const handleScheduleUpdate = async (
 
     const teacherRef = doc(firestore, 'teachers', absentTeacher.id);
     const existingAbsences = absentTeacher.absences || [];
-    const absenceData = absenceDays.map(d => ({...d, date: new Date(d.date).toISOString()}));
+    const absenceData = absenceDays.map(d => ({...d, date: startOfDay(new Date(d.date)).toISOString()}));
     batch.update(teacherRef, { absences: [...existingAbsences, ...absenceData] });
-
-    const allClassSchedulesToUpdate = new Map<string, ClassSchedule>();
-    (schoolClasses || []).forEach(c => allClassSchedulesToUpdate.set(c.id, JSON.parse(JSON.stringify(c.schedule))));
-    
-    const allTeacherSchedulesToUpdate = new Map<string, ClassSchedule>();
-    (teachers || []).forEach(t => allTeacherSchedulesToUpdate.set(t.id, JSON.parse(JSON.stringify(t.schedule || {}))));
-
-    for (const assignment of assignments) {
-      const { classId, day, time, newTeacherId, originalLesson } = assignment;
-      
-      const classSchedule = allClassSchedulesToUpdate.get(classId);
-      if (classSchedule) {
-          if (!classSchedule[day]) classSchedule[day] = {};
-          classSchedule[day][time] = newTeacherId ? { ...originalLesson, teacherId: newTeacherId } : null;
-      }
-
-      const originalTeacherSchedule = allTeacherSchedulesToUpdate.get(absentTeacher.id);
-      if (originalTeacherSchedule) {
-        if (!originalTeacherSchedule[day]) originalTeacherSchedule[day] = {};
-        originalTeacherSchedule[day][time] = null;
-      }
-
-      if (newTeacherId) {
-        const subTeacherSchedule = allTeacherSchedulesToUpdate.get(newTeacherId);
-        if(subTeacherSchedule) {
-           if (!subTeacherSchedule[day]) subTeacherSchedule[day] = {};
-           subTeacherSchedule[day][time] = { ...originalLesson, classId };
-        }
-      }
-    }
-    
-    for (const [classId, schedule] of allClassSchedulesToUpdate.entries()) {
-        const classRef = doc(firestore, 'classes', classId);
-        batch.update(classRef, { schedule });
-    }
-    for (const [teacherId, schedule] of allTeacherSchedulesToUpdate.entries()) {
-        const teacherRef = doc(firestore, 'teachers', teacherId);
-        batch.update(teacherRef, { schedule });
-    }
     
     await commitBatchWithContext(batch, { operation: 'update', path: `absences_and_substitutions` });
     setRecommendation(null);
