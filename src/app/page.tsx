@@ -36,6 +36,9 @@ const SettingsTab = dynamic(() => import('@/components/app/settings-tab'), {
 const ClassTimetableDialog = dynamic(() => import('@/components/app/class-timetable-dialog'), {
     loading: () => null
 });
+const SchoolCalendar = dynamic(() => import('@/components/app/school-calendar'), {
+  loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
+});
 
 
 export default function Home() {
@@ -120,7 +123,7 @@ export default function Home() {
               if (isAbsentDuringLesson) {
                 const schoolClass = allClasses.find(c => c.id === lesson.classId);
                 if (schoolClass) {
-                  const isCovered = allSubstitutions.some(sub => 
+                  const isCovered = (allSubstitutions || []).some(sub => 
                     isSameDay(startOfDay(new Date(sub.date)), today) &&
                     sub.time === time &&
                     sub.classId === lesson.classId
@@ -159,7 +162,7 @@ export default function Home() {
             });
             
             if (isAbsentDuringLesson) {
-                 const schoolClass = allClasses.find(c => c.id === lesson.classId);
+                 const schoolClass = (allClasses || []).find(c => c.id === lesson.classId);
                  if (schoolClass) {
                     if (!affected.has(schoolClass.id)) {
                         affected.set(schoolClass.id, {
@@ -180,7 +183,7 @@ export default function Home() {
 
     return Array.from(affected.values()).map(classData => {
         const uncoveredLessons = classData.lessons.filter(lesson => 
-            !allSubstitutions.some(sub => 
+            !(allSubstitutions || []).some(sub => 
                 isSameDay(startOfDay(new Date(sub.date)), today) &&
                 sub.time === lesson.time &&
                 sub.classId === lesson.classId
@@ -307,7 +310,7 @@ export default function Home() {
 
      const schoolClasses = allClasses || [];
 
-    const affected = await getAffectedLessons(absentTeacher, newAbsenceData, schoolClasses, teachers, timeSlots);
+    const affected = await getAffectedLessons(absentTeacher, newAbsenceData, schoolClasses, teachers || [], timeSlots);
     if(affected.length > 0) {
        setRecommendation({
          results: affected,
@@ -430,7 +433,7 @@ export default function Home() {
               <CardContent>
                   <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
                   {affectedClasses.map(({ classId, className, lessons, isFullyCovered }) => {
-                      const schoolClass = allClasses.find(c => c.id === classId);
+                      const schoolClass = (allClasses || []).find(c => c.id === classId);
                       return (
                       <div 
                           key={classId} 
@@ -474,11 +477,12 @@ export default function Home() {
 
 
         <div className="space-y-6">
-             <div className="w-full">
-              <div className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-3xl mx-auto h-auto p-1 bg-muted/50 backdrop-blur-sm rounded-full mb-8">
+              <div className="w-full">
+              <div className="grid w-full grid-cols-2 sm:grid-cols-5 max-w-4xl mx-auto h-auto p-1 bg-muted/50 backdrop-blur-sm rounded-full mb-8 overflow-x-auto">
                 <Button variant="ghost" onClick={() => setActiveTab("teachers")} className={`rounded-full py-2.5 transition-all ${activeTab === "teachers" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>פרופילי מורים</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("classes")} className={`rounded-full py-2.5 transition-all ${activeTab === "classes" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>כיתות לימוד</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("timetable")} className={`rounded-full py-2.5 transition-all ${activeTab === "timetable" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>זמינות מחליפים</Button>
+                <Button variant="ghost" onClick={() => setActiveTab("calendar")} className={`rounded-full py-2.5 transition-all ${activeTab === "calendar" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>לוח שנה</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("settings")} className={`rounded-full py-2.5 transition-all ${activeTab === "settings" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>הגדרות</Button>
               </div>
 
@@ -499,6 +503,12 @@ export default function Home() {
               {activeTab === "timetable" && (
                 <div className="mt-0">
                   <Timetable/>
+                </div>
+              )}
+
+              {activeTab === "calendar" && (
+                <div className="mt-0">
+                  <SchoolCalendar />
                 </div>
               )}
 
@@ -533,9 +543,9 @@ export default function Home() {
         isOpen={!!classToView}
         onOpenChange={(isOpen) => !isOpen && setClassToView(null)}
         schoolClass={classToView}
-        allTeachers={teachers}
+        allTeachers={teachers || []}
         isEditing={false}
-        allClasses={allClasses}
+        allClasses={allClasses || []}
         timeSlots={timeSlots}
       />
 

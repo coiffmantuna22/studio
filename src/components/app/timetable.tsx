@@ -142,6 +142,7 @@ export default function Timetable({}: TimetableProps) {
       lessonsToCover: any[];
   }>({ isOpen: false, substitute: null, lessonsToCover: [] });
   const [availabilityFilter, setAvailabilityFilter] = useState('in_school'); // 'in_school' or 'all_not_teaching'
+  const [selectedDay, setSelectedDay] = useState(daysOfWeek[new Date().getDay()] || daysOfWeek[0]);
 
 
   const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
@@ -377,7 +378,8 @@ export default function Timetable({}: TimetableProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+        {/* Desktop View */}
+        <ScrollArea className="w-full whitespace-nowrap rounded-md border hidden md:block">
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-center table-fixed min-w-[900px]">
                     <thead>
@@ -472,6 +474,111 @@ export default function Timetable({}: TimetableProps) {
             </div>
             <ScrollBar orientation="horizontal" />
         </ScrollArea>
+
+        {/* Mobile View */}
+        <div className="md:hidden space-y-4">
+            <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar">
+                {daysOfWeek.map((day, index) => {
+                    const date = addDays(weekStartDate, index);
+                    const isSelected = index === new Date().getDay(); // Default to today, but we need state for this
+                    // For now, let's just use a simple state or default to Sunday if no state
+                    return (
+                         <Button
+                            key={day}
+                            variant={selectedDay === day ? "default" : "outline"}
+                            className="flex-shrink-0 flex flex-col items-center h-auto py-2 px-4"
+                            onClick={() => setSelectedDay(day)}
+                        >
+                            <span className="font-bold">{day}</span>
+                            <span className="text-xs font-normal opacity-70">{format(date, 'dd/MM')}</span>
+                        </Button>
+                    );
+                })}
+            </div>
+
+            <div className="space-y-4">
+                {timeSlots.map(slot => {
+                     const availableSubs = timetableData[selectedDay]?.[slot.start] || [];
+                     const dayIndex = daysOfWeek.indexOf(selectedDay);
+                     const currentDate = addDays(weekStartDate, dayIndex);
+                     
+                     const substitutionsInSlot = (allSubstitutions || [])
+                         .filter(sub => isSameDay(startOfDay(new Date(sub.date)), currentDate) && sub.time === slot.start);
+                     
+                     const uncoveredForSlot = uncoveredLessons.get(`${selectedDay}-${slot.start}`);
+                     
+                     const lessonsThatNeedCover = uncoveredForSlot?.filter(uncovered => {
+                         const isCoveredForThisAbsentee = substitutionsInSlot.some(sub => 
+                             sub.absentTeacherId === uncovered.teacher.id && 
+                             sub.classId === uncovered.lesson.classId
+                         );
+                         return !isCoveredForThisAbsentee;
+                     });
+
+                    return (
+                        <div key={slot.id} className="border rounded-lg p-4 bg-card">
+                            <div className="flex justify-between items-center mb-3">
+                                <span className="font-semibold text-lg">{slot.start} - {slot.end}</span>
+                                {slot.type === 'break' && <Badge variant="outline">הפסקה</Badge>}
+                            </div>
+                            
+                            {slot.type !== 'break' && (
+                                <div className="space-y-3">
+                                    {lessonsThatNeedCover && lessonsThatNeedCover.length > 0 && (
+                                        <div className="space-y-2">
+                                            {lessonsThatNeedCover.map(({ teacher, lesson }, index) => (
+                                                <div key={`${teacher.id}-${index}`} className="flex items-center justify-between p-2 rounded-md bg-destructive/10 text-destructive border border-destructive/20">
+                                                    <span className="text-sm font-medium">דרוש מחליף: {teacher.name}</span>
+                                                    <span className="text-xs opacity-80">{lesson.subject}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {substitutionsInSlot.length > 0 && (
+                                        <div className="flex flex-wrap gap-2">
+                                            {substitutionsInSlot.map(sub => (
+                                                <Badge key={sub.id} variant={'secondary'} className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">
+                                                    <UserCheck className="h-3 w-3 ml-1" />
+                                                    {sub.substituteTeacherName}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <div className="text-sm text-muted-foreground mb-2">מורים פנויים:</div>
+                                        {availableSubs.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {availableSubs.map(teacher => (
+                                                    <Button 
+                                                        key={teacher.id} 
+                                                        variant={teacher.isInSchool ? 'secondary' : 'outline'} 
+                                                        size="sm" 
+                                                        className="h-auto px-2 py-1 text-xs"
+                                                        onClick={() => openAssignDialog(teacher, selectedDay, slot.start)}
+                                                    >
+                                                        {!teacher.isInSchool && <Home className="h-3 w-3 ml-1 text-muted-foreground"/>}
+                                                        {teacher.name}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm text-muted-foreground italic">אין מורים פנויים</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                             {slot.type === 'break' && (
+                                <div className="flex justify-center py-2">
+                                    <Coffee className="h-6 w-6 text-muted-foreground opacity-50" />
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
       </CardContent>
     </Card>
     <AssignSubstituteDialog 

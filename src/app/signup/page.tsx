@@ -85,7 +85,10 @@ export default function SignupPage() {
       });
 
       toast({ title: 'החשבון נוצר בהצלחה!' });
-      router.push('/');
+      // Small delay to ensure toast is seen and state is settled
+      setTimeout(() => {
+        router.push('/');
+      }, 1000);
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         setError('כתובת האימייל כבר בשימוש.');
