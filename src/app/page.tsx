@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Header from '@/components/app/header';
 import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay, SubstitutionRecord } from '@/lib/types';
-import { isSameDay, startOfDay, getDay } from 'date-fns';
+import { isSameDay, startOfDay, getDay, format } from 'date-fns';
+import { he } from 'date-fns/locale';
 
 const TeacherList = dynamic(() => import('@/components/app/teacher-list'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
@@ -23,7 +24,7 @@ const StatisticsTab = dynamic(() => import('@/components/app/statistics-tab'), {
 });
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { collection, doc, writeBatch, query, where, getDocs, getDoc, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, writeBatch, query, where, getDocs, getDoc, limit, orderBy } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Loader2, AlertTriangle, ListChecks } from 'lucide-react';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
@@ -405,18 +406,33 @@ const handleScheduleUpdate = async (
       }
   }
 
-  const handleMarkAbsent = async (absentTeacher: Teacher, absenceDays: any[]) => {
+  const handleMarkAbsent = async (absentTeacher: Teacher, absenceDays: AbsenceDay[]) => {
     if (!firestore || !user) return;
-    
-    const batch = writeBatch(firestore);
 
+    const batch = writeBatch(firestore);
     const teacherRef = doc(firestore, 'teachers', absentTeacher.id);
-    const existingAbsences = absentTeacher.absences || [];
-    const absenceData = absenceDays.map(d => ({...d, date: startOfDay(new Date(d.date)).toISOString()}));
-    batch.update(teacherRef, { absences: [...existingAbsences, ...absenceData] });
-    
+
+    // Filter out old absences for the same days and add the new ones.
+    const newAbsenceDates = absenceDays.map(d => startOfDay(new Date(d.date)).getTime());
+    const updatedAbsences = (absentTeacher.absences || []).filter(
+      (existing) => !newAbsenceDates.includes(startOfDay(new Date(existing.date)).getTime())
+    );
+
+    const newAbsenceData = absenceDays.map(d => ({
+      ...d,
+      date: startOfDay(new Date(d.date)).toISOString(),
+    }));
+
+    batch.update(teacherRef, { absences: [...updatedAbsences, ...newAbsenceData] });
+
+    await commitBatchWithContext(batch, {
+        operation: 'update',
+        path: teacherRef.path,
+        data: { absences: '...' }
+    });
+
     setRecommendation(null);
-  }
+  };
 
   const todaysAbsences = useMemo(() => {
     const today = startOfDay(new Date());
@@ -504,22 +520,22 @@ const handleScheduleUpdate = async (
                   <AlertTriangle className="text-destructive h-5 w-5" />
                   מורים חסרים היום
                 </CardTitle>
-                <CardDescription>סקירה מהירה של ההיעדרויות להיום. לחץ על מורה כדי למצוא מחליפים.</CardDescription>
+                <CardDescription>סקירה מהירה של ההיעדרויות להיום. ניתן לעבור ללשונית "זמינות מחליפים" לשיבוץ.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {todaysAbsences.map(({ teacher, absences }) => {
-                      const absenceTime = absences.map(a => a.isAllDay ? 'יום שלם' : `${a.startTime}-${a.endTime}`).join(', ');
+                      const absenceTime = absences.map(a => {
+                          const dayName = format(new Date(a.date), 'EEEE', { locale: he });
+                          return a.isAllDay ? `${dayName}, יום שלם` : `${dayName}, ${a.startTime}-${a.endTime}`;
+                      }).join('; ');
+                      
                       return (
-                          <div key={teacher.id} className="flex flex-col justify-between p-4 bg-secondary/30 rounded-xl border border-border hover:bg-secondary/50 transition-colors">
+                          <div key={teacher.id} className="flex flex-col justify-between p-4 bg-secondary/30 rounded-xl border border-border">
                               <div className="mb-3">
                                 <span className="font-semibold text-lg block">{teacher.name}</span>
                                 <p className="text-sm text-muted-foreground mt-1">{absenceTime}</p>
                               </div>
-                              <Button size="sm" variant="outline" className="w-full justify-center" onClick={() => setAbsenceToReview({ teacher, absences })}>
-                                  <ListChecks className="me-2 h-4 w-4" />
-                                  הצג שיעורים מושפעים
-                              </Button>
                           </div>
                       );
                   })}
@@ -592,10 +608,6 @@ const handleScheduleUpdate = async (
         isOpen={!!teacherToMarkAbsent}
         onOpenChange={(open) => !open && setTeacherToMarkAbsent(null)}
         teacher={teacherToMarkAbsent}
-        getAffectedLessons={getAffectedLessons}
-        onShowRecommendation={(results, absentTeacher, absenceDays) => {
-            setRecommendation({ results, absentTeacher, absenceDays });
-        }}
         onConfirm={handleMarkAbsent}
       />
 

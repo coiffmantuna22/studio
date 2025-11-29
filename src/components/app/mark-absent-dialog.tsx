@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Teacher, AbsenceDay, SchoolClass, AffectedLesson, TimeSlot } from '@/lib/types';
+import type { Teacher, AbsenceDay } from '@/lib/types';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -55,17 +55,6 @@ interface MarkAbsentDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   teacher: Teacher | null;
-  getAffectedLessons: (
-    absentTeacher: Teacher,
-    absenceDays: AbsenceDay[],
-    allClasses: SchoolClass[],
-    timeSlots: TimeSlot[]
-  ) => Omit<AffectedLesson, 'recommendation' | 'recommendationId' | 'reasoning' | 'substituteOptions'>[];
-  onShowRecommendation: (
-    results: AffectedLesson[],
-    absentTeacher: Teacher,
-    absenceDays: AbsenceDay[]
-  ) => void;
   onConfirm: (teacher: Teacher, absenceDays: AbsenceDay[]) => void;
 }
 
@@ -74,8 +63,6 @@ export default function MarkAbsentDialog({
   isOpen,
   onOpenChange,
   teacher,
-  onShowRecommendation,
-  getAffectedLessons,
   onConfirm,
 }: MarkAbsentDialogProps) {
   const { toast } = useToast();
@@ -89,7 +76,7 @@ export default function MarkAbsentDialog({
     },
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "absencePeriods",
   });
@@ -114,7 +101,7 @@ export default function MarkAbsentDialog({
   const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
     try {
-      onConfirm(teacher, values.absencePeriods);
+      await onConfirm(teacher, values.absencePeriods);
       toast({
         title: 'היעדרות נרשמה',
         description: `ההיעדרות של ${teacher.name} עודכנה במערכת.`,
@@ -147,7 +134,7 @@ export default function MarkAbsentDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>סימון היעדרות עבור {teacher.name}</DialogTitle>
-          <DialogDescription>בחר את תאריכי ושעות ההיעדרות. לאחר אישור, תוכל לראות את השיעורים המושפעים ולשבץ מחליפים.</DialogDescription>
+          <DialogDescription>בחר את תאריכי ושעות ההיעדרות. לאחר אישור, ההיעדרות תירשם במערכת.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
