@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { ThemeProvider } from '@/components/theme-provider';
-import { FirebaseProvider } from '@/firebase';
+import { FirebaseClientProvider } from '@/firebase';
 import ToasterClient from '@/components/app/toaster-client';
 
 export const metadata: Metadata = {
@@ -26,7 +26,7 @@ export default function RootLayout({
         />
       </head>
       <body className={cn('font-body antialiased')}>
-        <FirebaseProvider>
+        <FirebaseClientProvider>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -36,7 +36,7 @@ export default function RootLayout({
             {children}
             <ToasterClient />
           </ThemeProvider>
-        </FirebaseProvider>
+        </FirebaseClientProvider>
       </body>
     </html>
   );
