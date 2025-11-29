@@ -195,7 +195,8 @@ export default function Timetable({}: TimetableProps) {
                const isCovered = allSubstitutions.some(sub => 
                   isSameDay(startOfDay(new Date(sub.date)), absenceDate) &&
                   sub.time === time &&
-                  sub.classId === lesson.classId
+                  sub.classId === lesson.classId &&
+                  sub.absentTeacherId === teacher.id
                 );
 
                 if (!isCovered) {
@@ -411,7 +412,15 @@ export default function Timetable({}: TimetableProps) {
                                 <td key={`${day}-${slot.start}`} className={cn("p-2 align-top h-24 border-r", slot.type === 'break' && 'bg-muted/30')}>
                                 {slot.type === 'break' ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
                                     <div className="flex flex-col items-stretch gap-1.5 justify-start h-full">
-                                        {uncoveredInSlot && uncoveredInSlot.map(({ teacher }, index) => (
+                                        {uncoveredInSlot && uncoveredInSlot.map(({ teacher, lesson }, index) => {
+                                           const isCoveredForThisAbsentee = substitutionsInSlot.some(sub => 
+                                                sub.absentTeacherId === teacher.id && 
+                                                sub.classId === lesson.classId
+                                           );
+                                           
+                                           if (isCoveredForThisAbsentee) return null;
+
+                                           return (
                                             <div key={`${teacher.id}-${index}`} className="text-center p-2 rounded-md bg-destructive/10 text-destructive border border-destructive/20">
                                                 <div className='font-bold text-xs flex items-center justify-center gap-1.5'>
                                                     <UserX className="h-3.5 w-3.5" />
@@ -419,7 +428,8 @@ export default function Timetable({}: TimetableProps) {
                                                 </div>
                                                 <div className='text-xs opacity-80'>({teacher.name})</div>
                                             </div>
-                                        ))}
+                                           )
+                                        })}
                                          {substitutionsInSlot.map(sub => (
                                             <Badge key={sub.id} variant={'secondary'} className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 font-normal">
                                                 <UserCheck className="h-3 w-3 ml-1" />
@@ -469,5 +479,7 @@ export default function Timetable({}: TimetableProps) {
     </>
   );
 }
+
+    
 
     
