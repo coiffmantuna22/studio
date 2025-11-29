@@ -229,6 +229,7 @@ export const initialClasses: SchoolClass[] = [
                 '10:00': { subject: 'אנגלית', teacherId: '2', classId: 'c1' },
                 '10:45': { subject: 'אנגלית', teacherId: '2', classId: 'c1' },
                 '12:00': { subject: 'כימיה', teacherId: '3', classId: 'c1' },
+                '12:45': { subject: 'לשון', teacherId: '11', classId: 'c1' },
             },
             'רביעי': {
                 '08:00': { subject: 'מתמטיקה', teacherId: '1', classId: 'c1' },
@@ -251,7 +252,32 @@ export const initialClasses: SchoolClass[] = [
     {
         id: 'c2',
         name: 'כיתה י״א3',
-        schedule: generateEmptySchedule(),
+        schedule: {
+            'ראשון': {
+                '08:00': { subject: 'מתמטיקה', teacherId: '8', classId: 'c2' },
+                '08:45': { subject: 'מתמטיקה', teacherId: '8', classId: 'c2' },
+                '10:00': { subject: 'היסטוריה', teacherId: '2', classId: 'c2' },
+            },
+            'שני': {
+                '08:00': { subject: 'מדעי המחשב', teacherId: '8', classId: 'c2' },
+                '08:45': { subject: 'מדעי המחשב', teacherId: '8', classId: 'c2' },
+                '10:00': { subject: 'אנגלית', teacherId: '2', classId: 'c2' },
+            },
+            'שלישי': {
+                 '08:00': { subject: 'אנגלית', teacherId: '2', classId: 'c2' },
+                 '08:45': { subject: 'אנגלית', teacherId: '2', classId: 'c2' },
+                 '10:00': { subject: 'כימיה', teacherId: '3', classId: 'c2' },
+            },
+            'רביעי': {
+                '12:00': { subject: 'מוזיקה', teacherId: '4', classId: 'c2' },
+                '12:45': { subject: 'מוזיקה', teacherId: '4', classId: 'c2' },
+            },
+            'חמישי': {
+                '08:00': { subject: 'מדעי המחשב', teacherId: '8', classId: 'c2' },
+                '08:45': { subject: 'מדעי המחשב', teacherId: '8', classId: 'c2' },
+            },
+            'שישי': {},
+        },
     },
      {
         id: 'c3',
@@ -273,17 +299,30 @@ export const initialClasses: SchoolClass[] = [
                 '08:00': { subject: 'תנ"ך', teacherId: '9', classId: 'c3'},
                 '08:45': { subject: 'תנ"ך', teacherId: '9', classId: 'c3'},
                 '10:00': { subject: 'מתמטיקה', teacherId: '8', classId: 'c3' },
+                 '12:00': { subject: 'ערבית', teacherId: '11', classId: 'c3' },
+                 '12:45': { subject: 'ערבית', teacherId: '11', classId: 'c3' },
             },
             'רביעי': {
                 '08:00': { subject: 'ספרות', teacherId: '6', classId: 'c3' },
                 '08:45': { subject: 'ספרות', teacherId: '6', classId: 'c3' },
-            },'חמישי': {},'שישי': {},
+            },'חמישי': {
+                 '10:00': { subject: 'היסטוריה', teacherId: '7', classId: 'c3' },
+                 '10:45': { subject: 'היסטוריה', teacherId: '7', classId: 'c3' },
+            },'שישי': {},
         }
     },
     {
         id: 'c4',
         name: 'כיתה י״ב2',
         schedule: {
+             'ראשון': {
+                '10:00': { subject: 'פיזיקה', teacherId: '1', classId: 'c4' },
+                '10:45': { subject: 'פיזיקה', teacherId: '1', classId: 'c4' },
+             },
+             'שני': {},
+             'שלישי': {
+                '12:00': { subject: 'מחשבת ישראל', teacherId: '9', classId: 'c4' },
+             },
              'רביעי': {
                 '08:45': { subject: 'ביולוגיה', teacherId: '3', classId: 'c4' },
                 '10:00': { subject: 'ביולוגיה', teacherId: '3', classId: 'c4' },
@@ -294,18 +333,34 @@ export const initialClasses: SchoolClass[] = [
                 '10:45': { subject: 'אנגלית', teacherId: '2', classId: 'c4' },
                 '12:00': { subject: 'אזרחות', teacherId: '7', classId: 'c4' },
             },
-            'ראשון': {}, 'שני': {}, 'שלישי': {},'שישי': {},
+            'שישי': {},
         }
     },
     {
         id: 'c5',
         name: 'כיתה ז׳4',
-        schedule: generateEmptySchedule(),
+        schedule: {
+            'ראשון': {
+                '08:00': { subject: 'ספרות', teacherId: '6', classId: 'c5' },
+                '08:45': { subject: 'ספרות', teacherId: '6', classId: 'c5' },
+            },
+            'שני': {
+                '10:00': { subject: 'גיאוגרפיה', teacherId: '10', classId: 'c5' },
+            },
+            'שלישי': {},
+            'רביעי': {},
+            'חמישי': {
+                '12:00': { subject: 'חינוך גופני', teacherId: '5', classId: 'c5' },
+                '12:45': { subject: 'חינוך גופני', teacherId: '5', classId: 'c5' },
+            },
+            'שישי': {},
+        },
     },
     {
         id: 'c6',
         name: 'כיתה ח׳2',
         schedule: {
+            'ראשון': {},
             'שני': {
                 '08:00': { subject: 'גיאוגרפיה', teacherId: '10', classId: 'c6' },
                 '08:45': { subject: 'גיאוגרפיה', teacherId: '10', classId: 'c6' },
@@ -314,7 +369,12 @@ export const initialClasses: SchoolClass[] = [
                 '10:00': { subject: 'ערבית', teacherId: '11', classId: 'c6' },
                 '10:45': { subject: 'ערבית', teacherId: '11', classId: 'c6' },
             },
-            'ראשון': {}, 'רביעי': {}, 'חמישי': {}, 'שישי': {},
+            'רביעי': {
+                 '08:00': { subject: 'אמנות', teacherId: '4', classId: 'c6' },
+                 '08:45': { subject: 'אמנות', teacherId: '4', classId: 'c6' },
+            }, 
+            'חמישי': {}, 
+            'שישי': {},
         },
     }
 ]
