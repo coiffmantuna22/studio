@@ -28,7 +28,8 @@ import { X, Book, User, BookOpen, Coffee } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Combobox } from '../ui/combobox';
 import { isTeacherAvailable, isTeacherAlreadyScheduled } from '@/lib/substitute-finder';
-import { startOfToday } from 'date-fns';
+import { startOfDay, addDays, getDay, format } from 'date-fns';
+import { he } from 'date-fns/locale';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -55,6 +56,16 @@ interface EditSlotPopoverProps {
     timeSlots: TimeSlot[];
 }
 
+const getStartOfWeek = (date: Date): Date => {
+    const day = getDay(date); // Sunday is 0, Saturday is 6
+    if (day === 6) { // If it's Saturday, start from next Sunday
+        return startOfDay(addDays(date, 1));
+    }
+    const diff = date.getDate() - day;
+    return startOfDay(new Date(new Date(date).setDate(diff)));
+}
+
+
 function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, schoolClass, timeSlots }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [subject, setSubject] = useState(lesson?.subject || '');
@@ -69,9 +80,9 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
 
     const availableTeachersForSlot = useMemo(() => {
         const dayIndex = daysOfWeek.indexOf(day);
-        const today = startOfToday();
-        const todayIndex = today.getDay();
-        const date = new Date(today.setDate(today.getDate() - todayIndex + dayIndex));
+        const today = startOfDay(new Date());
+        const startOfWeek = getStartOfWeek(today);
+        const date = addDays(startOfWeek, dayIndex);
         
         return allTeachers.filter(t => {
             const isGenerallyAvailable = isTeacherAvailable(t, date, time, timeSlots);
@@ -194,6 +205,8 @@ export default function ClassTimetableDialog({
     }
   }, [schoolClass]);
 
+  const weekStartDate = useMemo(() => getStartOfWeek(new Date()), []);
+
   if (!schoolClass) return null;
 
   const handleSaveSlot = (day: string, time: string, lesson: Lesson | null) => {
@@ -219,12 +232,18 @@ export default function ClassTimetableDialog({
     }
   }
   
-  const DayView = ({ day }: { day: string }) => (
+  const DayView = ({ day }: { day: string }) => {
+    const dayIndex = daysOfWeek.indexOf(day);
+    const date = addDays(weekStartDate, dayIndex);
+     return (
      <table className="w-full text-sm text-center table-fixed">
         <thead className='bg-muted/40'>
           <tr className='bg-muted/40'>
             <th className="sticky top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
-            <th className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">{day}</th>
+            <th className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">
+                <div>{day}</div>
+                <div className="font-normal text-xs text-muted-foreground">{format(date, 'dd/MM')}</div>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -278,7 +297,8 @@ export default function ClassTimetableDialog({
           })}
         </tbody>
       </table>
-  );
+    )
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -311,9 +331,15 @@ export default function ClassTimetableDialog({
                                     <thead className='bg-muted/40'>
                                     <tr className='bg-muted/40'>
                                         <th className="sticky left-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
-                                        {daysOfWeek.map(day => (
-                                        <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">{day}</th>
-                                        ))}
+                                        {daysOfWeek.map((day, dayIndex) => {
+                                            const date = addDays(weekStartDate, dayIndex);
+                                            return (
+                                                <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">
+                                                    <div>{day}</div>
+                                                    <div className="font-normal text-xs text-muted-foreground">{format(date, 'dd/MM')}</div>
+                                                </th>
+                                            )
+                                        })}
                                     </tr>
                                     </thead>
                                     <tbody>

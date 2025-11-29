@@ -10,6 +10,7 @@ import { daysOfWeek } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Coffee, UserCheck, UserX, Home } from 'lucide-react';
 import { isSameDay, startOfDay, getDay, addDays, format } from 'date-fns';
+import { he } from 'date-fns/locale';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc, writeBatch } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -166,11 +167,11 @@ export default function Timetable({}: TimetableProps) {
     return [];
   }, [settingsCollection, user]);
 
+  const weekStartDate = useMemo(() => getStartOfWeek(new Date()), []);
+
   const uncoveredLessons = useMemo(() => {
     const uncovered = new Map<string, { teacher: Teacher; lesson: Lesson }[]>();
     if (!allTeachers || !allSubstitutions) return uncovered;
-
-    const weekStartDate = getStartOfWeek(new Date());
 
     allTeachers.forEach(teacher => {
       (teacher.absences || []).forEach(absence => {
@@ -213,13 +214,12 @@ export default function Timetable({}: TimetableProps) {
     });
 
     return uncovered;
-  }, [allTeachers, allSubstitutions, timeSlots]);
+  }, [allTeachers, allSubstitutions, timeSlots, weekStartDate]);
 
 
   const timetableData = useMemo(() => {
     const data: Record<string, Record<string, {name: string, id: string, isInSchool: boolean}[]>> = {};
-    const weekStartDate = getStartOfWeek(new Date());
-
+    
     daysOfWeek.forEach((day) => {
       data[day] = {};
       timeSlots.forEach(slot => {
@@ -282,11 +282,10 @@ export default function Timetable({}: TimetableProps) {
     });
 
     return data;
-  }, [allTeachers, timeSlots, allSubstitutions, availabilityFilter]);
+  }, [allTeachers, timeSlots, allSubstitutions, availabilityFilter, weekStartDate]);
 
 
   const openAssignDialog = (substitute: {id: string, name: string}, day: string, time: string) => {
-    const weekStartDate = getStartOfWeek(new Date());
     const dayIndex = daysOfWeek.indexOf(day);
     const date = addDays(weekStartDate, dayIndex);
 
@@ -384,9 +383,15 @@ export default function Timetable({}: TimetableProps) {
                     <thead>
                         <tr className="bg-muted/40">
                         <th className="sticky left-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
-                        {daysOfWeek.map(day => (
-                            <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[150px]">{day}</th>
-                        ))}
+                        {daysOfWeek.map((day, dayIndex) => {
+                            const date = addDays(weekStartDate, dayIndex);
+                            return (
+                                <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[150px]">
+                                <div>{day}</div>
+                                <div className="font-normal text-xs text-muted-foreground">{format(date, 'dd/MM')}</div>
+                                </th>
+                            )
+                        })}
                         </tr>
                     </thead>
                     <tbody>
@@ -399,27 +404,27 @@ export default function Timetable({}: TimetableProps) {
                             {daysOfWeek.map(day => {
                                 const availableSubs = timetableData[day]?.[slot.start] || [];
                                 
-                                const weekStartDate = getStartOfWeek(new Date());
                                 const dayIndex = daysOfWeek.indexOf(day);
                                 const currentDate = addDays(weekStartDate, dayIndex);
                                     
                                 const substitutionsInSlot = (allSubstitutions || [])
                                     .filter(sub => isSameDay(startOfDay(new Date(sub.date)), currentDate) && sub.time === slot.start);
                                 
-                                const uncoveredInSlot = uncoveredLessons.get(`${day}-${slot.start}`);
+                                const uncoveredForSlot = uncoveredLessons.get(`${day}-${slot.start}`);
+                                
+                                const lessonsThatNeedCover = uncoveredForSlot?.filter(uncovered => {
+                                    const isCoveredForThisAbsentee = substitutionsInSlot.some(sub => 
+                                        sub.absentTeacherId === uncovered.teacher.id && 
+                                        sub.classId === uncovered.lesson.classId
+                                    );
+                                    return !isCoveredForThisAbsentee;
+                                });
 
                                 return (
                                 <td key={`${day}-${slot.start}`} className={cn("p-2 align-top h-24 border-r", slot.type === 'break' && 'bg-muted/30')}>
                                 {slot.type === 'break' ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
                                     <div className="flex flex-col items-stretch gap-1.5 justify-start h-full">
-                                        {uncoveredInSlot && uncoveredInSlot.map(({ teacher, lesson }, index) => {
-                                           const isCoveredForThisAbsentee = substitutionsInSlot.some(sub => 
-                                                sub.absentTeacherId === teacher.id && 
-                                                sub.classId === lesson.classId
-                                           );
-                                           
-                                           if (isCoveredForThisAbsentee) return null;
-
+                                        {lessonsThatNeedCover && lessonsThatNeedCover.map(({ teacher, lesson }, index) => {
                                            return (
                                             <div key={`${teacher.id}-${index}`} className="text-center p-2 rounded-md bg-destructive/10 text-destructive border border-destructive/20">
                                                 <div className='font-bold text-xs flex items-center justify-center gap-1.5'>
@@ -450,7 +455,7 @@ export default function Timetable({}: TimetableProps) {
                                             </Button>
                                             ))}
                                         </div>
-                                        {availableSubs.length === 0 && !uncoveredInSlot && substitutionsInSlot.length === 0 && (
+                                        {availableSubs.length === 0 && (!lessonsThatNeedCover || lessonsThatNeedCover.length === 0) && substitutionsInSlot.length === 0 && (
                                             <div className="flex items-center justify-center h-full">
                                                 <span className="text-muted-foreground text-xs opacity-70">--</span>
                                             </div>

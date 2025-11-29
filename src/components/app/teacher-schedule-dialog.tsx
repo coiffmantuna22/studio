@@ -28,6 +28,9 @@ import { X, Book, Home, Coffee } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Combobox } from '../ui/combobox';
 import { Badge } from '../ui/badge';
+import { startOfDay, addDays, getDay, format } from 'date-fns';
+import { he } from 'date-fns/locale';
+
 
 interface TeacherScheduleDialogProps {
   isOpen: boolean;
@@ -45,6 +48,15 @@ interface EditSlotPopoverProps {
     onSave: (day: string, time: string, lesson: Lesson | null) => void;
     teacher: Teacher;
     allClasses: SchoolClass[];
+}
+
+const getStartOfWeek = (date: Date): Date => {
+    const day = getDay(date); // Sunday is 0, Saturday is 6
+    if (day === 6) { // If it's Saturday, start from next Sunday
+        return startOfDay(addDays(date, 1));
+    }
+    const diff = date.getDate() - day;
+    return startOfDay(new Date(new Date(date).setDate(diff)));
 }
 
 function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses }: EditSlotPopoverProps) {
@@ -154,6 +166,8 @@ export default function TeacherScheduleDialog({
         setLocalSchedule(JSON.parse(JSON.stringify(teacher.schedule || {})));
     }
   }, [teacher]);
+  
+  const weekStartDate = useMemo(() => getStartOfWeek(new Date()), []);
 
   if (!teacher) return null;
 
@@ -198,9 +212,15 @@ export default function TeacherScheduleDialog({
                         <thead className='bg-muted/40'>
                         <tr className='bg-muted/40'>
                             <th className="sticky left-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
-                            {daysOfWeek.map(day => (
-                            <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">{day}</th>
-                            ))}
+                            {daysOfWeek.map((day, dayIndex) => {
+                                const date = addDays(weekStartDate, dayIndex);
+                                return (
+                                <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">
+                                    <div>{day}</div>
+                                    <div className="font-normal text-xs text-muted-foreground">{format(date, 'dd/MM')}</div>
+                                </th>
+                                )
+                            })}
                         </tr>
                         </thead>
                         <tbody>
