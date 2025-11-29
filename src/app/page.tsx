@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -8,7 +9,7 @@ import Timetable from '@/components/app/timetable';
 import ClassList from '@/components/app/class-list';
 import SettingsTab from '@/components/app/settings-tab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson } from '@/lib/types';
+import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay } from '@/lib/types';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, doc, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
@@ -27,7 +28,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 
 const getAffectedLessons = (
   absentTeacher: Teacher,
-  absenceDays: {date: Date, isAllDay: boolean, startTime: string, endTime: string}[],
+  absenceDays: AbsenceDay[],
   allClasses: SchoolClass[],
   timeSlots: TimeSlot[]
 ): Omit<AffectedLesson, 'recommendation' | 'recommendationId' | 'reasoning' | 'substituteOptions'>[] => {
@@ -35,7 +36,7 @@ const getAffectedLessons = (
   const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
   absenceDays.forEach(day => {
-    const dayOfWeek = dayMap[getDay(day.date)];
+    const dayOfWeek = dayMap[getDay(new Date(day.date))];
     const absenceStart = day.isAllDay ? 0 : parseInt(day.startTime.split(':')[0], 10);
     const absenceEnd = day.isAllDay ? 24 : parseInt(day.endTime.split(':')[0], 10);
 
@@ -49,11 +50,11 @@ const getAffectedLessons = (
           const lessonStartHour = parseInt(lessonSlot.start.split(':')[0], 10);
           const lessonEndHour = parseInt(lessonSlot.end.split(':')[0], 10);
           
-          if (lesson && lesson.teacherId === absentTeacher.id && Math.max(lessonStartHour, absenceStart) < Math.min(lessonEndHour, absenceEnd)) {
-            affected.push({
+          if (lesson && lesson.teacherId === absentTeacher.id && isSameDay(new Date(day.date), new Date(day.date)) && Math.max(lessonStartHour, absenceStart) < Math.min(lessonEndHour, absenceEnd)) {
+             affected.push({
               classId: schoolClass.id,
               className: schoolClass.name,
-              date: day.date,
+              date: new Date(day.date),
               time: time,
               lesson: lesson,
             });
@@ -304,7 +305,7 @@ const handleScheduleUpdate = async (
 
             const allRelevantClassIds = new Set<string>();
             for (const schedule of [oldSchedule, newSchedule]) {
-                Object.values(schedule).forEach(day => 
+                Object.values(schedule || {}).forEach(day => 
                     Object.values(day || {}).forEach(lesson => 
                         lesson?.classId && allRelevantClassIds.add(lesson.classId)
                     )
@@ -320,7 +321,7 @@ const handleScheduleUpdate = async (
                 const updatedClassSchedule = JSON.parse(JSON.stringify(classData.schedule || {}));
 
                 daysOfWeek.forEach(day => {
-                    timeSlots.forEach(slot => {
+                    (timeSlots || []).forEach(slot => {
                         const time = slot.start;
                         const oldLesson = oldSchedule[day]?.[time];
                         const newLesson = newSchedule[day]?.[time];
@@ -349,7 +350,7 @@ const handleScheduleUpdate = async (
 
             const allRelevantTeacherIds = new Set<string>();
             for (const schedule of [oldSchedule, newSchedule]) {
-                Object.values(schedule).forEach(day => 
+                Object.values(schedule || {}).forEach(day => 
                     Object.values(day || {}).forEach(lesson => 
                         lesson?.teacherId && allRelevantTeacherIds.add(lesson.teacherId)
                     )
@@ -365,7 +366,7 @@ const handleScheduleUpdate = async (
                 const updatedTeacherSchedule = JSON.parse(JSON.stringify(teacherData.schedule || {}));
 
                 daysOfWeek.forEach(day => {
-                    timeSlots.forEach(slot => {
+                    (timeSlots || []).forEach(slot => {
                         const time = slot.start;
                         const oldLesson = oldSchedule[day]?.[time];
                         const newLesson = newSchedule[day]?.[time];
@@ -433,7 +434,7 @@ const handleScheduleUpdate = async (
 
     const teacherRef = doc(firestore, 'teachers', absentTeacher.id);
     const existingAbsences = absentTeacher.absences || [];
-    const absenceData = absenceDays.map(d => ({...d, date: d.date.toISOString()}));
+    const absenceData = absenceDays.map(d => ({...d, date: new Date(d.date).toISOString()}));
     batch.update(teacherRef, { absences: [...existingAbsences, ...absenceData] });
 
     const allClassSchedulesToUpdate = new Map<string, ClassSchedule>();
@@ -482,10 +483,10 @@ const handleScheduleUpdate = async (
   const todaysAbsences = useMemo(() => {
     const today = startOfDay(new Date());
     return (teachers || []).filter(teacher => 
-        teacher.absences?.some(absence => {
+        (teacher.absences || []).some(absence => {
             if (typeof absence.date !== 'string') return false;
             try {
-                return isSameDay(new Date(absence.date), today);
+                return isSameDay(startOfDay(new Date(absence.date)), today);
             } catch (e) {
                 return false;
             }
@@ -495,18 +496,11 @@ const handleScheduleUpdate = async (
 
   const handleShowAffectedLessons = async (teacher: Teacher) => {
     const today = startOfDay(new Date());
-    const absenceForToday = teacher.absences?.find(a => isSameDay(new Date(a.date), today));
+    const absenceForToday = (teacher.absences || []).filter(a => isSameDay(startOfDay(new Date(a.date)), today));
     
-    if (!absenceForToday || !schoolClasses) return;
-
-    const absenceDay = {
-        date: today,
-        isAllDay: absenceForToday.isAllDay,
-        startTime: absenceForToday.startTime,
-        endTime: absenceForToday.endTime,
-    };
-
-    const affectedLessons = getAffectedLessons(teacher, [absenceDay], schoolClasses, timeSlots);
+    if (absenceForToday.length === 0 || !schoolClasses) return;
+    
+    const affectedLessons = getAffectedLessons(teacher, absenceForToday, schoolClasses, timeSlots);
 
     const substitutePool = (teachers || []).filter(t => t.id !== teacher.id);
     const recommendationPromises = affectedLessons.map(affected => 
@@ -528,7 +522,7 @@ const handleScheduleUpdate = async (
       substituteOptions: recommendations[index].substituteOptions,
     }));
     
-    setRecommendation({ results: finalResults, absentTeacher: teacher, absenceDays: [absenceDay] });
+    setRecommendation({ results: finalResults, absentTeacher: teacher, absenceDays: absenceForToday });
   };
 
 

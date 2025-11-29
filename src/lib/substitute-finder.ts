@@ -1,4 +1,5 @@
 
+
 import { getDay, isSameDay, startOfDay } from 'date-fns';
 import type { Teacher, SchoolClass, TimeSlot, TeacherAvailabilityStatus } from './types';
 
@@ -18,6 +19,7 @@ interface FindSubstituteResult {
 const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
 const parseTimeToNumber = (time: string) => {
+    if (!time || typeof time !== 'string' || !time.includes(':')) return 0;
     const [hours, minutes] = time.split(':').map(Number);
     return hours + minutes / 60;
 };
@@ -32,15 +34,16 @@ export function getTeacherAvailabilityStatus(teacher: Teacher, date: Date, timeS
 
     // 1. Is the teacher marked as absent today?
     const today = startOfDay(date);
-    const todaysAbsence = teacher.absences?.find(absence => isSameDay(new Date(absence.date), today));
-    if (todaysAbsence) {
-        if (todaysAbsence.isAllDay) return 'absent';
-        const absenceStart = parseTimeToNumber(todaysAbsence.startTime);
-        const absenceEnd = parseTimeToNumber(todaysAbsence.endTime);
+    const todaysAbsences = (teacher.absences || []).filter(absence => isSameDay(startOfDay(new Date(absence.date)), today));
+    if (todaysAbsences.length > 0) {
         const slotStart = parseTimeToNumber(currentSlot.start);
-        if (slotStart >= absenceStart && slotStart < absenceEnd) {
-            return 'absent';
-        }
+        const isAbsentNow = todaysAbsences.some(absence => {
+            if (absence.isAllDay) return true;
+            const absenceStart = parseTimeToNumber(absence.startTime);
+            const absenceEnd = parseTimeToNumber(absence.endTime);
+            return slotStart >= absenceStart && slotStart < absenceEnd;
+        });
+        if (isAbsentNow) return 'absent';
     }
 
     // 2. Is the teacher generally present at school during this slot?
@@ -90,14 +93,15 @@ export function isTeacherAvailable(teacher: Teacher, date: Date, time: string, t
   const isTeaching = teacher.schedule?.[dayOfWeek]?.[time];
   if (isTeaching) return false;
 
-  const todaysAbsence = teacher.absences?.find(absence => isSameDay(new Date(absence.date), startOfDay(date)));
-   if (todaysAbsence) {
-        if (todaysAbsence.isAllDay) return false;
-        const absenceStart = parseTimeToNumber(todaysAbsence.startTime);
-        const absenceEnd = parseTimeToNumber(todaysAbsence.endTime);
-        if (lessonStartNum >= absenceStart && lessonStartNum < absenceEnd) {
-            return false;
-        }
+  const todaysAbsences = (teacher.absences || []).filter(absence => isSameDay(startOfDay(new Date(absence.date)), startOfDay(date)));
+   if (todaysAbsences.length > 0) {
+        const isAbsentNow = todaysAbsences.some(absence => {
+            if (absence.isAllDay) return true;
+            const absenceStart = parseTimeToNumber(absence.startTime);
+            const absenceEnd = parseTimeToNumber(absence.endTime);
+            return lessonStartNum >= absenceStart && lessonStartNum < absenceEnd;
+        });
+        if (isAbsentNow) return false;
     }
 
   return true;

@@ -7,14 +7,14 @@ import type { Teacher, AbsenceDay, SchoolClass, AffectedLesson, TimeSlot } from 
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format, eachDayOfInterval, startOfDay, getDay } from 'date-fns';
+import { format, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
@@ -23,7 +23,7 @@ import { Separator } from '../ui/separator';
 
 const timeRegex = /^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/;
 
-const absenceDaySchema = z.object({
+const absencePeriodSchema = z.object({
   date: z.date(),
   isAllDay: z.boolean(),
   startTime: z.string().regex(timeRegex, { message: 'פורמט זמן לא חוקי (HH:mm).' }),
@@ -31,17 +31,13 @@ const absenceDaySchema = z.object({
 });
 
 const formSchema = z.object({
-  dateRange: z.object({
-    from: z.date({ required_error: 'נדרש תאריך התחלה.' }),
-    to: z.date().optional(),
-  }),
-  absenceDays: z.array(absenceDaySchema),
+  absencePeriods: z.array(absencePeriodSchema),
   reason: z.string().optional(),
 }).refine(data => {
-    for (const day of data.absenceDays) {
-        if (!day.isAllDay) {
-            const start = new Date(`1970-01-01T${day.startTime}:00`);
-            const end = new Date(`1970-01-01T${day.endTime}:00`);
+    for (const period of data.absencePeriods) {
+        if (!period.isAllDay) {
+            const start = new Date(`1970-01-01T${period.startTime}:00`);
+            const end = new Date(`1970-01-01T${period.endTime}:00`);
             if (start >= end) {
                 return false;
             }
@@ -50,7 +46,7 @@ const formSchema = z.object({
     return true;
 }, {
     message: "שעת הסיום חייבת להיות אחרי שעת ההתחלה.",
-    path: ["absenceDays"], 
+    path: ["absencePeriods"], 
 });
 
 
@@ -65,7 +61,7 @@ interface MarkAbsentDialogProps {
   timeSlots: TimeSlot[];
   getAffectedLessons: (
     absentTeacher: Teacher,
-    absenceDays: { date: Date; isAllDay: boolean; startTime: string; endTime: string }[],
+    absenceDays: AbsenceDay[],
     allClasses: SchoolClass[],
     timeSlots: TimeSlot[]
   ) => Omit<AffectedLesson, 'recommendation' | 'recommendationId' | 'reasoning' | 'substituteOptions'>[];
@@ -94,42 +90,27 @@ export default function MarkAbsentDialog({
     resolver: zodResolver(formSchema),
     defaultValues: {
       reason: '',
-      absenceDays: [],
+      absencePeriods: [],
     },
   });
 
-  const { fields, replace } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control: form.control,
-    name: "absenceDays",
+    name: "absencePeriods",
   });
-
-  const dateRange = form.watch('dateRange');
-
-  useEffect(() => {
-    if (dateRange?.from) {
-      const end = dateRange.to || dateRange.from;
-      const days = eachDayOfInterval({ start: startOfDay(dateRange.from), end: startOfDay(end) });
-      const newAbsenceDays = days.map(day => ({
-        date: day,
-        isAllDay: true,
-        startTime: '08:00',
-        endTime: '16:00',
-      }));
-      replace(newAbsenceDays);
-    } else {
-      replace([]);
-    }
-  }, [dateRange, replace]);
-
 
   useEffect(() => {
     if (!isOpen) {
       form.reset({
         reason: '',
-        dateRange: undefined,
-        absenceDays: [],
+        absencePeriods: [],
       });
       setIsSubmitting(false);
+    } else {
+       form.reset({
+        reason: '',
+        absencePeriods: [{ date: startOfDay(new Date()), isAllDay: true, startTime: '08:00', endTime: '16:00' }],
+      });
     }
   }, [isOpen, form]);
 
@@ -140,7 +121,7 @@ export default function MarkAbsentDialog({
     try {
       const substituteProfiles = allTeachers.filter((t) => t.id !== teacher.id);
       
-      const affectedLessons = getAffectedLessons(teacher, values.absenceDays, allClasses, timeSlots);
+      const affectedLessons = getAffectedLessons(teacher, values.absencePeriods, allClasses, timeSlots);
 
       const recommendationPromises = affectedLessons.map(affected => 
         findSubstitute(
@@ -165,7 +146,7 @@ export default function MarkAbsentDialog({
         substituteOptions: recommendations[index].substituteOptions,
       }));
 
-      onShowRecommendation(finalResults, teacher, values.absenceDays);
+      onShowRecommendation(finalResults, teacher, values.absencePeriods);
       onOpenChange(false);
     } catch (error) {
       console.error('שגיאה בקבלת המלצות:', error);
@@ -178,6 +159,16 @@ export default function MarkAbsentDialog({
       setIsSubmitting(false);
     }
   };
+  
+  const addAbsencePeriod = () => {
+    const lastDate = fields.length > 0 ? fields[fields.length - 1].date : new Date();
+     append({
+        date: startOfDay(lastDate),
+        isAllDay: false,
+        startTime: '08:00',
+        endTime: '09:00'
+     });
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -188,115 +179,117 @@ export default function MarkAbsentDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <FormField
-              control={form.control}
-              name="dateRange"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>תאריכי היעדרות</FormLabel>
-                   <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-right font-normal",
-                            !field.value?.from && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="ml-2 h-4 w-4" />
-                          {field.value?.from ? (
-                            field.value.to ? (
-                              <>
-                                {format(field.value.from, "d LLL, y", {locale: he})} -{" "}
-                                {format(field.value.to, "d LLL, y", {locale: he})}
-                              </>
-                            ) : (
-                              format(field.value.from, "d LLL, y", {locale: he})
-                            )
-                          ) : (
-                            <span>בחר טווח תאריכים</span>
-                          )}
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        locale={he}
-                        mode="range"
-                        selected={{ from: field.value?.from, to: field.value?.to }}
-                        onSelect={field.onChange}
-                        numberOfMonths={2}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            {fields.length > 0 && (
-                <div className="space-y-4 max-h-60 overflow-y-auto pl-2">
-                    {fields.map((field, index) => {
-                       const isAllDay = form.watch(`absenceDays.${index}.isAllDay`);
-                        return (
-                          <div key={field.id} className="space-y-2">
-                            <h4 className="font-semibold text-sm">{format(field.date, "EEEE, d MMM", {locale: he})}</h4>
-                             <FormField
-                              control={form.control}
-                              name={`absenceDays.${index}.isAllDay`}
-                              render={({ field }) => (
-                                <FormItem className="flex flex-row items-center space-x-2 space-x-reverse space-y-0">
+            <div className="space-y-4 max-h-60 overflow-y-auto pl-2">
+              {fields.map((field, index) => {
+                const isAllDay = form.watch(`absencePeriods.${index}.isAllDay`);
+                return (
+                  <div key={field.id} className="p-3 border rounded-lg relative">
+                    <div className="space-y-3">
+                      <FormField
+                          control={form.control}
+                          name={`absencePeriods.${index}.date`}
+                          render={({ field }) => (
+                           <FormItem className="flex flex-col">
+                              <FormLabel>תאריך</FormLabel>
+                              <Popover>
+                                <PopoverTrigger asChild>
                                   <FormControl>
-                                    <Checkbox
-                                      checked={field.value}
-                                      onCheckedChange={field.onChange}
-                                    />
+                                    <Button
+                                      variant={"outline"}
+                                      className={cn(
+                                        "w-full justify-start text-right font-normal",
+                                        !field.value && "text-muted-foreground"
+                                      )}
+                                    >
+                                      <CalendarIcon className="ml-2 h-4 w-4" />
+                                      {field.value ? format(field.value, "PPP", {locale: he}) : <span>בחר תאריך</span>}
+                                    </Button>
                                   </FormControl>
-                                  <FormLabel className="font-normal cursor-pointer">
-                                    יום שלם
-                                  </FormLabel>
-                                </FormItem>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    locale={he}
+                                    mode="single"
+                                    selected={field.value}
+                                    onSelect={(date) => field.onChange(date ? startOfDay(date) : undefined)}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                       <FormField
+                        control={form.control}
+                        name={`absencePeriods.${index}.isAllDay`}
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2 space-x-reverse space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal cursor-pointer">
+                              יום שלם
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      {!isAllDay && (
+                          <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                              control={form.control}
+                              name={`absencePeriods.${index}.startTime`}
+                              render={({ field }) => (
+                              <FormItem>
+                                  <FormLabel>שעת התחלה</FormLabel>
+                                  <FormControl>
+                                  <Input type="time" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                              </FormItem>
                               )}
-                            />
-                            {!isAllDay && (
-                                <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                    control={form.control}
-                                    name={`absenceDays.${index}.startTime`}
-                                    render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>שעת התחלה</FormLabel>
-                                        <FormControl>
-                                        <Input type="time" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name={`absenceDays.${index}.endTime`}
-                                    render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>שעת סיום</FormLabel>
-                                        <FormControl>
-                                        <Input type="time" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                    )}
-                                />
-                                </div>
-                            )}
-                            {index < fields.length - 1 && <Separator className="mt-4" />}
+                          />
+                          <FormField
+                              control={form.control}
+                              name={`absencePeriods.${index}.endTime`}
+                              render={({ field }) => (
+                              <FormItem>
+                                  <FormLabel>שעת סיום</FormLabel>
+                                  <FormControl>
+                                  <Input type="time" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                              </FormItem>
+                              )}
+                          />
                           </div>
-                        )
-                    })}
-                </div>
-            )}
+                      )}
+                    </div>
+                    {fields.length > 1 && (
+                        <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute top-1 left-1 h-6 w-6"
+                            onClick={() => remove(index)}>
+                            <Trash2 className="h-4 w-4 text-destructive"/>
+                        </Button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <Button type="button" variant="outline" size="sm" onClick={addAbsencePeriod}>
+                <PlusCircle className="ml-2 h-4 w-4"/>
+                הוסף תקופת היעדרות
+            </Button>
             
+            <Separator />
+
             <FormField
               control={form.control}
               name="reason"
@@ -311,8 +304,8 @@ export default function MarkAbsentDialog({
               )}
             />
             
-            {form.formState.errors.absenceDays && (
-                 <p className="text-sm font-medium text-destructive">{form.formState.errors.absenceDays.message}</p>
+            {form.formState.errors.absencePeriods && (
+                 <p className="text-sm font-medium text-destructive">{form.formState.errors.absencePeriods.message}</p>
             )}
 
             <DialogFooter>
