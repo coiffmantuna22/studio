@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Header from '@/components/app/header';
 import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay, SubstitutionRecord } from '@/lib/types';
+import { isSameDay as isSameDate, startOfDay, getDay } from 'date-fns';
 
 const TeacherList = dynamic(() => import('@/components/app/teacher-list'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
@@ -29,7 +30,6 @@ import { commitBatchWithContext } from '@/lib/firestore-utils';
 import { Button } from '@/components/ui/button';
 import { daysOfWeek } from '@/lib/constants';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { isSameDay, startOfDay, getDay } from 'date-fns';
 import { getTeacherAvailabilityStatus, findSubstitute, isTeacherAvailable } from '@/lib/substitute-finder';
 import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
 import RecommendationDialog from '@/components/app/recommendation-dialog';
@@ -87,6 +87,7 @@ export default function Home() {
   const router = useRouter();
   const firestore = useFirestore();
 
+  const [activeTab, setActiveTab] = useState("teachers");
   const [teacherToMarkAbsent, setTeacherToMarkAbsent] = useState<Teacher | null>(null);
   const [recommendation, setRecommendation] = useState<{
     results: AffectedLesson[];
@@ -118,6 +119,10 @@ export default function Home() {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
+
+  const isDataLoading = isUserLoading || teachersLoading || classesLoading || settingsLoading;
+
+  const isInitialSetup = !isDataLoading && user && timeSlots.length === 0;
 
   const teacherAvailabilityNow = useMemo(() => {
     const availabilityMap = new Map<string, TeacherAvailabilityStatus>();
@@ -482,7 +487,7 @@ const handleScheduleUpdate = async (
         const absences = (teacher.absences || []).filter(absence => {
           if (typeof absence.date !== 'string') return false;
           try {
-            return isSameDay(startOfDay(new Date(absence.date)), today);
+            return isSameDate(startOfDay(new Date(absence.date)), today);
           } catch (e) {
             return false;
           }
@@ -494,7 +499,7 @@ const handleScheduleUpdate = async (
 
   const handleShowAffectedLessons = async (teacher: Teacher) => {
     const today = startOfDay(new Date());
-    const absenceForToday = (teacher.absences || []).filter(a => a.date && isSameDay(startOfDay(new Date(a.date)), today));
+    const absenceForToday = (teacher.absences || []).filter(a => a.date && isSameDate(startOfDay(new Date(a.date)), today));
     
     if (absenceForToday.length === 0 || !schoolClasses) return;
     
@@ -523,11 +528,6 @@ const handleScheduleUpdate = async (
     setRecommendation({ results: finalResults, absentTeacher: teacher, absenceDays: absenceForToday });
   };
 
-
-  const [activeTab, setActiveTab] = useState("teachers");
-
-  const isDataLoading = isUserLoading || teachersLoading || classesLoading || settingsLoading;
-
   if (isDataLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -535,8 +535,6 @@ const handleScheduleUpdate = async (
       </div>
     );
   }
-  
-  const isInitialSetup = !isDataLoading && user && timeSlots.length === 0;
 
   if (isInitialSetup) {
       return (
@@ -671,3 +669,5 @@ const handleScheduleUpdate = async (
     </div>
   );
 }
+
+    
