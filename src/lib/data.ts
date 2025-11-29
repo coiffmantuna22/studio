@@ -13,21 +13,19 @@ export const initialTimeSlots: TimeSlot[] = [
 ];
 
 
-const defaultAvailability = [
-  { day: 'ראשון', slots: [] },
-  { day: 'שני', slots: [{ start: '08:00', end: '13:30' }] },
-  { day: 'שלישי', slots: [{ start: '08:00', end: '13:30' }] },
-  { day: 'רביעי', slots: [{ start: '08:00', end: '11:30' }] },
-  { day: 'חמישי', slots: [{ start: '08:00', end: '13:30' }] },
-  { day: 'שישי', slots: [] },
-];
-
 export const initialTeachers: Teacher[] = [
   {
     id: '1',
     name: 'מריה גרסיה',
     subjects: ['מתמטיקה', 'פיזיקה'],
-    availability: defaultAvailability,
+    availability: [
+      { day: 'ראשון', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'שני', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'שלישי', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'רביעי', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'חמישי', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'שישי', slots: [] },
+    ],
     avatar: { fallback: 'מג' },
     preferences: 'מעדיפה כיתות בוגרות',
   },
@@ -36,12 +34,12 @@ export const initialTeachers: Teacher[] = [
     name: 'דוד סמית',
     subjects: ['אנגלית', 'היסטוריה'],
     availability: [
-      { day: 'ראשון', slots: [] },
-      { day: 'שני', slots: [] },
-      { day: 'שלישי', slots: [{ start: '10:00', end: '12:45' }] },
-      { day: 'רביעי', slots: [] },
-      { day: 'חמישי', slots: [{ start: '10:00', end: '12:45' }] },
-      { day: 'שישי', slots: [{ start: '08:45', end: '12:00' }] },
+      { day: 'ראשון', slots: [{ start: '10:00', end: '13:30' }] },
+      { day: 'שני', slots: [{ start: '12:00', end: '13:30' }] },
+      { day: 'שלישי', slots: [{ start: '10:00', end: '13:30' }] },
+      { day: 'רביעי', slots: [{ start: '10:00', end: '13:30' }] },
+      { day: 'חמישי', slots: [{ start: '10:00', end: '13:30' }] },
+      { day: 'שישי', slots: [{ start: '08:45', end: '12:45' }] },
     ],
     avatar: { fallback: 'דס' },
     preferences: 'זמין להחלפות של יום שלם',
@@ -144,6 +142,9 @@ export const initialTeachers: Teacher[] = [
       { day: 'ראשון', slots: [{ start: '08:00', end: '11:30' }] },
       { day: 'שלישי', slots: [{ start: '08:00', end: '11:30' }] },
       { day: 'חמישי', slots: [{ start: '08:00', end: '11:30' }] },
+      { day: 'שני', slots: [] },
+      { day: 'רביעי', slots: [] },
+      { day: 'שישי', slots: [] },
     ],
     avatar: { fallback: 'אב' },
     preferences: 'מעדיפה כיתות קטנות',
@@ -155,6 +156,10 @@ export const initialTeachers: Teacher[] = [
     availability: [
       { day: 'שני', slots: [{ start: '08:00', end: '13:30' }] },
       { day: 'רביעי', slots: [{ start: '08:00', end: '13:30' }] },
+      { day: 'ראשון', slots: [] },
+      { day: 'שלישי', slots: [] },
+      { day: 'חמישי', slots: [] },
+      { day: 'שישי', slots: [] },
     ],
     avatar: { fallback: 'אי' },
     preferences: 'אוהב לצאת לסיורים',
@@ -166,6 +171,10 @@ export const initialTeachers: Teacher[] = [
     availability: [
       { day: 'שלישי', slots: [{ start: '10:00', end: '13:30' }] },
       { day: 'חמישי', slots: [{ start: '10:00', end: '13:30' }] },
+      { day: 'ראשון', slots: [] },
+      { day: 'שני', slots: [] },
+      { day: 'רביעי', slots: [] },
+      { day: 'שישי', slots: [] },
     ],
     avatar: { fallback: 'רח' },
     preferences: '',
@@ -191,17 +200,19 @@ export const initialClasses: SchoolClass[] = [
                 '08:45': { subject: 'מתמטיקה', teacherId: '1' },
                 '10:00': { subject: 'מתמטיקה', teacherId: '1' },
                 '10:45': { subject: 'אנגלית', teacherId: '2' },
+                '12:00': { subject: 'היסטוריה', teacherId: '7' },
+                '12:45': { subject: 'היסטוריה', teacherId: '7' },
             },
             'שני': {
                 '08:45': { subject: 'מתמטיקה', teacherId: '1' },
-                '10:00': { subject: 'מתמטיקה', teacherId: '1' },
-                '10:45': { subject: 'חינוך גופני', teacherId: '5' },
+                '10:00': { subject: 'כימיה', teacherId: '3' },
+                '10:45': { subject: 'כימיה', teacherId: '3' },
                  '12:00': { subject: 'היסטוריה', teacherId: '7' },
-                '12:45': { subject: 'היסטוריה', teacherId: '7' },
+                '12:45': { subject: 'חינוך גופני', teacherId: '5' },
             },
             'שלישי': {
                 '08:00': { subject: 'ספרות', teacherId: '6' },
-                '08:45': { subject: 'ספרות', teacherId: '6' },
+                '08:45': { subject: 'לשון', teacherId: '6' },
                 '10:00': { subject: 'אנגלית', teacherId: '2' },
                 '10:45': { subject: 'אנגלית', teacherId: '2' },
                 '12:00': { subject: 'כימיה', teacherId: '3' },
@@ -209,12 +220,12 @@ export const initialClasses: SchoolClass[] = [
             'רביעי': {
                 '10:00': { subject: 'אזרחות', teacherId: '7' },
                 '10:45': { subject: 'כימיה', teacherId: '3' },
-                '12:00': { subject: 'כימיה', teacherId: '3' },
-                '12:45': { subject: 'אמנות', teacherId: '4' },
+                '12:00': { subject: 'אמנות', teacherId: '4' },
+                '12:45': { subject: 'חינוך גופני', teacherId: '5' },
             },
             'חמישי': {
                 '08:00': { subject: 'ספרות', teacherId: '6' },
-                '08:45': { subject: 'לשון', teacherId: '6' },
+                '08:45': { subject: 'לשון', teacherId: '11' },
                 '10:00': { subject: 'פיזיקה', teacherId: '1' },
                 '10:45': { subject: 'פיזיקה', teacherId: '1' },
                  '12:00': { subject: 'חינוך גופני', teacherId: '5' },
@@ -234,7 +245,8 @@ export const initialClasses: SchoolClass[] = [
             'ראשון': {
                 '08:45': { subject: 'מתמטיקה', teacherId: '8' },
                 '10:00': { subject: 'מתמטיקה', teacherId: '8' },
-                '10:45': { subject: 'היסטוריה', teacherId: '2' },
+                '10:45': { subject: 'תנ"ך', teacherId: '9' },
+                '08:00': { subject: 'תנ"ך', teacherId: '9' },
             },
             'שני': {
                 '08:45': { subject: 'מדעי המחשב', teacherId: '8' },
@@ -255,12 +267,12 @@ export const initialClasses: SchoolClass[] = [
              'רביעי': {
                 '08:45': { subject: 'ביולוגיה', teacherId: '3' },
                 '10:00': { subject: 'ביולוגיה', teacherId: '3' },
-                '10:45': { subject: 'מוזיקה', teacherId: '4' },
+                '10:45': { subject: 'מוזיקה', teacherId: '4' }, // Fatima is not available
             },
             'חמישי': {
                 '10:00': { subject: 'אנגלית', teacherId: '2' },
                 '10:45': { subject: 'אנגלית', teacherId: '2' },
-                '12:00': { subject: 'אזרחות', teacherId: '7' },
+                '12:00': { subject: 'אזרחות', teacherId: '7' }, // Yosef is not available
             },
             'ראשון': {}, 'שני': {}, 'שלישי': {},'שישי': {},
         }

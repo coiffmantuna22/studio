@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Teacher, SchoolClass, AffectedLesson, TimeSlot } from '@/lib/types';
+import type { Teacher, SchoolClass, AffectedLesson, TimeSlot, AbsenceDay } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Plus, Search } from 'lucide-react';
 import TeacherCard from './teacher-card';
@@ -31,6 +31,7 @@ interface TeacherListProps {
   onEditTeacher: (teacher: Omit<Teacher, 'userId' | 'avatar'>) => void;
   onDeleteTeacher: (teacherId: string) => void;
   onClassesUpdate: (collectionName: 'teachers' | 'classes', classes: SchoolClass[]) => void;
+  onMarkAbsent: (teacherId: string, absenceDays: AbsenceDay[]) => void;
 }
 
 export default function TeacherList({ 
@@ -41,6 +42,7 @@ export default function TeacherList({
   onEditTeacher,
   onDeleteTeacher,
   onClassesUpdate,
+  onMarkAbsent
 }: TeacherListProps) {
   const { toast } = useToast();
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
@@ -92,8 +94,10 @@ export default function TeacherList({
 
   const handleShowRecommendation = (
     results: AffectedLesson[],
-    absentTeacher: Teacher
+    absentTeacher: Teacher,
+    absenceDays: AbsenceDay[]
   ) => {
+    onMarkAbsent(absentTeacher.id, absenceDays);
     setRecommendation({ results, absentTeacher });
   };
 

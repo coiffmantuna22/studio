@@ -86,8 +86,12 @@ export default function Home() {
     await commitBatchWithContext(batch, {
       operation: 'create',
       path: `settings/timetable_${user.uid}`,
-      data: timetableData,
-      firestore
+      firestore,
+      data: {
+        teachers: initialTeachers.length,
+        classes: defaultClasses.length,
+        timeSlots: initialTimeSlots.length
+      }
     });
   };
   
@@ -193,11 +197,24 @@ export default function Home() {
       const batch = writeBatch(firestore);
       const timetableData = { slots: newTimeSlots, userId: user.uid };
       batch.set(settingsRef, timetableData, { merge: true });
+      
       await commitBatchWithContext(batch, { operation: 'update', path: settingsRef.path, data: timetableData, firestore });
 
       if (isInitialSetup) {
         await seedData();
       }
+  }
+
+  const handleMarkAbsent = async (teacherId: string, absenceDays: any[]) => {
+    if (!firestore || !user) return;
+    const teacherRef = doc(firestore, 'teachers', teacherId);
+    
+    // Firestore works with string dates or Timestamps, not Date objects directly in arrays.
+    const absenceData = absenceDays.map(d => ({...d, date: d.date.toISOString()}));
+
+    const batch = writeBatch(firestore);
+    batch.update(teacherRef, { absences: absenceData });
+    await commitBatchWithContext(batch, { operation: 'update', path: teacherRef.path, data: { absences: absenceData }, firestore });
   }
 
   const isDataLoading = isUserLoading || teachersLoading || classesLoading || settingsLoading;
@@ -254,6 +271,7 @@ export default function Home() {
               onEditTeacher={handleEditTeacher}
               onDeleteTeacher={handleDeleteTeacher}
               onClassesUpdate={handleUpdate}
+              onMarkAbsent={handleMarkAbsent}
             />
           </TabsContent>
            <TabsContent value="classes">

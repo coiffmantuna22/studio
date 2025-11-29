@@ -65,7 +65,8 @@ interface MarkAbsentDialogProps {
   timeSlots: TimeSlot[];
   onShowRecommendation: (
     results: AffectedLesson[],
-    absentTeacher: Teacher
+    absentTeacher: Teacher,
+    absenceDays: AbsenceDay[]
   ) => void;
 }
 
@@ -196,7 +197,7 @@ export default function MarkAbsentDialog({
         reasoning: recommendations[index].reasoning,
       }));
 
-      onShowRecommendation(finalResults, teacher);
+      onShowRecommendation(finalResults, teacher, values.absenceDays);
       onOpenChange(false);
     } catch (error) {
       console.error('שגיאה בקבלת המלצות:', error);

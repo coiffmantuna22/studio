@@ -13,10 +13,11 @@ export interface Teacher {
   avatar: {
     fallback: string;
   };
+  absences?: AbsenceDay[];
 }
 
 export interface AbsenceDay {
-  date: Date;
+  date: Date | string;
   isAllDay: boolean;
   startTime: string;
   endTime: string;
