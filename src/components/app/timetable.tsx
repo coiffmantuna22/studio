@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { daysOfWeek } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { Coffee, UserCheck, UserX } from 'lucide-react';
+import { Coffee, UserCheck, UserX, Home } from 'lucide-react';
 import { isSameDay, startOfDay, getDay, addDays, format } from 'date-fns';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc, writeBatch } from 'firebase/firestore';
@@ -54,6 +54,13 @@ const AssignSubstituteDialog = ({
     const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    useEffect(() => {
+        if(isOpen) {
+            setSelectedLessonId(null);
+            setIsSubmitting(false);
+        }
+    }, [isOpen]);
+
     if (!substitute) return null;
 
     const handleConfirm = async () => {
@@ -79,10 +86,10 @@ const AssignSubstituteDialog = ({
                 {lessonsToCover.length > 0 && (
                   <div className="py-4">
                       <RadioGroup onValueChange={setSelectedLessonId}>
-                          {lessonsToCover.map((l) => {
+                          {lessonsToCover.map((l, index) => {
                               const id = `${l.schoolClass.id}-${l.lesson.subject}-${l.time}`;
                               return (
-                                  <div key={id} className="flex items-center space-x-2 space-x-reverse">
+                                  <div key={`${id}-${index}`} className="flex items-center space-x-2 space-x-reverse">
                                       <RadioGroupItem value={id} id={id} />
                                       <Label htmlFor={id} className="flex flex-col">
                                           <span>{l.schoolClass.name} - {l.lesson.subject} ({l.time})</span>
@@ -96,10 +103,12 @@ const AssignSubstituteDialog = ({
                 )}
                 <DialogFooter>
                     <DialogClose asChild><Button variant="ghost">ביטול</Button></DialogClose>
-                    {lessonsToCover.length > 0 && (
+                    {lessonsToCover.length > 0 ? (
                       <Button onClick={handleConfirm} disabled={!selectedLessonId || isSubmitting}>
                           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : "אישור שיבוץ"}
                       </Button>
+                    ) : (
+                      <Button onClick={() => onOpenChange(false)}>הבנתי</Button>
                     )}
                 </DialogFooter>
             </DialogContent>
@@ -131,6 +140,7 @@ export default function Timetable({}: TimetableProps) {
       substitute: Teacher | null;
       lessonsToCover: any[];
   }>({ isOpen: false, substitute: null, lessonsToCover: [] });
+  const [availabilityFilter, setAvailabilityFilter] = useState('in_school'); // 'in_school' or 'all_not_teaching'
 
 
   const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
@@ -170,30 +180,31 @@ export default function Timetable({}: TimetableProps) {
         const dayDifference = (getDay(absenceDate) - getDay(weekStartDate) + 7) % 7;
         if(dayDifference < 0 || dayDifference >= daysOfWeek.length) return;
 
+        const daySchedule = teacher.schedule?.[dayOfWeek] || {};
 
-        const relevantTimeSlots = timeSlots.filter(slot => {
-          if (absence.isAllDay) return slot.type === 'lesson';
-          const slotStartNum = parseTimeToNumber(slot.start);
-          const absenceStart = parseTimeToNumber(absence.startTime);
-          const absenceEnd = parseTimeToNumber(absence.endTime);
-          return slotStartNum >= absenceStart && slotStartNum < absenceEnd;
-        });
-
-        relevantTimeSlots.forEach(slot => {
-          const lesson = teacher.schedule?.[dayOfWeek]?.[slot.start];
-          if (lesson) {
-            const isCovered = allSubstitutions.some(sub => 
-              isSameDay(startOfDay(new Date(sub.date)), absenceDate) &&
-              sub.time === slot.start &&
-              sub.classId === lesson.classId
+        Object.keys(daySchedule).forEach(time => {
+          const lesson = daySchedule[time];
+          if(lesson) {
+            const slotStartNum = parseTimeToNumber(time);
+            const isAbsentDuringLesson = absence.isAllDay || (
+              slotStartNum >= parseTimeToNumber(absence.startTime) && 
+              slotStartNum < parseTimeToNumber(absence.endTime)
             );
 
-            if (!isCovered) {
-              const key = `${dayOfWeek}-${slot.start}`;
-              if (!uncovered.has(key)) {
-                uncovered.set(key, []);
-              }
-              uncovered.get(key)!.push({ teacher, lesson });
+            if (isAbsentDuringLesson) {
+               const isCovered = allSubstitutions.some(sub => 
+                  isSameDay(startOfDay(new Date(sub.date)), absenceDate) &&
+                  sub.time === time &&
+                  sub.classId === lesson.classId
+                );
+
+                if (!isCovered) {
+                  const key = `${dayOfWeek}-${time}`;
+                  if (!uncovered.has(key)) {
+                    uncovered.set(key, []);
+                  }
+                  uncovered.get(key)!.push({ teacher, lesson });
+                }
             }
           }
         });
@@ -205,7 +216,7 @@ export default function Timetable({}: TimetableProps) {
 
 
   const timetableData = useMemo(() => {
-    const data: Record<string, Record<string, {name: string, id: string, isAbsent: boolean}[]>> = {};
+    const data: Record<string, Record<string, {name: string, id: string, isInSchool: boolean}[]>> = {};
     const weekStartDate = getStartOfWeek(new Date());
 
     daysOfWeek.forEach((day) => {
@@ -220,55 +231,57 @@ export default function Timetable({}: TimetableProps) {
     (allTeachers || []).forEach(teacher => {
       daysOfWeek.forEach((day, dayIndex) => {
         const currentDate = addDays(weekStartDate, dayIndex);
-        const availabilityForDay = teacher.availability.find(a => a.day === day);
         
         const absencesForCurrentDate = (teacher.absences || []).filter(absence => 
             isSameDay(startOfDay(new Date(absence.date as string)), currentDate)
         );
 
-        if (availabilityForDay) {
-          availabilityForDay.slots.forEach(timeRange => {
-            const startNum = parseTimeToNumber(timeRange.start);
-            const endNum = parseTimeToNumber(timeRange.end);
-            
-            timeSlots.forEach(slot => {
-                if (slot.type === 'lesson') {
-                    const slotStartNum = parseTimeToNumber(slot.start);
+        timeSlots.forEach(slot => {
+            if (slot.type === 'lesson') {
+                const slotStartNum = parseTimeToNumber(slot.start);
 
-                    if (slotStartNum >= startNum && slotStartNum < endNum) {
-                        const isTeaching = teacher.schedule?.[day]?.[slot.start];
-                        
-                        let isAbsent = false;
-                        if (absencesForCurrentDate.length > 0) {
-                            isAbsent = absencesForCurrentDate.some(absence => {
-                                if (absence.isAllDay) return true;
-                                const absenceStart = parseTimeToNumber(absence.startTime);
-                                const absenceEnd = parseTimeToNumber(absence.endTime);
-                                return slotStartNum >= absenceStart && slotStartNum < absenceEnd;
-                            });
-                        }
-                        
-                         const isSubstituting = (allSubstitutions || []).some(sub => 
-                            sub.substituteTeacherId === teacher.id &&
-                            isSameDay(startOfDay(new Date(sub.date)), currentDate) &&
-                            sub.time === slot.start
-                         );
+                const isTeaching = teacher.schedule?.[day]?.[slot.start];
+                if(isTeaching) return; // Skip if they are teaching
 
-                        if (!isTeaching && !isAbsent && !isSubstituting) {
-                            if (data[day]?.[slot.start]) {
-                              data[day][slot.start].push({ name: teacher.name, id: teacher.id, isAbsent: false });
-                            }
-                        }
-                    }
+                let isAbsent = false;
+                if (absencesForCurrentDate.length > 0) {
+                    isAbsent = absencesForCurrentDate.some(absence => {
+                        if (absence.isAllDay) return true;
+                        const absenceStart = parseTimeToNumber(absence.startTime);
+                        const absenceEnd = parseTimeToNumber(absence.endTime);
+                        return slotStartNum >= absenceStart && slotStartNum < absenceEnd;
+                    });
                 }
-            });
-          });
-        }
+                if(isAbsent) return; // Skip if they are absent
+
+                const isSubstituting = (allSubstitutions || []).some(sub => 
+                    sub.substituteTeacherId === teacher.id &&
+                    isSameDay(startOfDay(new Date(sub.date)), currentDate) &&
+                    sub.time === slot.start
+                );
+                if(isSubstituting) return; // Skip if they are substituting
+
+                const availabilityForDay = teacher.availability.find(a => a.day === day);
+                const isPresent = availabilityForDay?.slots.some(presenceSlot => {
+                  const startNum = parseTimeToNumber(presenceSlot.start);
+                  const endNum = parseTimeToNumber(presenceSlot.end);
+                  return slotStartNum >= startNum && slotStartNum < endNum;
+                });
+                
+                if (availabilityFilter === 'in_school') {
+                  if (isPresent) {
+                    data[day]?.[slot.start]?.push({ name: teacher.name, id: teacher.id, isInSchool: true });
+                  }
+                } else if (availabilityFilter === 'all_not_teaching') {
+                  data[day]?.[slot.start]?.push({ name: teacher.name, id: teacher.id, isInSchool: !!isPresent });
+                }
+            }
+        });
       });
     });
 
     return data;
-  }, [allTeachers, timeSlots, allSubstitutions]);
+  }, [allTeachers, timeSlots, allSubstitutions, availabilityFilter]);
 
 
  const openAssignDialog = (substitute: {id: string, name: string}, day: string, time: string) => {
@@ -277,27 +290,27 @@ export default function Timetable({}: TimetableProps) {
     const date = addDays(weekStartDate, dayIndex);
     
     const lessonsToCover: any[] = [];
-
-    const absentTeachers = (allTeachers || []).filter(teacher => {
-        return (teacher.absences || []).some(absence =>
+    
+    (allTeachers || []).forEach(absentTeacher => {
+        const isAbsentNow = (absentTeacher.absences || []).some(absence =>
             isSameDay(startOfDay(new Date(absence.date as string)), date) &&
             (absence.isAllDay || (time >= absence.startTime && time < absence.endTime))
         );
-    });
-    
-    absentTeachers.forEach(absentTeacher => {
-        const lesson = absentTeacher.schedule?.[day]?.[time];
-        if (lesson && lesson.classId) {
-            const schoolClass = (allClasses || []).find(c => c.id === lesson.classId);
-            if (schoolClass) {
-                const isCovered = (allSubstitutions || []).some(sub => 
-                    isSameDay(startOfDay(new Date(sub.date)), date) &&
-                    sub.time === time &&
-                    sub.classId === schoolClass.id
-                );
 
-                if (!isCovered) {
-                    lessonsToCover.push({ date, time, absentTeacher, lesson, schoolClass });
+        if (isAbsentNow) {
+            const lesson = absentTeacher.schedule?.[day]?.[time];
+            if (lesson && lesson.classId) {
+                const schoolClass = (allClasses || []).find(c => c.id === lesson.classId);
+                if (schoolClass) {
+                    const isCovered = (allSubstitutions || []).some(sub => 
+                        isSameDay(startOfDay(new Date(sub.date)), date) &&
+                        sub.time === time &&
+                        sub.classId === schoolClass.id
+                    );
+
+                    if (!isCovered) {
+                        lessonsToCover.push({ date, time, absentTeacher, lesson, schoolClass });
+                    }
                 }
             }
         }
@@ -331,7 +344,7 @@ export default function Timetable({}: TimetableProps) {
             userId: user.uid,
             createdAt: new Date().toISOString(),
         };
-        batch.set(subRef, newSub);
+        batch.set(subRef, { ...newSub, id: subRef.id });
 
         await commitBatchWithContext(batch, {
             operation: 'create',
@@ -352,8 +365,26 @@ export default function Timetable({}: TimetableProps) {
       <CardHeader>
         <CardTitle className="text-xl">זמינות מורים להחלפה</CardTitle>
         <CardDescription>
-          הטבלה מציגה מורים הנוכחים בבית הספר אך אינם משובצים לשיעור או בחופש. לחץ על שם מורה כדי לשבץ אותו.
+          הטבלה מציגה מורים שאינם משובצים לשיעור. לחץ על שם מורה כדי לשבץ אותו כמחליף.
         </CardDescription>
+        <div className="mt-4 pt-4 border-t">
+          <RadioGroup 
+              defaultValue="in_school" 
+              className="flex items-center gap-4"
+              onValueChange={setAvailabilityFilter}
+              value={availabilityFilter}
+            >
+              <Label className="font-normal text-sm">הצג:</Label>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                  <RadioGroupItem value="in_school" id="filter-in_school" />
+                  <Label htmlFor="filter-in_school" className="font-normal">פנויים בביה"ס</Label>
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                  <RadioGroupItem value="all_not_teaching" id="filter-all_not_teaching" />
+                  <Label htmlFor="filter-all_not_teaching" className="font-normal">כלל הלא-מלמדים</Label>
+              </div>
+          </RadioGroup>
+        </div>
       </CardHeader>
       <CardContent>
         <ScrollArea className="w-full whitespace-nowrap rounded-md border">
@@ -390,8 +421,8 @@ export default function Timetable({}: TimetableProps) {
                                 <td key={`${day}-${slot.start}`} className={cn("p-2 align-top h-24 border-r", slot.type === 'break' && 'bg-muted/30')}>
                                 {slot.type === 'break' ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
                                     <div className="flex flex-col items-center gap-1.5 justify-center h-full">
-                                        {uncoveredInSlot && uncoveredInSlot.map(({ teacher, lesson }) => (
-                                            <Badge key={teacher.id} variant={'destructive'} className="font-normal">
+                                        {uncoveredInSlot && uncoveredInSlot.map(({ teacher }, index) => (
+                                            <Badge key={`${teacher.id}-${index}`} variant={'destructive'} className="font-normal">
                                                 <UserX className="h-3 w-3 ml-1" />
                                                 דרוש מחליף ({teacher.name})
                                             </Badge>
@@ -405,11 +436,12 @@ export default function Timetable({}: TimetableProps) {
                                         {availableSubs.map(teacher => (
                                            <Button 
                                              key={teacher.id} 
-                                             variant={'secondary'} 
+                                             variant={teacher.isInSchool ? 'secondary' : 'outline'} 
                                              size="sm" 
                                              className="h-auto px-2 py-1 font-normal"
                                              onClick={() => openAssignDialog(teacher, day, slot.start)}
                                             >
+                                               {!teacher.isInSchool && <Home className="h-3 w-3 ml-1 text-muted-foreground"/>}
                                                 {teacher.name}
                                            </Button>
                                         ))}
