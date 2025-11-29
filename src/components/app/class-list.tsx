@@ -162,7 +162,7 @@ export default function ClassList({ initialClasses, allTeachers, onClassesUpdate
       
       <ClassTimetableDialog
         isOpen={!!classToView}
-        onOpenChange={() => setClassToView(null)}
+        onOpenChange={(isOpen) => !isOpen && setClassToView(null)}
         schoolClass={classToView}
         allTeachers={allTeachers}
         isEditing={false}
@@ -171,7 +171,7 @@ export default function ClassList({ initialClasses, allTeachers, onClassesUpdate
 
       <ClassTimetableDialog
         isOpen={!!classToEditSchedule}
-        onOpenChange={() => setClassToEditSchedule(null)}
+        onOpenChange={(isOpen) => !isOpen && setClassToEditSchedule(null)}
         schoolClass={classToEditSchedule}
         allTeachers={allTeachers}
         onUpdateSchedule={handleUpdateSchedule}
