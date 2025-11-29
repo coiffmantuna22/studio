@@ -86,47 +86,45 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-            <div className="relative">
-                <table className="w-full text-sm text-center table-fixed">
-                    <thead>
-                        <tr className="bg-muted/40">
-                        <th className="sticky left-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
+        <ScrollArea className="w-full whitespace-nowrap rounded-md border" viewportClassName="relative">
+            <table className="w-full text-sm text-center table-fixed">
+                <thead>
+                    <tr className="bg-muted/40">
+                    <th className="sticky left-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
+                    {daysOfWeek.map(day => (
+                        <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[150px]">{day}</th>
+                    ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {timeSlots.map(slot => (
+                    <tr key={slot.id} className="border-t">
+                        <td className="sticky left-0 font-semibold bg-card p-2 w-40 z-10 text-center">
+                            <div>{slot.start} - {slot.end}</div>
+                            {slot.type === 'break' && <Badge variant="outline" className='mt-1'>הפסקה</Badge>}
+                        </td>
                         {daysOfWeek.map(day => (
-                            <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[150px]">{day}</th>
+                        <td key={`${day}-${slot.start}`} className={cn("p-2 align-top h-24 border-r", slot.type === 'break' && 'bg-muted/30')}>
+                           {slot.type === 'break' ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
+                            <div className="flex flex-wrap gap-1.5 justify-center">
+                                {timetableData[day]?.[slot.start]?.length > 0 ? (
+                                    timetableData[day][slot.start].map(teacher => (
+                                    <Badge key={teacher.name} variant={teacher.isAbsent ? 'destructive': 'secondary'} className="font-normal">
+                                        {teacher.isAbsent && <UserX className="h-3 w-3 ml-1" />}
+                                        {teacher.name}
+                                    </Badge>
+                                    ))
+                                ) : (
+                                    <span className="text-muted-foreground text-xs opacity-70">--</span>
+                                )}
+                            </div>
+                           )}
+                        </td>
                         ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {timeSlots.map(slot => (
-                        <tr key={slot.id} className="border-t">
-                            <td className="sticky left-0 font-semibold bg-card p-2 w-40 z-10 text-center">
-                                <div>{slot.start} - {slot.end}</div>
-                                {slot.type === 'break' && <Badge variant="outline" className='mt-1'>הפסקה</Badge>}
-                            </td>
-                            {daysOfWeek.map(day => (
-                            <td key={`${day}-${slot.start}`} className={cn("p-2 align-top h-24 border-r", slot.type === 'break' && 'bg-muted/30')}>
-                               {slot.type === 'break' ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
-                                <div className="flex flex-wrap gap-1.5 justify-center">
-                                    {timetableData[day]?.[slot.start]?.length > 0 ? (
-                                        timetableData[day][slot.start].map(teacher => (
-                                        <Badge key={teacher.name} variant={teacher.isAbsent ? 'destructive': 'secondary'} className="font-normal">
-                                            {teacher.isAbsent && <UserX className="h-3 w-3 ml-1" />}
-                                            {teacher.name}
-                                        </Badge>
-                                        ))
-                                    ) : (
-                                        <span className="text-muted-foreground text-xs opacity-70">--</span>
-                                    )}
-                                </div>
-                               )}
-                            </td>
-                            ))}
-                        </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                    </tr>
+                    ))}
+                </tbody>
+            </table>
             <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </CardContent>
