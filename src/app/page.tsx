@@ -88,11 +88,11 @@ export default function Home() {
 
   const todaysAbsences = useMemo(() => {
     const today = startOfDay(new Date());
-    
-    return (teachers || [])
+    if (!teachers || teachers.length === 0) return [];
+  
+    return teachers
       .map(teacher => {
         const todaysTeacherAbsences = (teacher.absences || []).filter(absence => {
-          if (typeof absence.date !== 'string' && !(absence.date instanceof Date)) return false;
           try {
             const absenceDate = typeof absence.date === 'string' ? new Date(absence.date) : absence.date;
             return isSameDay(startOfDay(absenceDate), today);
@@ -100,69 +100,99 @@ export default function Home() {
             return false;
           }
         });
-
+  
         if (todaysTeacherAbsences.length === 0) return null;
-
+  
         const dayOfWeek = daysOfWeek[today.getDay()];
-        const affectedLessons: any[] = [];
-        
         const teacherScheduleForToday = teacher.schedule?.[dayOfWeek] || {};
-
-        Object.entries(teacherScheduleForToday).forEach(([time, lesson]) => {
-          if (lesson && lesson.classId) {
-            const isAbsentDuringLesson = todaysTeacherAbsences.some(absence => {
-              if (absence.isAllDay) return true;
-              const lessonStart = parseTimeToNumber(time);
-              const absenceStart = parseTimeToNumber(absence.startTime);
-              const absenceEnd = parseTimeToNumber(absence.endTime);
-              return lessonStart >= absenceStart && lessonStart < absenceEnd;
-            });
-            
-            if (isAbsentDuringLesson) {
-              const schoolClass = allClasses.find(c => c.id === lesson.classId);
-              if (schoolClass) {
-                const isCovered = allSubstitutions.some(sub => 
-                  isSameDay(startOfDay(new Date(sub.date)), today) &&
-                  sub.time === time &&
-                  sub.classId === lesson.classId
-                );
-                affectedLessons.push({ ...lesson, time, className: schoolClass.name, isCovered, absentTeacherName: teacher.name });
+        
+        const affectedLessons: any[] = Object.entries(teacherScheduleForToday)
+          .map(([time, lesson]) => {
+            if (lesson && lesson.classId) {
+              const isAbsentDuringLesson = todaysTeacherAbsences.some(absence => {
+                if (absence.isAllDay) return true;
+                const lessonStart = parseTimeToNumber(time);
+                const absenceStart = parseTimeToNumber(absence.startTime);
+                const absenceEnd = parseTimeToNumber(absence.endTime);
+                return lessonStart >= absenceStart && lessonStart < absenceEnd;
+              });
+  
+              if (isAbsentDuringLesson) {
+                const schoolClass = allClasses.find(c => c.id === lesson.classId);
+                if (schoolClass) {
+                  const isCovered = allSubstitutions.some(sub => 
+                    isSameDay(startOfDay(new Date(sub.date)), today) &&
+                    sub.time === time &&
+                    sub.classId === lesson.classId
+                  );
+                  return { ...lesson, time, className: schoolClass.name, isCovered, absentTeacherName: teacher.name };
+                }
               }
             }
-          }
-        });
-
+            return null;
+          })
+          .filter(Boolean);
+  
         return { teacher, absences: todaysTeacherAbsences, affectedLessons };
       })
-      .filter(item => item !== null && item.absences.length > 0);
+      .filter(item => item !== null && item.absences.length > 0) as { teacher: Teacher, absences: AbsenceDay[], affectedLessons: any[] }[];
   }, [teachers, allClasses, allSubstitutions]);
 
 
   const affectedClasses = useMemo(() => {
-    if (!todaysAbsences) return [];
-  
-    const allAffectedLessons = todaysAbsences.flatMap(absence => absence.affectedLessons);
-    if (allAffectedLessons.length === 0) return [];
-  
-    const lessonsByClass = groupBy(allAffectedLessons, 'classId');
-  
-    return Object.entries(lessonsByClass).map(([classId, lessons]) => {
-      const schoolClass = allClasses.find(c => c.id === classId);
-      const uncoveredLessons = lessons.filter(l => !l.isCovered);
-      const isFullyCovered = uncoveredLessons.length === 0;
-  
-      return {
-        classId,
-        className: schoolClass?.name || 'Unknown Class',
-        isFullyCovered,
-        lessons: uncoveredLessons.map(l => ({ 
-          subject: l.subject, 
-          time: l.time, 
-          absentTeacherName: l.absentTeacherName 
-        })),
-      };
+    const today = startOfDay(new Date());
+    const affected = new Map<string, { classId: string; className: string; lessons: any[] }>();
+
+    todaysAbsences.forEach(({ teacher, absences }) => {
+        const dayOfWeek = daysOfWeek[today.getDay()];
+        const teacherSchedule = teacher.schedule?.[dayOfWeek] || {};
+
+        Object.entries(teacherSchedule).forEach(([time, lesson]) => {
+            if (!lesson || !lesson.classId) return;
+
+            const isAbsentDuringLesson = absences.some(absence => {
+                if (absence.isAllDay) return true;
+                const lessonStart = parseTimeToNumber(time);
+                const absenceStart = parseTimeToNumber(absence.startTime);
+                const absenceEnd = parseTimeToNumber(absence.endTime);
+                return lessonStart >= absenceStart && lessonStart < absenceEnd;
+            });
+            
+            if (isAbsentDuringLesson) {
+                 const schoolClass = allClasses.find(c => c.id === lesson.classId);
+                 if (schoolClass) {
+                    if (!affected.has(schoolClass.id)) {
+                        affected.set(schoolClass.id, {
+                            classId: schoolClass.id,
+                            className: schoolClass.name,
+                            lessons: [],
+                        });
+                    }
+                    affected.get(schoolClass.id)!.lessons.push({
+                        ...lesson,
+                        time,
+                        absentTeacherName: teacher.name,
+                    });
+                 }
+            }
+        });
     });
-  }, [todaysAbsences, allClasses]);
+
+    return Array.from(affected.values()).map(classData => {
+        const uncoveredLessons = classData.lessons.filter(lesson => 
+            !allSubstitutions.some(sub => 
+                isSameDay(startOfDay(new Date(sub.date)), today) &&
+                sub.time === lesson.time &&
+                sub.classId === lesson.classId
+            )
+        );
+        return {
+            ...classData,
+            isFullyCovered: uncoveredLessons.length === 0,
+            lessons: uncoveredLessons,
+        };
+    });
+}, [todaysAbsences, allClasses, allSubstitutions]);
 
 
   const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
