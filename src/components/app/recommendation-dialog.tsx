@@ -125,7 +125,7 @@ export default function RecommendationDialog({
               בטל
             </Button>
           </DialogClose>
-           <Button type="button" onClick={handleConfirm} disabled={results.length === 0}>
+           <Button type="button" onClick={handleConfirm} disabled={results.every(r => r.recommendation === null)}>
               עדכן מערכת שעות
             </Button>
         </DialogFooter>

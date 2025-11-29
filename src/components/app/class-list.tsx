@@ -57,7 +57,7 @@ export default function ClassList({ initialClasses, allTeachers, onClassesUpdate
 
 
   return (
-    <Card className="mt-6">
+    <Card className="mt-6 border-border/80 border rounded-2xl">
       <CardHeader className="flex-row items-center justify-between">
         <div>
             <CardTitle className="text-xl">כיתות לימוד</CardTitle>
