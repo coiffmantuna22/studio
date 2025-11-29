@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Book, Calendar, UserX, Pencil, Trash2, CalendarClock } from 'lucide-react';
+import { Book, UserX, Pencil, Trash2, CalendarClock, Clock } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +21,6 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { MoreVertical } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 
@@ -32,19 +31,6 @@ interface TeacherCardProps {
   onDelete: () => void;
   onViewSchedule: () => void;
   availabilityStatus: TeacherAvailabilityStatus;
-}
-
-const formatAvailability = (availability: Teacher['availability']) => {
-  const presentDays = availability
-    .filter(day => day.slots.length > 0)
-    .map(day => day.day.substring(0, 3));
-  if (presentDays.length === 0) {
-    return 'לא נוכח/ת';
-  }
-  if (presentDays.length > 3) {
-    return `${presentDays.slice(0, 3).join(', ')}...`;
-  }
-  return presentDays.join(', ');
 }
 
 const AvailabilityBadge = ({ status }: { status: TeacherAvailabilityStatus }) => {
@@ -73,8 +59,8 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
         </Avatar>
         <div className="flex-1">
           <CardTitle>{teacher.name}</CardTitle>
-          <div className='mt-1'>
-            <AvailabilityBadge status={availabilityStatus} />
+          <div className='mt-1 text-xs text-muted-foreground'>
+            מקצועות: {teacher.subjects.join(', ')}
           </div>
         </div>
          <DropdownMenu>
@@ -111,23 +97,12 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
       </CardHeader>
       <CardContent className="flex-grow space-y-4">
         <div className="flex items-start gap-3">
-          <Book className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
+          <Clock className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
           <div>
-            <h4 className="font-semibold text-sm">מקצועות</h4>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {teacher.subjects.map((subject) => (
-                <Badge key={subject} variant="secondary">
-                  {subject}
-                </Badge>
-              ))}
+            <h4 className="font-semibold text-sm">סטטוס נוכחי</h4>
+            <div className="mt-1">
+                <AvailabilityBadge status={availabilityStatus} />
             </div>
-          </div>
-        </div>
-        <div className="flex items-start gap-3">
-          <Calendar className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
-          <div>
-            <h4 className="font-semibold text-sm">שעות נוכחות</h4>
-            <p className="text-sm text-muted-foreground">{formatAvailability(teacher.availability)}</p>
           </div>
         </div>
       </CardContent>
