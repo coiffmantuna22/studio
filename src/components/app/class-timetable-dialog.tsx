@@ -204,10 +204,10 @@ export default function ClassTimetableDialog({
           <div className="relative">
             <table className="w-full text-sm text-center table-fixed">
               <thead>
-                <tr className="bg-muted">
-                  <th className="sticky right-0 bg-muted p-2 w-28 z-10">שעה</th>
+                <tr className="bg-muted/40">
+                  <th className="sticky right-0 top-0 bg-muted/40 p-2 w-28 z-20">שעה</th>
                   {daysOfWeek.map(day => (
-                    <th key={day} className="p-2 min-w-[150px]">{day}</th>
+                    <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[150px]">{day}</th>
                   ))}
                 </tr>
               </thead>
