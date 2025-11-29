@@ -106,8 +106,7 @@ export default function TeacherList({
   ) => {
     const dayMap = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
     const updatedClasses = JSON.parse(JSON.stringify(allClasses)) as SchoolClass[];
-    let lessonsUpdatedCount = 0;
-
+    
     results.forEach(res => {
       const substituteId = getSubstituteTeacherId(res.recommendation);
       if (substituteId) {
@@ -115,7 +114,6 @@ export default function TeacherList({
         if (classToUpdate) {
           const dayOfWeek = dayMap[getDay(res.date)];
           if (classToUpdate.schedule[dayOfWeek]?.[res.time]) {
-             lessonsUpdatedCount++;
             classToUpdate.schedule[dayOfWeek][res.time]!.teacherId = substituteId;
           }
         }
@@ -150,26 +148,40 @@ export default function TeacherList({
     
     const teacherScheduleUpdates = new Map<string, ClassSchedule>();
 
-    recommendation.results.forEach(res => {
-        const subId = getSubstituteTeacherId(res.recommendation);
-        if(!subId) return;
+    // Use newClassSchedules to determine updates
+    recommendation.newClassSchedules.forEach(updatedClass => {
+        const originalClass = allClasses.find(c => c.id === updatedClass.id);
+        if (!originalClass) return;
+        
+        daysOfWeek.forEach(day => {
+            Object.keys(updatedClass.schedule[day] || {}).forEach(time => {
+                const updatedLesson = updatedClass.schedule[day]?.[time];
+                const originalLesson = originalClass.schedule[day]?.[time];
 
-        lessonsUpdatedCount++;
+                // If a change occurred
+                if (updatedLesson?.teacherId !== originalLesson?.teacherId) {
+                    lessonsUpdatedCount++;
+                    // Remove lesson from original teacher's schedule if they existed
+                    if (originalLesson?.teacherId) {
+                        const originalTeacherId = originalLesson.teacherId;
+                        const teacherSchedule = teacherScheduleUpdates.get(originalTeacherId) || (teachers.find(t=>t.id === originalTeacherId)?.schedule ? JSON.parse(JSON.stringify(teachers.find(t=>t.id === originalTeacherId)!.schedule)) : {});
+                        if (teacherSchedule[day]?.[time]?.classId === updatedClass.id) {
+                            teacherSchedule[day][time] = null;
+                        }
+                        teacherScheduleUpdates.set(originalTeacherId, teacherSchedule);
+                    }
 
-        const day = dayMap[getDay(res.date)];
-        const time = res.time;
-
-        const subSchedule = teacherScheduleUpdates.get(subId) || (teachers.find(t=>t.id === subId)?.schedule ? JSON.parse(JSON.stringify(teachers.find(t=>t.id === subId)!.schedule)) : {});
-        subSchedule[day] = subSchedule[day] || {};
-        subSchedule[day][time] = {subject: res.lesson.subject, teacherId: subId, classId: res.classId};
-        teacherScheduleUpdates.set(subId, subSchedule);
-
-        const absentTeacherId = recommendation.absentTeacher.id;
-        const absentTeacherSchedule = teacherScheduleUpdates.get(absentTeacherId) || (recommendation.absentTeacher.schedule ? JSON.parse(JSON.stringify(recommendation.absentTeacher.schedule)) : {});
-        if (absentTeacherSchedule[day]?.[time]) {
-            absentTeacherSchedule[day][time] = null;
-        }
-        teacherScheduleUpdates.set(absentTeacherId, absentTeacherSchedule);
+                    // Add lesson to new teacher's schedule
+                    if (updatedLesson?.teacherId) {
+                        const newTeacherId = updatedLesson.teacherId;
+                        const subSchedule = teacherScheduleUpdates.get(newTeacherId) || (teachers.find(t=>t.id === newTeacherId)?.schedule ? JSON.parse(JSON.stringify(teachers.find(t=>t.id === newTeacherId)!.schedule)) : {});
+                        subSchedule[day] = subSchedule[day] || {};
+                        subSchedule[day][time] = { ...updatedLesson, classId: updatedClass.id };
+                        teacherScheduleUpdates.set(newTeacherId, subSchedule);
+                    }
+                }
+            });
+        });
     });
 
     for(const [teacherId, schedule] of teacherScheduleUpdates.entries()) {
@@ -183,9 +195,8 @@ export default function TeacherList({
       });
     } else {
         toast({
-        variant: "destructive",
-        title: "פעולה בוטלה",
-        description: "לא נבחרו המלצות ולכן לא בוצע עדכון.",
+        title: "לא בוצעו שינויים",
+        description: "לא נמצאו המלצות לשיבוץ ולכן מערכת השעות לא עודכנה.",
       });
     }
 
@@ -221,7 +232,7 @@ export default function TeacherList({
       <CardHeader>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
             <div className='flex-1'>
-                <CardTitle className="text-xl">פרופילי מורים</CardTitle>
+                <CardTitle className="text-xl font-bold">פרופילי מורים</CardTitle>
                 <CardDescription>ניהול מורים מחליפים וסימון היעדרויות.</CardDescription>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
