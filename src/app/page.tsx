@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -85,24 +86,8 @@ export default function Home() {
         });
 
         const synchronizedTeachers = initialTeachers.map(teacher => {
-            const newSchedule: ClassSchedule = {};
-            daysOfWeek.forEach(day => {
-                newSchedule[day] = {};
-                if (teacher.schedule?.[day]) {
-                    Object.keys(teacher.schedule[day]).forEach(time => {
-                        const lesson = teacher.schedule[day]?.[time];
-                        if(lesson && lesson.classId) {
-                            const newClassRef = classRefMap.get(lesson.classId);
-                            if (newClassRef) {
-                                newSchedule[day]![time] = { ...lesson, classId: newClassRef.id, teacherId: '' }; // teacherId will be set later
-                            }
-                        }
-                    })
-                }
-            })
-            
             const newTeacherRef = teacherRefMap.get(teacher.id)!;
-            return { ...teacher, id: newTeacherRef.id, userId: user.uid, schedule: newSchedule };
+            return { ...teacher, id: newTeacherRef.id, userId: user.uid, schedule: {} };
         });
 
         const synchronizedClasses = defaultClasses.map(sc => {
@@ -126,17 +111,15 @@ export default function Home() {
             return { ...sc, id: newClassRef.id, userId: user.uid, schedule: newSchedule };
         });
 
-        // Now, populate teacher schedules based on class schedules
+        // Now, populate teacher schedules based on the newly synchronized class schedules
         synchronizedTeachers.forEach(teacher => {
-             const originalTeacherId = Array.from(teacherRefMap.entries()).find(([, ref]) => ref.id === teacher.id)?.[0] || teacher.id;
              const newTeacherSchedule: ClassSchedule = {};
               daysOfWeek.forEach(day => {
                 newTeacherSchedule[day] = {};
                 synchronizedClasses.forEach(sc => {
                     if (sc.schedule[day]) {
                         Object.entries(sc.schedule[day]).forEach(([time, lesson]) => {
-                             const originalLessonTeacherRef = teacherRefMap.get(lesson?.teacherId || '');
-                             if(lesson && originalLessonTeacherRef?.id === teacher.id) {
+                             if(lesson && lesson.teacherId === teacher.id) {
                                 newTeacherSchedule[day]![time] = { ...lesson, classId: sc.id };
                             }
                         })
