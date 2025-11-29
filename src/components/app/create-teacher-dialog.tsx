@@ -101,6 +101,12 @@ export default function CreateTeacherDialog({
   }, [isOpen, isEditMode, teacherToEdit, form]);
 
   const onSubmit = (values: FormValues) => {
+    const fallback = values.name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase();
+
     const teacherData = {
       name: values.name,
       subjects: values.subjects,
@@ -111,7 +117,7 @@ export default function CreateTeacherDialog({
     if (isEditMode && teacherToEdit) {
       onEditTeacher({ ...teacherData, id: teacherToEdit.id });
     } else {
-      onAddTeacher(teacherData);
+      onAddTeacher({...teacherData, avatar: {fallback}});
     }
     
     onOpenChange(false);

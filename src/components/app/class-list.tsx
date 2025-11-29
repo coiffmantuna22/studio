@@ -30,30 +30,23 @@ import { Input } from '../ui/input';
 interface ClassListProps {
   initialClasses: SchoolClass[];
   allTeachers: Teacher[];
-  onClassesUpdate: (classes: SchoolClass[]) => void;
+  onAddClass: (name: string) => void;
+  onDeleteClass: (classId: string) => void;
+  onUpdateSchedule: (classId: string, schedule: ClassSchedule) => void;
 }
 
-export default function ClassList({ initialClasses, allTeachers, onClassesUpdate }: ClassListProps) {
+export default function ClassList({ initialClasses, allTeachers, onAddClass, onDeleteClass, onUpdateSchedule }: ClassListProps) {
   const [isCreateClassOpen, setCreateClassOpen] = useState(false);
   const [classToView, setClassToView] = useState<SchoolClass | null>(null);
   const [classToEditSchedule, setClassToEditSchedule] = useState<SchoolClass | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const handleAddClass = (className: string) => {
-    const newClass: SchoolClass = {
-      id: `c${Date.now()}`,
-      name: className,
-      schedule: {}, // Initially empty schedule
-    };
-    onClassesUpdate([...initialClasses, newClass]);
-  };
-
   const handleDeleteClass = (classId: string) => {
-    onClassesUpdate(initialClasses.filter(c => c.id !== classId));
+    onDeleteClass(classId);
   };
   
   const handleUpdateSchedule = (classId: string, newSchedule: ClassSchedule) => {
-    onClassesUpdate(initialClasses.map(c => c.id === classId ? { ...c, schedule: newSchedule } : c));
+    onUpdateSchedule(classId, newSchedule);
     setClassToEditSchedule(null);
   };
 
@@ -63,14 +56,14 @@ export default function ClassList({ initialClasses, allTeachers, onClassesUpdate
 
 
   return (
-    <Card className="mt-6 border border-border/80 rounded-2xl">
+    <Card className="mt-6 border-border/80 rounded-2xl">
       <CardHeader>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
-          <div>
+          <div className='flex-1'>
               <CardTitle className="text-xl">כיתות לימוד</CardTitle>
               <CardDescription>ניהול מערכת השעות הכיתתית.</CardDescription>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <div className="relative flex-grow">
                   <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -157,7 +150,7 @@ export default function ClassList({ initialClasses, allTeachers, onClassesUpdate
       <CreateClassDialog
         isOpen={isCreateClassOpen}
         onOpenChange={setCreateClassOpen}
-        onAddClass={handleAddClass}
+        onAddClass={onAddClass}
       />
       
       <ClassTimetableDialog
@@ -174,7 +167,7 @@ export default function ClassList({ initialClasses, allTeachers, onClassesUpdate
         onOpenChange={(isOpen) => !isOpen && setClassToEditSchedule(null)}
         schoolClass={classToEditSchedule}
         allTeachers={allTeachers}
-        onUpdateSchedule={handleUpdateSchedule}
+        onUpdateSchedule={onUpdateSchedule}
         isEditing={true}
         allClasses={initialClasses}
       />

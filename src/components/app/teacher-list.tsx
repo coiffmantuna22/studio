@@ -26,14 +26,18 @@ import {
 interface TeacherListProps {
   initialTeachers: Teacher[];
   allClasses: SchoolClass[];
-  onTeachersUpdate: (teachers: Teacher[]) => void;
+  onAddTeacher: (teacher: Omit<Teacher, 'id'|'avatar'>) => void;
+  onEditTeacher: (teacher: Omit<Teacher, 'avatar'>) => void;
+  onDeleteTeacher: (teacherId: string) => void;
   onClassesUpdate: (classes: SchoolClass[]) => void;
 }
 
 export default function TeacherList({ 
   initialTeachers, 
   allClasses, 
-  onTeachersUpdate,
+  onAddTeacher,
+  onEditTeacher,
+  onDeleteTeacher,
   onClassesUpdate
 }: TeacherListProps) {
   const { toast } = useToast();
@@ -53,65 +57,41 @@ export default function TeacherList({
     return teacher ? teacher.id : null;
   }
 
-  const handleAddTeacher = (newTeacher: Omit<Teacher, 'id' | 'avatar'>) => {
-    const fallback = newTeacher.name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase();
-
-    const teacherWithId: Teacher = {
-      ...newTeacher,
-      id: String(Date.now()),
-      avatar: { fallback },
-    };
-    onTeachersUpdate([teacherWithId, ...initialTeachers]);
+ const handleCreateTeacher = (newTeacherData: Omit<Teacher, 'id' | 'avatar'>) => {
+    onAddTeacher(newTeacherData);
      toast({
       title: "פרופיל מורה נוצר",
-      description: `הפרופיל של ${teacherWithId.name} נוסף למערכת.`,
+      description: `הפרופיל של ${newTeacherData.name} נוסף למערכת.`,
     });
   };
 
-  const handleEditTeacher = (updatedTeacher: Omit<Teacher, 'avatar'>) => {
-    const fallback = updatedTeacher.name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase();
-
-    onTeachersUpdate(
-      initialTeachers.map((t) =>
-        t.id === updatedTeacher.id
-          ? { ...t, ...updatedTeacher, avatar: { fallback } }
-          : t
-      )
-    );
+  const handleUpdateTeacher = (updatedTeacherData: Omit<Teacher, 'avatar'>) => {
+    onEditTeacher(updatedTeacherData);
     setTeacherToEdit(null);
      toast({
       title: "פרופיל עודכן",
-      description: `הפרופיל של ${updatedTeacher.name} עודכן.`,
+      description: `הפרופיל של ${updatedTeacherData.name} עודכן.`,
     });
   };
 
   const handleDeleteTeacher = () => {
     if (!teacherToDelete) return;
     
-    // First, remove the teacher from all class schedules
     const updatedClasses = JSON.parse(JSON.stringify(allClasses));
     updatedClasses.forEach((schoolClass: SchoolClass) => {
       Object.keys(schoolClass.schedule).forEach(day => {
-        Object.keys(schoolClass.schedule[day]).forEach(time => {
-          const lesson = schoolClass.schedule[day][time];
-          if (lesson && lesson.teacherId === teacherToDelete.id) {
-            schoolClass.schedule[day][time] = null; // Unassign the teacher
-          }
-        });
+        if(schoolClass.schedule[day]) {
+            Object.keys(schoolClass.schedule[day]).forEach(time => {
+                const lesson = schoolClass.schedule[day][time];
+                if (lesson && lesson.teacherId === teacherToDelete.id) {
+                    delete schoolClass.schedule[day][time]; 
+                }
+            });
+        }
       });
     });
     onClassesUpdate(updatedClasses);
-
-    // Then, remove the teacher from the main list
-    onTeachersUpdate(initialTeachers.filter(t => t.id !== teacherToDelete.id));
+    onDeleteTeacher(teacherToDelete.id);
 
     toast({
       title: "המורה נמחק",
@@ -158,7 +138,7 @@ export default function TeacherList({
         const classToUpdate = updatedClasses.find((c: SchoolClass) => c.id === res.classId);
         if (classToUpdate) {
           const dayOfWeek = dayMap[getDay(res.date)];
-          if (classToUpdate.schedule[dayOfWeek]?.[res.time] !== undefined) {
+          if (classToUpdate.schedule[dayOfWeek]?.[res.time]) {
              lessonsUpdatedCount++;
             classToUpdate.schedule[dayOfWeek][res.time] = {
               subject: res.lesson.subject,
@@ -195,11 +175,11 @@ export default function TeacherList({
     <Card className="mt-6 border-border/80 rounded-2xl">
       <CardHeader>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
-            <div>
+            <div className='flex-1'>
                 <CardTitle className="text-xl">פרופילי מורים</CardTitle>
                 <CardDescription>ניהול מורים מחליפים וסימון היעדרויות.</CardDescription>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <div className="relative flex-grow">
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -253,8 +233,8 @@ export default function TeacherList({
       <CreateTeacherDialog
         isOpen={isCreateDialogOpen}
         onOpenChange={closeCreateDialog}
-        onAddTeacher={handleAddTeacher}
-        onEditTeacher={handleEditTeacher}
+        onAddTeacher={handleCreateTeacher}
+        onEditTeacher={handleUpdateTeacher}
         teacherToEdit={teacherToEdit}
       />
 

@@ -26,7 +26,11 @@ export interface Lesson {
   teacherId: string | null;
 }
 
-export type ClassSchedule = Record<string, Record<string, Lesson | null>>;
+export type ClassSchedule = {
+    [day: string]: {
+        [time: string]: Lesson | null;
+    }
+};
 
 export interface SchoolClass {
   id: string;
