@@ -467,7 +467,7 @@ const handleScheduleUpdate = async (
     );
   }
   
-  const isNewUser = !isDataLoading && user && teachers.length === 0 && schoolClasses.length === 0 && timeSlots.length === 0;
+  const isNewUser = !isDataLoading && user && (teachers?.length === 0) && (schoolClasses?.length === 0) && timeSlots.length === 0;
 
   if (isNewUser) {
       return (
@@ -601,6 +601,8 @@ const handleScheduleUpdate = async (
 
     </div>
   );
+
+    
 
     
 
