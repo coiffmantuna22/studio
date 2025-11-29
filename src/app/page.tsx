@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Header from '@/components/app/header';
 import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay, SubstitutionRecord } from '@/lib/types';
-import { isSameDay as isSameDate, startOfDay, getDay } from 'date-fns';
+import { isSameDay, startOfDay, getDay } from 'date-fns';
 
 const TeacherList = dynamic(() => import('@/components/app/teacher-list'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
@@ -94,6 +94,7 @@ export default function Home() {
     absentTeacher: Teacher;
     absenceDays: any[];
   } | null>(null);
+  const [absenceToReview, setAbsenceToReview] = useState<{ teacher: Teacher; absences: AbsenceDay[] } | null>(null);
 
 
   const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
@@ -487,7 +488,7 @@ const handleScheduleUpdate = async (
         const absences = (teacher.absences || []).filter(absence => {
           if (typeof absence.date !== 'string') return false;
           try {
-            return isSameDate(startOfDay(new Date(absence.date)), today);
+            return isSameDay(startOfDay(new Date(absence.date)), today);
           } catch (e) {
             return false;
           }
@@ -524,6 +525,13 @@ const handleScheduleUpdate = async (
     
     setRecommendation({ results: finalResults, absentTeacher: teacher, absenceDays: absences });
   };
+  
+    useEffect(() => {
+        if (absenceToReview) {
+            handleShowAffectedLessons(absenceToReview.teacher, absenceToReview.absences);
+            setAbsenceToReview(null);
+        }
+    }, [absenceToReview]);
 
   if (isDataLoading) {
     return (
@@ -571,7 +579,7 @@ const handleScheduleUpdate = async (
                                 <span className="font-semibold text-lg block">{teacher.name}</span>
                                 <p className="text-sm text-muted-foreground mt-1">{absenceTime}</p>
                               </div>
-                              <Button size="sm" variant="outline" className="w-full justify-center" onClick={() => handleShowAffectedLessons(teacher, absences)}>
+                              <Button size="sm" variant="outline" className="w-full justify-center" onClick={() => setAbsenceToReview({ teacher, absences })}>
                                   <ListChecks className="me-2 h-4 w-4" />
                                   הצג שיעורים מושפעים
                               </Button>
