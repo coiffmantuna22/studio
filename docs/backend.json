@@ -1,5 +1,28 @@
 {
   "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user's profile containing their basic information.",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique identifier, matching their Firebase Auth UID."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The timestamp when the user profile was created.",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
     "TeacherProfile": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "TeacherProfile",
@@ -160,6 +183,22 @@
   },
   "firestore": {
     "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores user profiles. The userId is the Firebase Auth UID. All data in the profile is considered private to the user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user profile, matching the Firebase Auth UID."
+            }
+          ]
+        }
+      },
       {
         "path": "/teacherProfiles/{teacherProfileId}",
         "definition": {

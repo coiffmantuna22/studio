@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -123,17 +121,6 @@ export default function Home() {
       const classDocs = (await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)))).docs;
       
       if (teacherDocs.length > 0 || classDocs.length > 0) return;
-
-      const teacherIdMap: { [key: string]: string } = {};
-
-      
-      const classIdMap: { [key: string]: string } = {};
-
-      
-
-      const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
-      const timetableData = { slots: [], userId: user.uid };
-      batch.set(settingsRef, timetableData);
       
       await commitBatchWithContext(batch, {
           operation: 'create',
@@ -482,17 +469,19 @@ const handleScheduleUpdate = async (
 
   const todaysAbsences = useMemo(() => {
     const today = startOfDay(new Date());
-    return (teachers || []).map(teacher => {
+    return (teachers || [])
+      .map(teacher => {
         const absences = (teacher.absences || []).filter(absence => {
-            if (typeof absence.date !== 'string') return false;
-            try {
-                return isSameDay(startOfDay(new Date(absence.date)), today);
-            } catch (e) {
-                return false;
-            }
+          if (typeof absence.date !== 'string') return false;
+          try {
+            return isSameDay(startOfDay(new Date(absence.date)), today);
+          } catch (e) {
+            return false;
+          }
         });
         return { teacher, absences };
-    }).filter(item => item.absences.length > 0);
+      })
+      .filter(item => item.absences.length > 0);
   }, [teachers]);
 
   const handleShowAffectedLessons = async (teacher: Teacher) => {

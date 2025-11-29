@@ -15,12 +15,15 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { commitBatchWithContext } from '@/lib/firestore-utils';
+import { writeBatch } from 'firebase/firestore';
 
 const signupSchema = z
   .object({
@@ -37,6 +40,7 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function SignupPage() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -53,22 +57,43 @@ export default function SignupPage() {
   const onSubmit = async (data: SignupFormValues) => {
     setIsLoading(true);
     setError(null);
-    if (!auth) {
+    if (!auth || !firestore) {
         setError('שגיאת אימות. נסה לרענן את הדף.');
         setIsLoading(false);
         return;
     }
     try {
-      await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const user = userCredential.user;
+
+      const batch = writeBatch(firestore);
+
+      const userRef = doc(firestore, 'users', user.uid);
+      const newUserProfile = {
+        uid: user.uid,
+        email: user.email,
+        createdAt: new Date().toISOString(),
+      };
+      batch.set(userRef, newUserProfile);
+
+      const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
+      const timetableData = { slots: [], userId: user.uid };
+      batch.set(settingsRef, timetableData);
+      
+      await commitBatchWithContext(batch, {
+          operation: 'create',
+          path: `user_data_creation/${user.uid}`
+      });
+
       toast({ title: 'החשבון נוצר בהצלחה!' });
       router.push('/');
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         setError('כתובת האימייל כבר בשימוש.');
       } else {
+        console.error(error);
         setError('שגיאה ביצירת החשבון. נסה שוב.');
       }
-      console.error(error);
     } finally {
         setIsLoading(false);
     }

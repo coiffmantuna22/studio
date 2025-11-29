@@ -34,22 +34,27 @@ service cloud.firestore {
     // Collection Rules
     // -------------------------------------------------------------------------
 
+    match /users/{userId} {
+      allow read, update, delete: if isOwner(userId);
+      allow create: if isSignedIn() && request.auth.uid == userId;
+    }
+
     match /teachers/{teacherId} {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && isCreatingOwnResource();
-      allow update, delete: if isSignedIn() && request.auth.uid == get(/databases/$(database)/documents/teachers/$(teacherId)).data.userId;
+      allow update, delete: if isSignedIn() && isOwner(get(/databases/$(database)/documents/teachers/$(teacherId)).data.userId);
     }
     
     match /classes/{classId} {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && isCreatingOwnResource();
-      allow update, delete: if isSignedIn() && request.auth.uid == get(/databases/$(database)/documents/classes/$(classId)).data.userId;
+      allow update, delete: if isSignedIn() && isOwner(get(/databases/$(database)/documents/classes/$(classId)).data.userId);
     }
     
     match /settings/{settingId} {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && isCreatingOwnResource();
-      allow update: if isSignedIn() && request.auth.uid == get(/databases/$(database)/documents/settings/$(settingId)).data.userId;
+      allow update: if isSignedIn() && isOwner(get(/databases/$(database)/documents/settings/$(settingId)).data.userId);
     }
   }
 }
