@@ -6,7 +6,7 @@ import type { Teacher, AbsenceDay, SchoolClass, AffectedLesson, TimeSlot } from 
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format, eachDayOfInterval, startOfDay, getDay } from 'date-fns';
+import { format, eachDayOfInterval, startOfDay, getDay, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -33,7 +33,7 @@ const absenceDaySchema = z.object({
 const formSchema = z.object({
   dateRange: z.object({
     from: z.date({ required_error: 'נדרש תאריך התחלה.' }),
-    to: z.date({ required_error: 'נדרש תאריך סיום.' }),
+    to: z.date().optional(),
   }),
   absenceDays: z.array(absenceDaySchema),
   reason: z.string().optional(),
@@ -141,8 +141,9 @@ export default function MarkAbsentDialog({
   const dateRange = form.watch('dateRange');
 
   useEffect(() => {
-    if (dateRange?.from && dateRange?.to) {
-      const days = eachDayOfInterval({ start: dateRange.from, end: dateRange.to });
+    if (dateRange?.from) {
+      const end = dateRange.to || dateRange.from;
+      const days = eachDayOfInterval({ start: dateRange.from, end: end });
       const newAbsenceDays = days.map(day => ({
         date: startOfDay(day),
         isAllDay: true,
@@ -174,9 +175,23 @@ export default function MarkAbsentDialog({
     try {
       const substituteProfiles = allTeachers.filter((t) => t.id !== teacher.id);
       
-      const affectedLessons = getAffectedLessons(teacher, values.absenceDays, allClasses, timeSlots);
+      const today = startOfDay(new Date());
+      const endOfWeek = addDays(today, 6 - getDay(today)); // Find the end of the current week (Friday)
       
-      const recommendationPromises = affectedLessons.map(affected => 
+      const affectedLessons = getAffectedLessons(teacher, values.absenceDays, allClasses, timeSlots);
+      const weekAbsenceDays = eachDayOfInterval({start: today, end: endOfWeek}).map(date => ({
+          date,
+          isAllDay: true,
+          startTime: '00:00',
+          endTime: '23:59',
+      }));
+      const futureAffectedLessons = getAffectedLessons(teacher, weekAbsenceDays, allClasses, timeSlots)
+        .filter(lesson => !affectedLessons.some(l => l.date === lesson.date && l.time === lesson.time));
+        
+      const allAffectedLessons = [...affectedLessons, ...futureAffectedLessons];
+
+
+      const recommendationPromises = allAffectedLessons.map(affected => 
         findSubstitute(
           {
             subject: affected.lesson.subject,
@@ -191,7 +206,7 @@ export default function MarkAbsentDialog({
       
       const recommendations = await Promise.all(recommendationPromises);
       
-      const finalResults = affectedLessons.map((lesson, index) => ({
+      const finalResults = allAffectedLessons.map((lesson, index) => ({
         ...lesson,
         recommendation: recommendations[index].recommendation,
         reasoning: recommendations[index].reasoning,
@@ -216,7 +231,7 @@ export default function MarkAbsentDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>סימון היעדרות עבור {teacher.name}</DialogTitle>
-          <DialogDescription>בחר את תאריכי ושעות ההיעדרות כדי למצוא מחליף.</DialogDescription>
+          <DialogDescription>בחר את תאריכי ושעות ההיעדרות כדי למצוא מחליף. יוצגו המלצות לכל השבוע הקרוב.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
@@ -365,3 +380,5 @@ export default function MarkAbsentDialog({
     </Dialog>
   );
 }
+
+    

@@ -29,6 +29,7 @@ import { Combobox } from '../ui/combobox';
 import { isTeacherAvailable, isTeacherAlreadyScheduled } from '@/lib/substitute-finder';
 import { startOfToday } from 'date-fns';
 import { Badge } from '../ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 
 interface ClassTimetableDialogProps {
@@ -215,6 +216,67 @@ export default function ClassTimetableDialog({
         onUpdateSchedule(schoolClass.id, localSchedule);
     }
   }
+  
+  const DayView = ({ day }: { day: string }) => (
+     <table className="w-full text-sm text-center table-fixed">
+        <thead className='bg-muted/40'>
+          <tr className='bg-muted/40'>
+            <th className="sticky top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
+            <th className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">{day}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {timeSlots.map(slot => {
+            const lesson = localSchedule?.[day]?.[slot.start] || null;
+            const teacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
+            const isBreak = slot.type === 'break';
+            return (
+              <tr key={slot.id} className="border-t">
+                <td className="sticky left-0 font-semibold bg-card p-2 w-40 z-10 text-center">
+                    <div>{slot.start} - {slot.end}</div>
+                    {isBreak && <Badge variant="outline" className='mt-1'>הפסקה</Badge>}
+                </td>
+                 <td className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30')}>
+                    {isEditing && !isBreak ? (
+                        <EditSlotPopover 
+                            day={day} 
+                            time={slot.start}
+                            lesson={lesson}
+                            onSave={handleSaveSlot}
+                            allTeachers={allTeachers}
+                            allClasses={allClasses}
+                            schoolClass={schoolClass}
+                            timeSlots={timeSlots}
+                        />
+                    ) : (
+                        <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-center">
+                        {isBreak ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
+                            lesson && teacher ? (
+                                <div className="bg-secondary/50 rounded-md p-2 text-right h-full flex flex-col justify-center">
+                                <div className="flex items-center gap-2">
+                                    <BookOpen className="h-4 w-4 text-primary shrink-0" />
+                                    <p className="font-semibold text-primary">{lesson.subject}</p>
+                                </div>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <p className="text-sm text-muted-foreground">{teacher.name}</p>
+                                </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-center h-full">
+                                    <span className="text-muted-foreground text-xs">--</span>
+                                </div>
+                            )
+                        )}
+                        </div>
+                    )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -228,74 +290,95 @@ export default function ClassTimetableDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-          <div className="relative">
-            <table className="w-full text-sm text-center table-fixed">
-              <thead className='bg-muted/40'>
-                <tr className='bg-muted/40'>
-                  <th className="sticky left-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
-                  {daysOfWeek.map(day => (
-                    <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">{day}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {timeSlots.map(slot => (
-                  <tr key={slot.id} className="border-t">
-                    <td className="sticky left-0 font-semibold bg-card p-2 w-40 z-10 text-center">
-                        <div>{slot.start} - {slot.end}</div>
-                        {slot.type === 'break' && <Badge variant="outline" className='mt-1'>הפסקה</Badge>}
-                    </td>
-                    {daysOfWeek.map(day => {
-                      const lesson = localSchedule?.[day]?.[slot.start] || null;
-                      const teacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
-                      const isBreak = slot.type === 'break';
-                      return (
-                        <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30')}>
-                            {isEditing && !isBreak ? (
-                                <EditSlotPopover 
-                                    day={day} 
-                                    time={slot.start}
-                                    lesson={lesson}
-                                    onSave={handleSaveSlot}
-                                    allTeachers={allTeachers}
-                                    allClasses={allClasses}
-                                    schoolClass={schoolClass}
-                                    timeSlots={timeSlots}
-                                />
-                            ) : (
-                                <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-center">
-                                {isBreak ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
-                                    lesson && teacher ? (
-                                        <div className="bg-secondary/50 rounded-md p-2 text-right h-full flex flex-col justify-center">
-                                        <div className="flex items-center gap-2">
-                                            <BookOpen className="h-4 w-4 text-primary shrink-0" />
-                                            <p className="font-semibold text-primary">{lesson.subject}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                                            <p className="text-sm text-muted-foreground">{teacher.name}</p>
-                                        </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center justify-center h-full">
-                                            <span className="text-muted-foreground text-xs">--</span>
-                                        </div>
-                                    )
-                                )}
-                                </div>
-                            )}
-                        </td>
-                      )
-                    })}
-                  </tr>
+        <Tabs defaultValue="all" className="w-full" dir='rtl'>
+            <div className='flex justify-center'>
+              <TabsList>
+                <TabsTrigger value="all">כל השבוע</TabsTrigger>
+                {daysOfWeek.map(day => (
+                  <TabsTrigger key={day} value={day}>{day}</TabsTrigger>
                 ))}
-              </tbody>
-            </table>
-          </div>
-          <ScrollBar orientation="horizontal" />
-        </ScrollArea>
-
+              </TabsList>
+            </div>
+            
+            <TabsContent value="all">
+                <ScrollArea className="w-full whitespace-nowrap rounded-md border mt-4">
+                  <div className="relative">
+                    <table className="w-full text-sm text-center table-fixed">
+                      <thead className='bg-muted/40'>
+                        <tr className='bg-muted/40'>
+                          <th className="sticky left-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
+                          {daysOfWeek.map(day => (
+                            <th key={day} className="sticky top-0 bg-muted/40 p-2 min-w-[140px]">{day}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {timeSlots.map(slot => (
+                          <tr key={slot.id} className="border-t">
+                            <td className="sticky left-0 font-semibold bg-card p-2 w-40 z-10 text-center">
+                                <div>{slot.start} - {slot.end}</div>
+                                {slot.type === 'break' && <Badge variant="outline" className='mt-1'>הפסקה</Badge>}
+                            </td>
+                            {daysOfWeek.map(day => {
+                              const lesson = localSchedule?.[day]?.[slot.start] || null;
+                              const teacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
+                              const isBreak = slot.type === 'break';
+                              return (
+                                <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30')}>
+                                    {isEditing && !isBreak ? (
+                                        <EditSlotPopover 
+                                            day={day} 
+                                            time={slot.start}
+                                            lesson={lesson}
+                                            onSave={handleSaveSlot}
+                                            allTeachers={allTeachers}
+                                            allClasses={allClasses}
+                                            schoolClass={schoolClass}
+                                            timeSlots={timeSlots}
+                                        />
+                                    ) : (
+                                        <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-center">
+                                        {isBreak ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
+                                            lesson && teacher ? (
+                                                <div className="bg-secondary/50 rounded-md p-2 text-right h-full flex flex-col justify-center">
+                                                <div className="flex items-center gap-2">
+                                                    <BookOpen className="h-4 w-4 text-primary shrink-0" />
+                                                    <p className="font-semibold text-primary">{lesson.subject}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                    <p className="text-sm text-muted-foreground">{teacher.name}</p>
+                                                </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full">
+                                                    <span className="text-muted-foreground text-xs">--</span>
+                                                </div>
+                                            )
+                                        )}
+                                        </div>
+                                    )}
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+            </TabsContent>
+            {daysOfWeek.map(day => (
+              <TabsContent key={day} value={day}>
+                <ScrollArea className="w-full whitespace-nowrap rounded-md border mt-4">
+                  <DayView day={day} />
+                  <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+              </TabsContent>
+            ))}
+        </Tabs>
+        
         <DialogFooter>
           {isEditing && <Button onClick={handleSaveChanges}>שמור שינויים</Button>}
           <DialogClose asChild>
@@ -308,3 +391,5 @@ export default function ClassTimetableDialog({
     </Dialog>
   );
 }
+
+    
