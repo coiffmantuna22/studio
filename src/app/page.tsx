@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Header from '@/components/app/header';
 import type { SchoolClass, Teacher, TimeSlot, ClassSchedule, Lesson, TeacherAvailabilityStatus, AffectedLesson, AbsenceDay } from '@/lib/types';
-import { isSameDay, startOfDay, getDay, format } from 'date-fns';
+import { startOfDay, getDay, format } from 'date-fns';
 import { he } from 'date-fns/locale';
 
 const TeacherList = dynamic(() => import('@/components/app/teacher-list'), {
@@ -621,3 +621,5 @@ const handleScheduleUpdate = async (
     </div>
   );
 }
+
+    
