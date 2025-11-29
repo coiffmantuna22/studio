@@ -79,6 +79,51 @@ export const initialTeachers: Teacher[] = [
     avatar: { fallback: 'מג' },
     preferences: 'יכול לאמן גם קבוצות ספורט',
   },
+  {
+    id: '6',
+    name: 'שרה כהן',
+    subjects: ['ספרות', 'לשון'],
+    availability: [
+      { day: 'ראשון', slots: [{ start: '08:00', end: '12:00' }] },
+      { day: 'שני', slots: [] },
+      { day: 'שלישי', slots: [{ start: '08:00', end: '12:00' }] },
+      { day: 'רביעי', slots: [] },
+      { day: 'חמישי', slots: [{ start: '08:00', end: '12:00' }] },
+      { day: 'שישי', slots: [] },
+    ],
+    avatar: { fallback: 'שכ' },
+    preferences: '',
+  },
+  {
+    id: '7',
+    name: 'יוסף לוי',
+    subjects: ['היסטוריה', 'אזרחות'],
+    availability: [
+      { day: 'ראשון', slots: [{ start: '12:00', end: '16:00' }] },
+      { day: 'שני', slots: [{ start: '12:00', end: '16:00' }] },
+      { day: 'שלישי', slots: [] },
+      { day: 'רביעי', slots: [{ start: '10:00', end: '14:00' }] },
+      { day: 'חמישי', slots: [] },
+      { day: 'שישי', slots: [] },
+    ],
+    avatar: { fallback: 'יל' },
+    preferences: 'מתמחה בהיסטוריה של המזרח התיכון',
+  },
+  {
+    id: '8',
+    name: 'נועה מזרחי',
+    subjects: ['מתמטיקה', 'מדעי המחשב'],
+    availability: [
+      { day: 'ראשון', slots: [{ start: '09:00', end: '15:00' }] },
+      { day: 'שני', slots: [{ start: '09:00', end: '15:00' }] },
+      { day: 'שלישי', slots: [{ start: '09:00', end: '15:00' }] },
+      { day: 'רביעי', slots: [{ start: '09:00', end: '15:00' }] },
+      { day: 'חמישי', slots: [{ start: '09:00', end: '15:00' }] },
+      { day: 'שישי', slots: [] },
+    ],
+    avatar: { fallback: 'נמ' },
+    preferences: 'ראש צוות פיתוח לשעבר',
+  }
 ];
 
 const generateEmptySchedule = () => {
@@ -98,23 +143,89 @@ export const initialClasses: SchoolClass[] = [
         id: 'c1',
         name: 'כיתה י׳1',
         schedule: {
-            ...generateEmptySchedule(),
-            'שני': {
-                ...generateEmptySchedule()['שני'],
+            'ראשון': {
+                '08:00': { subject: 'ספרות', teacherId: '6' },
                 '09:00': { subject: 'מתמטיקה', teacherId: '1' },
                 '10:00': { subject: 'מתמטיקה', teacherId: '1' },
                 '11:00': { subject: 'אנגלית', teacherId: '2' },
+                 '12:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '07:00': null, '18:00': null
+            },
+            'שני': {
+                '09:00': { subject: 'מתמטיקה', teacherId: '1' },
+                '10:00': { subject: 'מתמטיקה', teacherId: '1' },
+                '11:00': { subject: 'חינוך גופני', teacherId: '5' },
+                 '12:00': { subject: 'היסטוריה', teacherId: '7' },
+                '13:00': { subject: 'היסטוריה', teacherId: '7' },
+                 '07:00': null, '08:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
+            },
+            'שלישי': {
+                '08:00': { subject: 'ספרות', teacherId: '6' },
+                '09:00': { subject: 'ספרות', teacherId: '6' },
+                '10:00': { subject: 'אנגלית', teacherId: '2' },
+                '11:00': { subject: 'אנגלית', teacherId: '2' },
+                '12:00': { subject: 'כימיה', teacherId: '3' },
+                 '07:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
             },
             'רביעי': {
-                ...generateEmptySchedule()['רביעי'],
+                '10:00': { subject: 'אזרחות', teacherId: '7' },
                 '11:00': { subject: 'כימיה', teacherId: '3' },
                 '12:00': { subject: 'כימיה', teacherId: '3' },
-            }
+                '13:00': { subject: 'אמנות', teacherId: '4' },
+                '14:00': { subject: 'אמנות', teacherId: '4' },
+                '07:00': null, '08:00': null, '09:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
+            },
+            'חמישי': {
+                '08:00': { subject: 'ספרות', teacherId: '6' },
+                '09:00': { subject: 'לשון', teacherId: '6' },
+                '10:00': { subject: 'פיזיקה', teacherId: '1' },
+                '11:00': { subject: 'פיזיקה', teacherId: '1' },
+                 '12:00': { subject: 'חינוך גופני', teacherId: '5' },
+                 '07:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
+            },
+            'שישי': generateEmptySchedule()['שישי'],
         }
     },
     {
         id: 'c2',
         name: 'כיתה י״א3',
         schedule: generateEmptySchedule(),
+    },
+     {
+        id: 'c3',
+        name: 'כיתה ט׳1',
+        schedule: {
+            'ראשון': {
+                '09:00': { subject: 'מתמטיקה', teacherId: '8' },
+                '10:00': { subject: 'מתמטיקה', teacherId: '8' },
+                '11:00': { subject: 'היסטוריה', teacherId: '2' },
+                '07:00': null, '08:00': null, '12:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
+            },
+            'שני': {
+                '09:00': { subject: 'מדעי המחשב', teacherId: '8' },
+                '10:00': { subject: 'מדעי המחשב', teacherId: '8' },
+                '11:00': { subject: 'חינוך גופני', teacherId: '5' },
+                '07:00': null, '08:00': null, '12:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
+            },
+             ...generateEmptySchedule(),
+        }
+    },
+    {
+        id: 'c4',
+        name: 'כיתה י״ב2',
+        schedule: {
+             ...generateEmptySchedule(),
+             'רביעי': {
+                '09:00': { subject: 'ביולוגיה', teacherId: '3' },
+                '10:00': { subject: 'ביולוגיה', teacherId: '3' },
+                '11:00': { subject: 'מוזיקה', teacherId: '4' },
+                '07:00': null, '08:00': null, '12:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
+            },
+            'חמישי': {
+                '10:00': { subject: 'אנגלית', teacherId: '2' },
+                '11:00': { subject: 'אנגלית', teacherId: '2' },
+                '12:00': { subject: 'אזרחות', teacherId: '7' },
+                '07:00': null, '08:00': null, '09:00': null, '13:00': null, '14:00': null, '15:00': null, '16:00': null, '17:00': null, '18:00': null
+            }
+        }
     }
 ]
