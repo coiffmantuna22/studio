@@ -1,3 +1,4 @@
+
 import { getDay } from 'date-fns';
 import type { Teacher, SchoolClass, TimeSlot } from './types';
 
@@ -27,16 +28,27 @@ export function isTeacherAvailable(teacher: Teacher, date: Date, time: string, t
   const lessonStartNum = parseTimeToNumber(lessonSlot.start);
   const lessonEndNum = parseTimeToNumber(lessonSlot.end);
 
+  // 1. Is the teacher present at school?
   const availabilityForDay = teacher.availability.find(a => a.day === dayOfWeek);
   if (!availabilityForDay) {
     return false;
   }
-
-  return availabilityForDay.slots.some(slot => {
+  const isPresent = availabilityForDay.slots.some(slot => {
     const startNum = parseTimeToNumber(slot.start);
     const endNum = parseTimeToNumber(slot.end);
     return lessonStartNum >= startNum && lessonEndNum <= endNum;
   });
+
+  if (!isPresent) return false;
+
+  // 2. Is the teacher teaching a scheduled lesson at that time?
+  const isTeaching = teacher.schedule?.[dayOfWeek]?.[time];
+  if (isTeaching) {
+      return false;
+  }
+
+  // If present and not teaching, they are available.
+  return true;
 }
 
 export function isTeacherAlreadyScheduled(teacherId: string, date: Date, time: string, allClasses: SchoolClass[], ignoreClassId?: string): boolean {
@@ -72,47 +84,36 @@ export async function findSubstitute(
   timeSlots: TimeSlot[],
 ): Promise<FindSubstituteResult> {
   
-  let qualifiedTeachers = substitutePool.filter(t => t.subjects.includes(lessonDetails.subject));
-
-  if (qualifiedTeachers.length === 0) {
-     const anyAvailableTeacher = substitutePool.filter(t => 
-        isTeacherAvailable(t, lessonDetails.date, lessonDetails.time, timeSlots) && 
-        !isTeacherAlreadyScheduled(t.id, lessonDetails.date, lessonDetails.time, allClasses)
-     );
-     if(anyAvailableTeacher.length > 0) {
-        const bestOfWorst = anyAvailableTeacher[0];
-         return {
-            recommendation: bestOfWorst.name,
-            reasoning: `שימו לב: לא נמצא מורה המוכשר ב${lessonDetails.subject}. ${bestOfWorst.name} מוצע/ת כמפקח/ת בלבד מאחר והוא/היא זמין/ה.`,
-        };
-     }
-
-    return {
-      recommendation: null,
-      reasoning: 'לא נמצאו מחליפים בעלי הכשרה במקצוע זה, וגם לא נמצא מורה פנוי שיכול לשמש כמפקח.',
-    };
-  }
-
-  const availableQualifiedTeachers = qualifiedTeachers.filter(t => 
+  const availableTeachers = substitutePool.filter(t => 
       isTeacherAvailable(t, lessonDetails.date, lessonDetails.time, timeSlots) &&
       !isTeacherAlreadyScheduled(t.id, lessonDetails.date, lessonDetails.time, allClasses)
   );
 
-  if (availableQualifiedTeachers.length === 0) {
-    return {
-      recommendation: null,
-      reasoning: `כל המורים המוכשרים ב${lessonDetails.subject} אינם זמינים או כבר משובצים לשיעורים אחרים בשעה זו.`,
+  if(availableTeachers.length === 0) {
+      return {
+          recommendation: null,
+          reasoning: 'לא נמצאו מורים פנויים (נוכחים בבית הספר אך ללא שיעור) בשעה זו.',
+      };
+  }
+  
+  let qualifiedTeachers = availableTeachers.filter(t => t.subjects.includes(lessonDetails.subject));
+
+  if (qualifiedTeachers.length === 0) {
+     const bestOfWorst = availableTeachers[0]; // Just take the first available
+      return {
+        recommendation: bestOfWorst.name,
+        reasoning: `שימו לב: לא נמצא מורה פנוי המוכשר ב${lessonDetails.subject}. ${bestOfWorst.name} מוצע/ת כמפקח/ת בלבד מאחר והוא/היא זמין/ה.`,
     };
   }
   
-  const scoredTeachers = availableQualifiedTeachers.map(teacher => ({
+  const scoredTeachers = qualifiedTeachers.map(teacher => ({
     teacher,
     score: scoreTeacher(teacher, lessonDetails),
   })).sort((a, b) => b.score - a.score);
 
   const bestChoice = scoredTeachers[0].teacher;
   
-  let reasoning = `${bestChoice.name} זמין/ה ומוכשר/ת ב${lessonDetails.subject}.`;
+  let reasoning = `${bestChoice.name} פנוי/ה ומוכשר/ת ב${lessonDetails.subject}.`;
   if (bestChoice.preferences) {
       reasoning += ` העדפות: ${bestChoice.preferences}.`
   }

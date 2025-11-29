@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -7,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { daysOfWeek } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { Coffee, UserX } from 'lucide-react';
+import { Coffee, UserCheck, UserX } from 'lucide-react';
 import { getDay, isSameDay, startOfDay } from 'date-fns';
 
 interface TimetableProps {
@@ -41,6 +42,8 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
       const currentDayOfWeek = dayMap[dayIndex];
 
       const todaysAbsences = (teacher.absences || []).filter(absence => isSameDay(new Date(absence.date), today));
+      
+      const teacherSchedule = teacher.schedule || {};
 
       teacher.availability.forEach(availDay => {
         if (daysOfWeek.includes(availDay.day)) {
@@ -51,20 +54,27 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
             timeSlots.forEach(slot => {
                 if (slot.type === 'lesson') {
                     const slotStartNum = parseTimeToNumber(slot.start);
+                    // Check if teacher is present at school
                     if (slotStartNum >= startNum && slotStartNum < endNum) {
-                        if (data[availDay.day]?.[slot.start]) {
-                          let isAbsent = false;
-                          if(availDay.day === currentDayOfWeek && todaysAbsences.length > 0) {
-                              const lessonStart = parseTimeToNumber(slot.start);
-                              isAbsent = todaysAbsences.some(absence => {
-                                  if (absence.isAllDay) return true;
-                                  const absenceStart = parseTimeToNumber(absence.startTime);
-                                  const absenceEnd = parseTimeToNumber(absence.endTime);
-                                  return lessonStart >= absenceStart && lessonStart < absenceEnd;
-                              });
-                          }
+                        
+                        // Check if teacher is NOT teaching at this time
+                        const isTeaching = teacherSchedule[availDay.day]?.[slot.start];
 
-                           data[availDay.day][slot.start].push({ name: teacher.name, isAbsent });
+                        if (!isTeaching) {
+                            if (data[availDay.day]?.[slot.start]) {
+                            let isAbsent = false;
+                            if(availDay.day === currentDayOfWeek && todaysAbsences.length > 0) {
+                                const lessonStart = parseTimeToNumber(slot.start);
+                                isAbsent = todaysAbsences.some(absence => {
+                                    if (absence.isAllDay) return true;
+                                    const absenceStart = parseTimeToNumber(absence.startTime);
+                                    const absenceEnd = parseTimeToNumber(absence.endTime);
+                                    return lessonStart >= absenceStart && lessonStart < absenceEnd;
+                                });
+                            }
+
+                            data[availDay.day][slot.start].push({ name: teacher.name, isAbsent });
+                            }
                         }
                     }
                 }
@@ -80,9 +90,9 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
   return (
     <Card className="mt-6">
       <CardHeader>
-        <CardTitle className="text-xl">זמינות כלל המורים המחליפים</CardTitle>
+        <CardTitle className="text-xl">זמינות מורים להחלפה</CardTitle>
         <CardDescription>
-          הצגת זמינות המורים המחליפים לפי שעה. מורים שסומנו כנעדרים להיום יופיעו בהתאם.
+          מורים פנויים לפי שעה (נוכחים בבית הספר אך לא מלמדים). מורים שסומנו כנעדרים יסומנו באדום.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -110,7 +120,7 @@ export default function Timetable({ allTeachers, timeSlots }: TimetableProps) {
                                 {timetableData[day]?.[slot.start]?.length > 0 ? (
                                     timetableData[day][slot.start].map(teacher => (
                                     <Badge key={teacher.name} variant={teacher.isAbsent ? 'destructive': 'secondary'} className="font-normal">
-                                        {teacher.isAbsent && <UserX className="h-3 w-3 ml-1" />}
+                                        {teacher.isAbsent ? <UserX className="h-3 w-3 ml-1" /> : <UserCheck className="h-3 w-3 ml-1" />}
                                         {teacher.name}
                                     </Badge>
                                     ))

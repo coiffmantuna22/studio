@@ -31,16 +31,16 @@ interface TeacherCardProps {
 }
 
 const formatAvailability = (availability: Teacher['availability']) => {
-  const availableDays = availability
+  const presentDays = availability
     .filter(day => day.slots.length > 0)
     .map(day => day.day.substring(0, 3));
-  if (availableDays.length === 0) {
-    return 'לא זמין/ה';
+  if (presentDays.length === 0) {
+    return 'לא נוכח/ת';
   }
-  if (availableDays.length > 3) {
-    return `${availableDays.slice(0, 3).join(', ')}...`;
+  if (presentDays.length > 3) {
+    return `${presentDays.slice(0, 3).join(', ')}...`;
   }
-  return availableDays.join(', ');
+  return presentDays.join(', ');
 }
 
 export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, onViewSchedule }: TeacherCardProps) {
@@ -90,7 +90,7 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
         <div className="flex items-start gap-3">
           <Calendar className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
           <div>
-            <h4 className="font-semibold text-sm">זמינות להחלפה</h4>
+            <h4 className="font-semibold text-sm">שעות נוכחות</h4>
             <p className="text-sm text-muted-foreground">{formatAvailability(teacher.availability)}</p>
           </div>
         </div>

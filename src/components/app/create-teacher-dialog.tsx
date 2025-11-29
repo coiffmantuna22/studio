@@ -39,7 +39,7 @@ const dayAvailabilitySchema = z.object({
 const formSchema = z.object({
   name: z.string().min(2, { message: 'השם חייב להכיל לפחות 2 תווים.' }),
   subjects: z.array(z.string()).min(1, { message: 'אנא הזן לפחות מקצוע אחד.' }),
-  availability: z.array(dayAvailabilitySchema).min(1, { message: 'אנא ציין זמינות.' }),
+  availability: z.array(dayAvailabilitySchema).min(1, { message: 'אנא ציין שעות נוכחות.' }),
   preferences: z.string().optional(),
 });
 
@@ -162,8 +162,8 @@ export default function CreateTeacherDialog({
               name="availability"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>זמינות שבועית (להחלפות)</FormLabel>
-                   <p className="text-sm text-muted-foreground">סמן את השעות בהן המורה פנוי/ה לשמש כמחליפ/ה.</p>
+                  <FormLabel>שעות נוכחות שבועיות</FormLabel>
+                   <p className="text-sm text-muted-foreground">סמן את כל השעות בהן המורה נוכח/ת בבית הספר, כולל שיעורים קבועים והפסקות.</p>
                   <FormControl>
                     <WeeklyScheduleSelector {...field} timeSlots={timeSlots} />
                   </FormControl>
