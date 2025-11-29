@@ -23,7 +23,6 @@ import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
 import RecommendationDialog from '@/components/app/recommendation-dialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { initialClasses, initialTeachers } from '@/lib/data';
 
 const getAffectedLessons = (
   absentTeacher: Teacher,
@@ -112,58 +111,6 @@ export default function Home() {
     return availabilityMap;
   }, [teachers, timeSlots]);
 
-
-  const seedData = async () => {
-    if (!firestore || !user) return;
-    try {
-      const batch = writeBatch(firestore);
-      
-      const teacherDocs = (await getDocs(query(collection(firestore, 'teachers'), where('userId', '==', user.uid)))).docs;
-      const classDocs = (await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)))).docs;
-      
-      if (teacherDocs.length > 0 || classDocs.length > 0) return;
-
-      initialTeachers.forEach(teacherData => {
-          const newDocRef = doc(collection(firestore, 'teachers'));
-          const fallback = teacherData.name.split(' ').map(n => n[0]).join('').toUpperCase();
-          const newTeacher: Teacher = { 
-              ...teacherData, 
-              id: newDocRef.id, 
-              userId: user.uid, 
-              avatar: { fallback },
-              schedule: {},
-              absences: []
-          };
-          batch.set(newDocRef, newTeacher);
-      });
-
-      initialClasses.forEach(classData => {
-          const newDocRef = doc(collection(firestore, 'classes'));
-          const newClass: SchoolClass = {
-              ...classData,
-              id: newDocRef.id,
-              userId: user.uid
-          };
-          batch.set(newDocRef, newClass);
-      });
-      
-      await commitBatchWithContext(batch, {
-          operation: 'create',
-          path: `user_data_seed/${user.uid}`
-      });
-
-    } catch (e) {
-      if (!(e instanceof FirestorePermissionError)) {
-        const permissionError = new FirestorePermissionError({
-          operation: 'create',
-          path: `seed data for user ${user?.uid}`,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        throw permissionError;
-      }
-      throw e;
-    }
-  };
 
   const handleAddTeacher = async (newTeacherData: Omit<Teacher, 'id' | 'userId' | 'avatar'>) => {
     if (!firestore || !user) return;
@@ -421,8 +368,6 @@ const handleScheduleUpdate = async (
   const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
       
-      const isInitialSetup = timeSlots.length === 0 && (teachers?.length === 0) && (schoolClasses?.length === 0);
-
       const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
       const timetableData = { slots: newTimeSlots, userId: user.uid };
 
@@ -431,9 +376,6 @@ const handleScheduleUpdate = async (
       
       try {
         await commitBatchWithContext(batch, { operation: 'update', path: settingsRef.path, data: timetableData });
-        if (isInitialSetup) {
-          await seedData();
-        }
       } catch (e) {
         console.error("Failed to update timetable settings.", e);
       }
