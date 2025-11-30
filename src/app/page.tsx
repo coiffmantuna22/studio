@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -6,7 +7,7 @@ import Header from '@/components/app/header';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, doc, writeBatch, getDocs } from 'firebase/firestore';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Loader2, AlertTriangle, CheckCircle, UserX, School, Edit, BookCopy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -212,7 +213,7 @@ export default function Home() {
         getDocs(teacherQuery),
         getDocs(classQuery),
         getDocs(subsQuery),
-        getDocs(majorsSnapshot)
+        getDocs(majorsQuery)
       ]);
 
       // Reset schedules and absences for all teachers
@@ -447,9 +448,9 @@ export default function Home() {
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           {todaysAbsences && todaysAbsences.length > 0 && (
-            <Card className="border-l-4 border-l-destructive shadow-md">
+            <Card className="border-l-4 border-l-destructive shadow-md h-full">
                 <CardHeader className="pb-3">
                     <CardTitle className="text-xl flex items-center gap-2">
                     <AlertTriangle className="text-destructive h-5 w-5" />
@@ -458,7 +459,7 @@ export default function Home() {
                     <CardDescription>סקירה מהירה של ההיעדרויות והשיעורים המושפעים להיום.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-1">
                     {todaysAbsences.map((item) => {
                         if (!item) return null;
                         const { teacher, absences, affectedLessons } = item;
@@ -514,6 +515,16 @@ export default function Home() {
             </Card>
           )}
 
+            <NeededSubstitutePanel 
+                teachers={teachers}
+                classes={allClasses}
+                substitutions={allSubstitutions}
+                timeSlots={timeSlots}
+                onAssignSubstitute={handleAssignSubstituteFromPanel}
+            />
+        </div>
+
+        <div className="space-y-6">
           {affectedClasses.length > 0 && (
             <Card className="border-l-4 border-l-amber-500 shadow-md">
               <CardHeader className="pb-3">
@@ -567,14 +578,6 @@ export default function Home() {
             </Card>
           )}
         </div>
-
-        <NeededSubstitutePanel 
-            teachers={teachers}
-            classes={allClasses}
-            substitutions={allSubstitutions}
-            timeSlots={timeSlots}
-            onAssignSubstitute={handleAssignSubstituteFromPanel}
-        />
 
 
         <div className="space-y-6">
