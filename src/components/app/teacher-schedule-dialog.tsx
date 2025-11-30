@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -73,8 +74,11 @@ const parseTimeToNumber = (time: string) => {
 function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAbsent, onToggleAbsence }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
     
+    // Safeguard: Ensure lessons is always an array
+    const safeLessons = Array.isArray(lessons) ? lessons : [];
+
     // Filter out major lessons for editing purposes
-    const majorLessons = lessons.filter(l => l.majorId);
+    const majorLessons = safeLessons.filter(l => l.majorId);
     const [regularLessons, setRegularLessons] = useState<Lesson[]>([]);
 
     const [newSubject, setNewSubject] = useState('');
@@ -82,11 +86,11 @@ function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAb
 
     useEffect(() => {
         if(isOpen) {
-            setRegularLessons(lessons.filter(l => !l.majorId));
+            setRegularLessons(safeLessons.filter(l => !l.majorId));
             setNewSubject('');
             setNewClassId(null);
         }
-    }, [lessons, isOpen]);
+    }, [safeLessons, isOpen]);
     
     const teacherSubjects = useMemo(() => {
         return teacher.subjects.map(s => ({label: s, value: s}));
@@ -127,13 +131,13 @@ function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAb
                  <div className={cn(
                     "w-full h-full p-1 flex flex-col justify-start items-center text-center cursor-pointer min-h-[6rem] transition-colors rounded-md gap-1 overflow-y-auto",
                     isAbsent && 'bg-destructive/10',
-                    lessons.length > 0 ? 'bg-primary/5 hover:bg-primary/10' : 'bg-card hover:bg-muted',
-                    isAbsent && lessons.length > 0 && 'bg-destructive/20 hover:bg-destructive/30'
+                    safeLessons.length > 0 ? 'bg-primary/5 hover:bg-primary/10' : 'bg-card hover:bg-muted',
+                    isAbsent && safeLessons.length > 0 && 'bg-destructive/20 hover:bg-destructive/30'
                 )}>
-                    {lessons.length === 0 && <span className="text-muted-foreground text-xs mt-2">ריקה</span>}
+                    {safeLessons.length === 0 && <span className="text-muted-foreground text-xs mt-2">ריקה</span>}
                     {isAbsent && <Badge variant="destructive" className="mt-1 mb-1">נעדר/ת</Badge>}
                     
-                    {lessons.map((lesson, idx) => {
+                    {safeLessons.map((lesson, idx) => {
                          const schoolClass = allClasses.find(c => c.id === lesson.classId);
                          return (
                             <div key={idx} className={cn(
