@@ -242,7 +242,6 @@ export default function Home() {
     const batch = writeBatch(firestore);
 
     try {
-      // Get all teachers and classes
       const teacherQuery = query(collection(firestore, 'teachers'), where('userId', '==', user.uid));
       const classQuery = query(collection(firestore, 'classes'), where('userId', '==', user.uid));
       const subsQuery = query(collection(firestore, 'substitutions'), where('userId', '==', user.uid));
@@ -255,7 +254,7 @@ export default function Home() {
         getDocs(majorsQuery)
       ]);
 
-      // Reset schedules for all teachers
+      // Reset schedules and absences for all teachers
       teacherSnapshot.forEach(teacherDoc => {
         batch.update(teacherDoc.ref, { schedule: {}, absences: [] });
       });
@@ -700,5 +699,7 @@ export default function Home() {
     </div>
   );
 }
+
+    
 
     
