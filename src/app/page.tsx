@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -10,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import { collection, query, where, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { Loader2, AlertTriangle, CheckCircle, UserX, School, Edit } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, UserX, School, Edit, BookUser } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { format, isSameDay, startOfDay } from 'date-fns';
@@ -198,14 +197,14 @@ export default function Home() {
 
   const handleStartNewYear = async () => {
     if (!firestore || !user) return;
-
     const batch = writeBatch(firestore);
 
     try {
+      // Get all teachers and classes belonging to the user
       const teacherQuery = query(collection(firestore, 'teachers'), where('userId', '==', user.uid));
       const classQuery = query(collection(firestore, 'classes'), where('userId', '==', user.uid));
       const subsQuery = query(collection(firestore, 'substitutions'), where('userId', '==', user.uid));
-
+      
       const [teacherSnapshot, classSnapshot, subsSnapshot] = await Promise.all([
         getDocs(teacherQuery),
         getDocs(classQuery),
@@ -278,11 +277,11 @@ export default function Home() {
 
                   const lessonStart = parseTimeToNumber(lessonSlot.start);
                   const lessonEnd = parseTimeToNumber(lessonSlot.end);
-
-                  const isAffected = absence.isAllDay || 
-                      (
-                        lessonStart < parseTimeToNumber(absence.endTime) && lessonEnd > parseTimeToNumber(absence.startTime)
-                      );
+                  const absenceStart = parseTimeToNumber(absence.startTime);
+                  const absenceEnd = parseTimeToNumber(absence.endTime);
+                  
+                  // Corrected overlap logic
+                  const isAffected = absence.isAllDay || (lessonStart < absenceEnd && lessonEnd > absenceStart);
                   
                   const schoolClass = allClasses.find(c => c.id === lesson.classId);
                   if(isAffected && schoolClass) {
@@ -441,8 +440,7 @@ export default function Home() {
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {todaysAbsences && todaysAbsences.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             <Card className="border-l-4 border-l-destructive shadow-md h-full">
                 <CardHeader className="pb-3">
                     <CardTitle className="text-xl flex items-center gap-2">
@@ -452,61 +450,68 @@ export default function Home() {
                     <CardDescription>סקירה מהירה של ההיעדרויות והשיעורים המושפעים להיום.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                <div className="grid gap-4 sm:grid-cols-1">
-                    {todaysAbsences.map((item) => {
-                        if (!item) return null;
-                        const { teacher, absences, affectedLessons } = item;
-                        const absenceTime = absences.map(a => a.isAllDay ? `יום שלם` : `${a.startTime}-${a.endTime}`).join('; ');
-                        
-                        return (
-                            <div key={teacher.id} className="flex flex-col justify-between p-4 bg-secondary/30 rounded-xl border">
-                                <div className="flex justify-between items-start">
-                                    <div className="flex-1">
-                                        <span className="font-semibold text-lg block">{teacher.name}</span>
-                                        <div className="text-xs text-center text-destructive-foreground bg-destructive/80 rounded-md px-2 py-1 font-medium inline-block mt-1">
-                                        {absenceTime}
+                {todaysAbsences && todaysAbsences.length > 0 ? (
+                    <div className="grid gap-4 sm:grid-cols-1">
+                        {todaysAbsences.map((item) => {
+                            if (!item) return null;
+                            const { teacher, absences, affectedLessons } = item;
+                            const absenceTime = absences.map(a => a.isAllDay ? `יום שלם` : `${a.startTime}-${a.endTime}`).join('; ');
+                            
+                            return (
+                                <div key={teacher.id} className="flex flex-col justify-between p-4 bg-secondary/30 rounded-xl border">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex-1">
+                                            <span className="font-semibold text-lg block">{teacher.name}</span>
+                                            <div className="text-xs text-center text-destructive-foreground bg-destructive/80 rounded-md px-2 py-1 font-medium inline-block mt-1">
+                                            {absenceTime}
+                                            </div>
                                         </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 -mr-2"
+                                            onClick={() => setTeacherToMarkAbsent({ teacher, existingAbsences: absences })}
+                                        >
+                                            <Edit className="h-4 w-4 text-muted-foreground" />
+                                            <span className="mr-1">ערוך</span>
+                                        </Button>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 -mr-2"
-                                        onClick={() => setTeacherToMarkAbsent({ teacher, existingAbsences: absences })}
-                                    >
-                                        <Edit className="h-4 w-4 text-muted-foreground" />
-                                        <span className="mr-1">ערוך</span>
-                                    </Button>
+                                    {affectedLessons.length > 0 && (
+                                        <div className="mt-3 space-y-2 text-sm">
+                                        <h4 className="font-medium text-muted-foreground">שיעורים מושפעים:</h4>
+                                        <ul className="space-y-1">
+                                            {affectedLessons.map((lesson, index) => (
+                                            <li key={index} className="flex items-center justify-between">
+                                                <span>{lesson.className} - {lesson.subject} ({lesson.time})</span>
+                                                {lesson.isCovered ? (
+                                                <span className="flex items-center text-green-600 dark:text-green-400">
+                                                    <CheckCircle className="ml-1 h-4 w-4" />
+                                                    מכוסה
+                                                </span>
+                                                ) : (
+                                                <span className="flex items-center text-destructive">
+                                                    <UserX className="ml-1 h-4 w-4" />
+                                                    דרוש מחליף
+                                                </span>
+                                                )}
+                                            </li>
+                                            ))}
+                                        </ul>
+                                        </div>
+                                    )}
                                 </div>
-                                {affectedLessons.length > 0 && (
-                                    <div className="mt-3 space-y-2 text-sm">
-                                    <h4 className="font-medium text-muted-foreground">שיעורים מושפעים:</h4>
-                                    <ul className="space-y-1">
-                                        {affectedLessons.map((lesson, index) => (
-                                        <li key={index} className="flex items-center justify-between">
-                                            <span>{lesson.className} - {lesson.subject} ({lesson.time})</span>
-                                            {lesson.isCovered ? (
-                                            <span className="flex items-center text-green-600 dark:text-green-400">
-                                                <CheckCircle className="ml-1 h-4 w-4" />
-                                                מכוסה
-                                            </span>
-                                            ) : (
-                                            <span className="flex items-center text-destructive">
-                                                <UserX className="ml-1 h-4 w-4" />
-                                                דרוש מחליף
-                                            </span>
-                                            )}
-                                        </li>
-                                        ))}
-                                    </ul>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
+                            );
+                        })}
+                    </div>
+                 ) : (
+                    <div className="flex flex-col items-center justify-center text-center p-8 text-muted-foreground bg-secondary/20 rounded-lg">
+                        <BookUser className="w-10 h-10 mb-2 opacity-50"/>
+                        <p className="font-medium">כל המורים נוכחים!</p>
+                        <p className="text-xs">אין היעדרויות רשומות להיום.</p>
+                    </div>
+                )}
                 </CardContent>
             </Card>
-          )}
 
             <NeededSubstitutePanel 
                 teachers={teachers}
@@ -704,4 +709,3 @@ export default function Home() {
     </div>
   );
 }
-
