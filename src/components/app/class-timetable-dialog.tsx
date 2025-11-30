@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -47,7 +48,7 @@ interface ClassTimetableDialogProps {
 interface EditSlotPopoverProps {
     day: string;
     time: string;
-    lessons: Lesson[];
+    lessons: Lesson[] | null;
     onSave: (day: string, time: string, lessons: Lesson[]) => void;
     allTeachers: Teacher[];
     allClasses: SchoolClass[];
@@ -68,7 +69,8 @@ const getStartOfWeek = (date: Date): Date => {
 function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, schoolClass, timeSlots }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
     
-    const majorLessons = lessons.filter(l => l.majorId);
+    const safeLessons = Array.isArray(lessons) ? lessons : [];
+    const majorLessons = safeLessons.filter(l => l.majorId);
     const [regularLessons, setRegularLessons] = useState<Lesson[]>([]);
 
     // New lesson state
@@ -77,19 +79,15 @@ function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, 
 
     useEffect(() => {
         if(isOpen) {
-            setRegularLessons(lessons.filter(l => !l.majorId));
+            setRegularLessons(safeLessons.filter(l => !l.majorId));
             setNewSubject('');
             setNewTeacherId(null);
         }
-    }, [lessons, isOpen]);
+    }, [safeLessons, isOpen]);
 
     const availableTeachersForSlot = useMemo(() => {
         return allTeachers.filter(t => {
             const isScheduledElsewhere = isTeacherAlreadyScheduled(t.id, new Date(), time, allClasses, schoolClass.id);
-            // If the teacher is already in one of the regular lessons we are editing, they are technically "busy" in this slot, 
-            // but since we are editing THIS slot, we might want to allow re-selecting them if we are modifying that specific lesson.
-            // However, for adding a NEW lesson, they should be free.
-            // Simplified: Filter out teachers who are busy elsewhere.
             return !isScheduledElsewhere;
         });
     }, [time, allTeachers, allClasses, schoolClass.id]);
@@ -120,9 +118,6 @@ function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, 
     };
 
     const handleSave = () => {
-        // If there's a pending new lesson that hasn't been added, we could auto-add it, or ignore it.
-        // Let's ignore it to avoid accidental adds, but maybe warn? 
-        // For now, just save the list of regular lessons + major lessons.
         const finalLessons = [...majorLessons, ...regularLessons];
         if (newSubject && newTeacherId) {
              finalLessons.push({ subject: newSubject, teacherId: newTeacherId, classId: schoolClass.id });
@@ -143,11 +138,11 @@ function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, 
             <PopoverTrigger asChild>
                 <div className={cn(
                     "w-full h-full p-1 flex flex-col justify-start items-center text-center cursor-pointer min-h-[6rem] transition-colors rounded-md gap-1 overflow-y-auto",
-                    lessons.length > 0 ? 'bg-primary/5 hover:bg-primary/10' : 'bg-card hover:bg-muted'
+                    safeLessons.length > 0 ? 'bg-primary/5 hover:bg-primary/10' : 'bg-card hover:bg-muted'
                 )}>
-                    {lessons.length === 0 && <span className="text-muted-foreground text-xs mt-2">ריקה</span>}
+                    {safeLessons.length === 0 && <span className="text-muted-foreground text-xs mt-2">ריקה</span>}
                     
-                    {lessons.map((lesson, idx) => {
+                    {safeLessons.map((lesson, idx) => {
                          const teacher = allTeachers.find(t => t.id === lesson.teacherId);
                          return (
                             <div key={idx} className={cn(
@@ -303,6 +298,7 @@ export default function ClassTimetableDialog({
         <tbody>
           {timeSlots.map(slot => {
             const lessons = localSchedule?.[day]?.[slot.start] || [];
+            const safeLessons = Array.isArray(lessons) ? lessons : [];
             const isBreak = slot.type === 'break';
             return (
               <tr key={slot.id} className="border-t">
@@ -315,7 +311,7 @@ export default function ClassTimetableDialog({
                         <EditSlotPopover 
                             day={day} 
                             time={slot.start}
-                            lessons={lessons}
+                            lessons={safeLessons}
                             onSave={handleSaveSlot}
                             allTeachers={allTeachers}
                             allClasses={allClasses}
@@ -325,8 +321,8 @@ export default function ClassTimetableDialog({
                     ) : (
                         <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-start gap-1">
                         {isBreak ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground mt-4' /> : (
-                            lessons.length > 0 ? (
-                                lessons.map((lesson, idx) => {
+                            safeLessons.length > 0 ? (
+                                safeLessons.map((lesson, idx) => {
                                     const teacher = allTeachers.find(t => t.id === lesson.teacherId);
                                     return (
                                         <div key={idx} className={cn(
@@ -413,6 +409,7 @@ export default function ClassTimetableDialog({
                                         </td>
                                         {daysOfWeek.map(day => {
                                             const lessons = localSchedule?.[day]?.[slot.start] || [];
+                                            const safeLessons = Array.isArray(lessons) ? lessons : [];
                                             const isBreak = slot.type === 'break';
                                             return (
                                             <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30')}>
@@ -420,7 +417,7 @@ export default function ClassTimetableDialog({
                                                     <EditSlotPopover 
                                                         day={day} 
                                                         time={slot.start}
-                                                        lessons={lessons}
+                                                        lessons={safeLessons}
                                                         onSave={handleSaveSlot}
                                                         allTeachers={allTeachers}
                                                         allClasses={allClasses}
@@ -430,8 +427,8 @@ export default function ClassTimetableDialog({
                                                 ) : (
                                                     <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-start gap-1">
                                                     {isBreak ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground mt-4' /> : (
-                                                        lessons.length > 0 ? (
-                                                            lessons.map((lesson, idx) => {
+                                                        safeLessons.length > 0 ? (
+                                                            safeLessons.map((lesson, idx) => {
                                                                 const teacher = allTeachers.find(t => t.id === lesson.teacherId);
                                                                 return (
                                                                     <div key={idx} className={cn(
