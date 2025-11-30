@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { format, isSameDay, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
-import type { Teacher, AbsenceDay, TimeSlot, AffectedLesson, SchoolClass, SubstitutionRecord, Lesson } from '@/lib/types';
+import type { Teacher, AbsenceDay, TimeSlot, AffectedLesson, SchoolClass, SubstitutionRecord, Lesson, Major } from '@/lib/types';
 import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
 import RecommendationDialog from '@/components/app/recommendation-dialog';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
@@ -21,6 +21,7 @@ import { findSubstitute } from '@/lib/substitute-finder';
 import { daysOfWeek } from '@/lib/constants';
 import { groupBy } from 'lodash';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 const TeacherList = dynamic(() => import('@/components/app/teacher-list'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
@@ -52,6 +53,7 @@ export default function Home() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState("teachers");
   const [teacherToMarkAbsent, setTeacherToMarkAbsent] = useState<{teacher: Teacher, existingAbsences?: AbsenceDay[]} | null>(null);
@@ -234,6 +236,65 @@ export default function Home() {
       }
   }
 
+  const handleStartNewYear = async () => {
+    if (!firestore || !user) return;
+
+    const batch = writeBatch(firestore);
+
+    try {
+      // Get all teachers and classes
+      const teacherQuery = query(collection(firestore, 'teachers'), where('userId', '==', user.uid));
+      const classQuery = query(collection(firestore, 'classes'), where('userId', '==', user.uid));
+      const subsQuery = query(collection(firestore, 'substitutions'), where('userId', '==', user.uid));
+      const majorsQuery = query(collection(firestore, 'majors'), where('userId', '==', user.uid));
+
+      const [teacherSnapshot, classSnapshot, subsSnapshot, majorsSnapshot] = await Promise.all([
+        getDocs(teacherQuery),
+        getDocs(classQuery),
+        getDocs(subsQuery),
+        getDocs(majorsQuery)
+      ]);
+
+      // Reset schedules for all teachers
+      teacherSnapshot.forEach(teacherDoc => {
+        batch.update(teacherDoc.ref, { schedule: {}, absences: [] });
+      });
+
+      // Reset schedules for all classes
+      classSnapshot.forEach(classDoc => {
+        batch.update(classDoc.ref, { schedule: {} });
+      });
+
+      // Delete all substitution records
+      subsSnapshot.forEach(subDoc => {
+        batch.delete(subDoc.ref);
+      });
+        
+      // Delete all major records
+      majorsSnapshot.forEach(majorDoc => {
+        batch.delete(majorDoc.ref);
+      });
+
+      await commitBatchWithContext(batch, {
+        operation: 'delete',
+        path: `user_data/${user.uid}/new_year_reset`,
+      });
+      
+      toast({
+        title: 'השנה החדשה החלה!',
+        description: 'כל מערכות השעות, ההיעדרויות וההחלפות אופסו.',
+      });
+
+    } catch (e) {
+      console.error("Failed to start new year:", e);
+      toast({
+        variant: "destructive",
+        title: 'שגיאה',
+        description: 'לא ניתן היה לאפס את נתוני השנה. אנא נסה שוב.',
+      });
+    }
+  };
+
   const getAffectedLessons = (
     absentTeacher: Teacher,
     absenceDays: AbsenceDay[],
@@ -375,6 +436,7 @@ export default function Home() {
                   timeSlots={[]}
                   onUpdate={handleTimetableSettingsUpdate}
                   isInitialSetup={isInitialSetup}
+                  onStartNewYear={handleStartNewYear}
                />
             </main>
          </div>
@@ -582,7 +644,11 @@ export default function Home() {
                     transition={{ duration: 0.3 }}
                     className="mt-0"
                   >
-                    <SettingsTab timeSlots={timeSlots} onUpdate={handleTimetableSettingsUpdate}/>
+                    <SettingsTab 
+                        timeSlots={timeSlots} 
+                        onUpdate={handleTimetableSettingsUpdate} 
+                        onStartNewYear={handleStartNewYear}
+                    />
                   </motion.div>
                 )}
 

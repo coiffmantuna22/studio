@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Coffee } from 'lucide-react';
+import { Plus, Trash2, Coffee, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -58,10 +58,11 @@ type FormValues = z.infer<typeof formSchema>;
 interface SettingsTabProps {
     timeSlots: TimeSlot[];
     onUpdate: (newTimeSlots: TimeSlot[]) => void;
+    onStartNewYear: () => void;
     isInitialSetup?: boolean;
 }
 
-export default function SettingsTab({ timeSlots, onUpdate, isInitialSetup = false }: SettingsTabProps) {
+export default function SettingsTab({ timeSlots, onUpdate, onStartNewYear, isInitialSetup = false }: SettingsTabProps) {
     const { toast } = useToast();
     
     const form = useForm<FormValues>({
@@ -151,110 +152,144 @@ export default function SettingsTab({ timeSlots, onUpdate, isInitialSetup = fals
     };
 
   return (
-    <Card className="mt-6 border-border/80 rounded-2xl max-w-4xl mx-auto">
-      <CardHeader>
-        <CardTitle>הגדרות מערכת שעות</CardTitle>
-        <CardDescription>
-            {isInitialSetup 
-                ? 'ברוך הבא! כדי להתחיל, הגדר את שעות הלימוד וההפסקות בבית הספר.'
-                : 'כאן ניתן להתאים את שעות הלימוד וההפסקות בבית הספר. השינויים יחולו על כל מערכות השעות באפליקציה.'
-            }
-        </CardDescription>
-      </CardHeader>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-            <CardContent className="space-y-6">
-                <div className="space-y-4">
-                    {fields.map((field, index) => (
-                        <div key={field.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end p-4 border rounded-lg">
-                            <FormField
-                                control={form.control}
-                                name={`slots.${index}.start`}
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>שעת התחלה</FormLabel>
-                                        <FormControl><Input type="time" {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                             <FormField
-                                control={form.control}
-                                name={`slots.${index}.end`}
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>שעת סיום</FormLabel>
-                                        <FormControl><Input type="time" {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name={`slots.${index}.type`}
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>סוג</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="בחר סוג" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="lesson">שיעור</SelectItem>
-                                                <SelectItem value="break">הפסקה</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </FormItem>
-                                )}
-                            />
-                             <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                             </Button>
-                        </div>
-                    ))}
-                </div>
-                 {form.formState.errors.slots && (
-                    <p className="text-sm font-medium text-destructive">{form.formState.errors.slots.message || form.formState.errors.slots?.root?.message}</p>
-                )}
-                <div className='flex flex-wrap gap-2'>
-                    <Button type="button" variant="outline" onClick={addSlot}>
-                        <Plus className="ml-2 h-4 w-4" />
-                        הוסף משבצת זמן
-                    </Button>
-                     <Button type="button" variant="secondary" onClick={handleSort}>
-                        מיין לפי שעה
-                    </Button>
-                    <Button type="button" variant="secondary" onClick={addFiveMinBreaks}>
-                        <Coffee className="ml-2 h-4 w-4" />
-                        הוסף הפסקות 5 דק'
-                    </Button>
-                </div>
-            </CardContent>
-            <CardFooter>
+    <div className="space-y-6 max-w-4xl mx-auto">
+        <Card className="border-border/80 rounded-2xl">
+        <CardHeader>
+            <CardTitle>הגדרות מערכת שעות</CardTitle>
+            <CardDescription>
+                {isInitialSetup 
+                    ? 'ברוך הבא! כדי להתחיל, הגדר את שעות הלימוד וההפסקות בבית הספר.'
+                    : 'כאן ניתן להתאים את שעות הלימוד וההפסקות בבית הספר. השינויים יחולו על כל מערכות השעות באפליקציה.'
+                }
+            </CardDescription>
+        </CardHeader>
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+                <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                        {fields.map((field, index) => (
+                            <div key={field.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end p-4 border rounded-lg">
+                                <FormField
+                                    control={form.control}
+                                    name={`slots.${index}.start`}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>שעת התחלה</FormLabel>
+                                            <FormControl><Input type="time" {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name={`slots.${index}.end`}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>שעת סיום</FormLabel>
+                                            <FormControl><Input type="time" {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name={`slots.${index}.type`}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>סוג</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="בחר סוג" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="lesson">שיעור</SelectItem>
+                                                    <SelectItem value="break">הפסקה</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
+                                    )}
+                                />
+                                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                    {form.formState.errors.slots && (
+                        <p className="text-sm font-medium text-destructive">{form.formState.errors.slots.message || form.formState.errors.slots?.root?.message}</p>
+                    )}
+                    <div className='flex flex-wrap gap-2'>
+                        <Button type="button" variant="outline" onClick={addSlot}>
+                            <Plus className="ml-2 h-4 w-4" />
+                            הוסף משבצת זמן
+                        </Button>
+                        <Button type="button" variant="secondary" onClick={handleSort}>
+                            מיין לפי שעה
+                        </Button>
+                        <Button type="button" variant="secondary" onClick={addFiveMinBreaks}>
+                            <Coffee className="ml-2 h-4 w-4" />
+                            הוסף הפסקות 5 דק'
+                        </Button>
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button type='button' disabled={!form.formState.isValid && !isInitialSetup}>שמור הגדרות</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>אישור שמירת שינויים</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {isInitialSetup 
+                            ? 'פעולה זו תקבע את מבנה מערכת השעות. האם להמשיך?'
+                            : 'שינוי מבנה מערכת השעות עשוי להשפיע על שיבוצים קיימים. האם אתה בטוח שברצונך לשמור את השינויים?'}
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel>ביטול</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => form.handleSubmit(onSubmit)()}>שמור</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                    </AlertDialog>
+                </CardFooter>
+            </form>
+        </Form>
+        </Card>
+        {!isInitialSetup && (
+        <Card className="border-destructive/50">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-destructive">
+                    <AlertTriangle />
+                    אזור מסוכן
+                </CardTitle>
+                <CardDescription>
+                    פעולות אלו הן בלתי הפיכות וישפיעו על כל הנתונים במערכת.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
                  <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button type='button' disabled={!form.formState.isValid && !isInitialSetup}>שמור הגדרות</Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>אישור שמירת שינויים</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {isInitialSetup 
-                        ? 'פעולה זו תקבע את מבנה מערכת השעות. האם להמשיך?'
-                        : 'שינוי מבנה מערכת השעות עשוי להשפיע על שיבוצים קיימים. האם אתה בטוח שברצונך לשמור את השינויים?'}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>ביטול</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => form.handleSubmit(onSubmit)()}>שמור</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="destructive">התחל שנת לימודים חדשה</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            פעולה זו תמחק לצמיתות את <strong>כל</strong> מערכות השעות (כיתות ומורים), את כל ההיעדרויות ואת כל רישומי ההחלפות. לא ניתן לבטל פעולה זו.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel>ביטול</AlertDialogCancel>
+                        <AlertDialogAction className='bg-destructive text-destructive-foreground hover:bg-destructive/90' onClick={onStartNewYear}>אני מבין, התחל שנה חדשה</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
                 </AlertDialog>
-            </CardFooter>
-        </form>
-      </Form>
-    </Card>
+            </CardContent>
+        </Card>
+        )}
+  </div>
   );
 }
