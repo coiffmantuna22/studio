@@ -18,10 +18,9 @@ import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
 import RecommendationDialog from '@/components/app/recommendation-dialog';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
 import { findSubstitute } from '@/lib/substitute-finder';
-import { daysOfWeek } from '@/lib/constants';
-import { groupBy } from 'lodash';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useAbsences } from '@/hooks/use-absences';
 
 const TeacherList = dynamic(() => import('@/components/app/teacher-list'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
@@ -97,138 +96,77 @@ export default function Home() {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
-
-  const parseTimeToNumber = (time: string) => {
-    if (!time || typeof time !== 'string' || !time.includes(':')) return 0;
-    const [hours, minutes] = time.split(':').map(Number);
-    return hours + minutes / 60;
-  };
+  
+  const todaysAffectedLessons = useAbsences({
+    teachers: teachers,
+    classes: allClasses,
+    substitutions: allSubstitutions,
+    timeSlots: timeSlots,
+  });
 
   const todaysAbsences = useMemo(() => {
-    const today = startOfDay(new Date());
-    if (!teachers || teachers.length === 0 || !timeSlots || timeSlots.length === 0) return [];
+    if (todaysAffectedLessons.length === 0) return [];
   
-    return teachers
-      .map(teacher => {
-        const todaysTeacherAbsences = (teacher.absences || []).filter(absence => {
-          try {
-            const absenceDate = typeof absence.date === 'string' ? new Date(absence.date) : absence.date;
-            return isSameDay(startOfDay(absenceDate), today);
-          } catch (e) {
-            console.error("Error parsing absence date:", absence.date);
-            return false;
-          }
+    const absencesByTeacher = new Map<string, { teacher: Teacher; absences: AbsenceDay[]; affectedLessons: any[] }>();
+  
+    todaysAffectedLessons.forEach(lesson => {
+      const teacher = teachers.find(t => t.id === lesson.absentTeacherId);
+      if (!teacher) return;
+  
+      if (!absencesByTeacher.has(teacher.id)) {
+        absencesByTeacher.set(teacher.id, {
+          teacher,
+          absences: (teacher.absences || []).filter(a => isSameDay(startOfDay(new Date(a.date)), startOfDay(new Date()))),
+          affectedLessons: [],
         });
+      }
+      absencesByTeacher.get(teacher.id)!.affectedLessons.push(lesson);
+    });
   
-        if (todaysTeacherAbsences.length === 0) return null;
-  
-        const dayOfWeek = daysOfWeek[today.getDay()];
-        const teacherScheduleForToday = teacher.schedule?.[dayOfWeek] || {};
-        
-        const affectedLessons: any[] = Object.entries(teacherScheduleForToday)
-          .flatMap(([time, lessonsData]) => {
-            const lessons = Array.isArray(lessonsData) ? lessonsData : (lessonsData ? [lessonsData] : []);
-            if (!lessons || lessons.length === 0) return [];
-            
-            return lessons.map(lesson => {
-                if (lesson && lesson.classId) {
-                  const lessonSlot = timeSlots.find(ts => ts.start === time);
-                  if (!lessonSlot) return null;
-
-                  const isAbsentDuringLesson = todaysTeacherAbsences.some(absence => {
-                    if (absence.isAllDay) return true;
-                    const lessonStart = parseTimeToNumber(lessonSlot.start);
-                    const lessonEnd = parseTimeToNumber(lessonSlot.end);
-                    const absenceStart = parseTimeToNumber(absence.startTime);
-                    const absenceEnd = parseTimeToNumber(absence.endTime);
-                    return lessonStart < absenceEnd && lessonEnd > absenceStart;
-                  });
-      
-                  if (isAbsentDuringLesson) {
-                    const schoolClass = allClasses.find(c => c.id === lesson.classId);
-                    if (schoolClass) {
-                      const isCovered = (allSubstitutions || []).some(sub => 
-                        isSameDay(startOfDay(new Date(sub.date)), today) &&
-                        sub.time === time &&
-                        sub.classId === lesson.classId
-                      );
-                      return { ...lesson, time, className: schoolClass.name, isCovered, absentTeacherName: teacher.name };
-                    }
-                  }
-                }
-                return null;
-            }).filter(Boolean);
-          });
-  
-        return { teacher, absences: todaysTeacherAbsences, affectedLessons };
-      })
-      .filter(item => item !== null && item.absences.length > 0) as { teacher: Teacher, absences: AbsenceDay[], affectedLessons: any[] }[];
-  }, [teachers, allClasses, allSubstitutions, timeSlots]);
-
+    return Array.from(absencesByTeacher.values());
+  }, [todaysAffectedLessons, teachers]);
 
   const affectedClasses = useMemo(() => {
-    const today = startOfDay(new Date());
     const affected = new Map<string, { classId: string; className: string; lessons: any[] }>();
+    const uncoveredLessons = todaysAffectedLessons.filter(l => !l.isCovered);
 
-    todaysAbsences.forEach(({ teacher, absences }) => {
-        const dayOfWeek = daysOfWeek[today.getDay()];
-        const teacherSchedule = teacher.schedule?.[dayOfWeek] || {};
-
-        Object.entries(teacherSchedule).forEach(([time, lessonsData]) => {
-            const lessons = Array.isArray(lessonsData) ? lessonsData : (lessonsData ? [lessonsData] : []);
-            if (!lessons || lessons.length === 0) return;
-
-            lessons.forEach((lesson: Lesson) => {
-                if (!lesson || !lesson.classId) return;
-
-                const lessonSlot = timeSlots.find(ts => ts.start === time);
-                if (!lessonSlot) return;
-
-                const isAbsentDuringLesson = absences.some(absence => {
-                    if (absence.isAllDay) return true;
-                    const lessonStart = parseTimeToNumber(lessonSlot.start);
-                    const lessonEnd = parseTimeToNumber(lessonSlot.end);
-                    const absenceStart = parseTimeToNumber(absence.startTime);
-                    const absenceEnd = parseTimeToNumber(absence.endTime);
-                    return lessonStart < absenceEnd && lessonEnd > absenceStart;
-                });
-                
-                if (isAbsentDuringLesson) {
-                     const schoolClass = (allClasses || []).find(c => c.id === lesson.classId);
-                     if (schoolClass) {
-                        if (!affected.has(schoolClass.id)) {
-                            affected.set(schoolClass.id, {
-                                classId: schoolClass.id,
-                                className: schoolClass.name,
-                                lessons: [],
-                            });
-                        }
-                        affected.get(schoolClass.id)!.lessons.push({
-                            ...lesson,
-                            time,
-                            absentTeacherName: teacher.name,
-                        });
-                     }
-                }
-            });
+    uncoveredLessons.forEach(lesson => {
+      if (!affected.has(lesson.classId)) {
+        affected.set(lesson.classId, {
+          classId: lesson.classId,
+          className: lesson.className,
+          lessons: [],
         });
+      }
+      affected.get(lesson.classId)!.lessons.push(lesson);
     });
 
-    return Array.from(affected.values()).map(classData => {
-        const uncoveredLessons = classData.lessons.filter(lesson => 
-            !(allSubstitutions || []).some(sub => 
-                isSameDay(startOfDay(new Date(sub.date)), today) &&
-                sub.time === lesson.time &&
-                sub.classId === lesson.classId
-            )
-        );
-        return {
-            ...classData,
-            isFullyCovered: uncoveredLessons.length === 0,
-            lessons: uncoveredLessons,
-        };
+    const fullyCoveredClasses = new Set<string>();
+    todaysAffectedLessons.forEach(lesson => {
+        if(lesson.isCovered && !uncoveredLessons.some(ul => ul.classId === lesson.classId)) {
+            fullyCoveredClasses.add(lesson.classId);
+        }
     });
-}, [todaysAbsences, allClasses, allSubstitutions, timeSlots]);
+
+    const result = Array.from(affected.values()).map(classData => ({
+        ...classData,
+        isFullyCovered: false,
+    }));
+    
+    fullyCoveredClasses.forEach(classId => {
+        const classInfo = allClasses.find(c => c.id === classId);
+        if(classInfo && !affected.has(classId)) {
+            result.push({
+                classId: classId,
+                className: classInfo.name,
+                lessons: [],
+                isFullyCovered: true
+            })
+        }
+    })
+
+    return result;
+  }, [todaysAffectedLessons, allClasses]);
 
 
   const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
@@ -315,53 +253,56 @@ export default function Home() {
       const affected: AffectedLesson[] = [];
       const promises: Promise<any>[] = [];
       const substitutePool = allTeachers.filter(t => t.id !== absentTeacher.id);
+      
+      const parseTimeToNumber = (time: string) => {
+        if (!time || typeof time !== 'string' || !time.includes(':')) return 0;
+        const [hours, minutes] = time.split(':').map(Number);
+        return hours + minutes / 60;
+      };
   
       absenceDays.forEach(absence => {
           const date = startOfDay(new Date(absence.date));
           const dayOfWeek = format(date, 'EEEE', { locale: he });
-  
-          allClasses.forEach(schoolClass => {
-              const daySchedule = schoolClass.schedule?.[dayOfWeek];
-              if (daySchedule) {
-                  Object.entries(daySchedule).forEach(([time, lessonsData]) => {
-                      const lessons = Array.isArray(lessonsData) ? lessonsData : (lessonsData ? [lessonsData] : []);
-                      lessons.forEach((lesson: Lesson) => {
-                          if (lesson?.teacherId === absentTeacher.id) {
-                              const lessonSlot = timeSlots.find(ts => ts.start === time);
-                              if (!lessonSlot) return;
-    
-                              const isAffected = absence.isAllDay || 
-                                  (
-                                      parseTimeToNumber(lessonSlot.start) < parseTimeToNumber(absence.endTime) && 
-                                      parseTimeToNumber(lessonSlot.end) > parseTimeToNumber(absence.startTime)
-                                  );
-      
-                              if (isAffected) {
-                                  const promise = findSubstitute(
-                                      { subject: lesson.subject, date, time },
-                                      substitutePool,
-                                      allClasses,
-                                      timeSlots
-                                  ).then(subResult => {
-                                    affected.push({
-                                          classId: schoolClass.id,
-                                          className: schoolClass.name,
-                                          date,
-                                          time,
-                                          lesson,
-                                          recommendation: subResult.recommendation,
-                                          recommendationId: subResult.recommendationId,
-                                          reasoning: subResult.reasoning,
-                                          substituteOptions: subResult.substituteOptions,
-                                      });
-                                  });
-                                  promises.push(promise);
-                              }
-                          }
-                      });
-                  });
-              }
-          });
+          
+          const daySchedule = absentTeacher.schedule?.[dayOfWeek];
+          if(daySchedule){
+            Object.entries(daySchedule).forEach(([time, lessonsData]) => {
+              const lessons = Array.isArray(lessonsData) ? lessonsData : (lessonsData ? [lessonsData] : []);
+              lessons.forEach((lesson: Lesson) => {
+                  const lessonSlot = timeSlots.find(ts => ts.start === time);
+                  if (!lessonSlot) return;
+
+                  const isAffected = absence.isAllDay || 
+                      (
+                          parseTimeToNumber(lessonSlot.start) < parseTimeToNumber(absence.endTime) && 
+                          parseTimeToNumber(lessonSlot.end) > parseTimeToNumber(absence.startTime)
+                      );
+                  
+                  const schoolClass = allClasses.find(c => c.id === lesson.classId);
+                  if(isAffected && schoolClass) {
+                    const promise = findSubstitute(
+                        { subject: lesson.subject, date, time },
+                        substitutePool,
+                        allClasses,
+                        timeSlots
+                    ).then(subResult => {
+                      affected.push({
+                            classId: schoolClass.id,
+                            className: schoolClass.name,
+                            date,
+                            time,
+                            lesson,
+                            recommendation: subResult.recommendation,
+                            recommendationId: subResult.recommendationId,
+                            reasoning: subResult.reasoning,
+                            substituteOptions: subResult.substituteOptions,
+                        });
+                    });
+                    promises.push(promise);
+                  }
+              });
+            });
+          }
       });
   
       return Promise.all(promises).then(() => affected);
@@ -595,7 +536,7 @@ export default function Home() {
                               <div className="mt-3 space-y-2 text-sm">
                               <h4 className="font-medium text-muted-foreground">שיעורים לא מכוסים:</h4>
                               <ul className="space-y-1">
-                                  {lessons.map((lesson, index) => (
+                                  {(lessons || []).map((lesson, index) => (
                                   <li key={index} className="flex items-center justify-between">
                                       <span>{lesson.subject} ({lesson.time})</span>
                                       <span className="text-xs text-muted-foreground">
@@ -755,7 +696,3 @@ export default function Home() {
     </div>
   );
 }
-
-    
-
-    

@@ -78,13 +78,15 @@ export default function NeededSubstitutePanel({
         <div className="space-y-6">
             {Object.entries(groupedLessons).map(([dateKey, lessons]) => {
                 const date = new Date(dateKey);
-                const isToday = isSameDay(date, new Date());
+                 // Since dateKey is 'yyyy-MM-dd', we need to adjust for timezone to avoid off-by-one day errors.
+                const localDate = new Date(date.valueOf() + date.getTimezoneOffset() * 60 * 1000);
+                const isToday = isSameDay(localDate, new Date());
                 
                 return (
                     <div key={dateKey} className="space-y-3">
                         <h3 className={cn("font-semibold text-sm flex items-center gap-2", isToday ? "text-orange-600" : "text-muted-foreground")}>
                             <span className="w-2 h-2 rounded-full bg-current"></span>
-                            {format(date, 'EEEE, d בMMMM', { locale: he })}
+                            {format(localDate, 'EEEE, d בMMMM', { locale: he })}
                             {isToday && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full mr-2">היום</span>}
                         </h3>
                         <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">

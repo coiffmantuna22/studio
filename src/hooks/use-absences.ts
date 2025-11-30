@@ -13,6 +13,8 @@ interface UseAbsencesProps {
 
 export function useAbsences({ teachers, classes, substitutions, timeSlots, dateRange }: UseAbsencesProps) {
   return useMemo(() => {
+    if (!teachers || !classes || !substitutions || !timeSlots) return [];
+    
     const start = dateRange ? startOfDay(dateRange.start) : startOfDay(new Date());
     const end = dateRange ? startOfDay(dateRange.end) : start;
     
@@ -28,8 +30,6 @@ export function useAbsences({ teachers, classes, substitutions, timeSlots, dateR
     // Iterate through each day in the range
     let currentDay = start;
     while (currentDay <= end) {
-        const dayOfWeek = daysOfWeek[currentDay.getDay()];
-        
         teachers.forEach(teacher => {
             const teacherAbsences = (teacher.absences || []).filter(absence => {
                 try {
@@ -42,6 +42,7 @@ export function useAbsences({ teachers, classes, substitutions, timeSlots, dateR
 
             if (teacherAbsences.length === 0) return;
 
+            const dayOfWeek = daysOfWeek[currentDay.getDay()];
             const teacherSchedule = teacher.schedule?.[dayOfWeek] || {};
 
             Object.entries(teacherSchedule).forEach(([time, lessonsData]) => {
@@ -69,12 +70,12 @@ export function useAbsences({ teachers, classes, substitutions, timeSlots, dateR
                              const substitution = (substitutions || []).find(sub => 
                                 isSameDay(startOfDay(new Date(sub.date)), currentDay) &&
                                 sub.time === time &&
-                                sub.classId === lesson.classId
+                                sub.classId === lesson.classId &&
+                                sub.absentTeacherId === teacher.id
                               );
 
                               let isCovered = !!substitution;
 
-                              // If covered, check if the substitute teacher is also absent
                               if (isCovered && substitution?.substituteTeacherId) {
                                   const substituteTeacher = teachers.find(t => t.id === substitution.substituteTeacherId);
                                   if (substituteTeacher) {
