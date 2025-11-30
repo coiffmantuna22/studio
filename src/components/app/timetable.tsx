@@ -28,7 +28,9 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from '../ui/label';
 
-interface TimetableProps {}
+interface TimetableProps {
+    substitutions: SubstitutionRecord[];
+}
 
 interface AssignSubstituteDialogProps {
     isOpen: boolean;
@@ -131,7 +133,7 @@ const getStartOfWeek = (date: Date): Date => {
     return startOfDay(new Date(new Date(date).setDate(diff)));
 }
 
-export default function Timetable({}: TimetableProps) {
+export default function Timetable({ substitutions }: TimetableProps) {
   const { user } = useUser();
   const firestore = useFirestore();
 
@@ -153,9 +155,7 @@ export default function Timetable({}: TimetableProps) {
   const settingsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null, [user, firestore]);
   const { data: settingsCollection, isLoading: settingsLoading } = useCollection(settingsQuery);
 
-  const substitutionsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'substitutions'), where('userId', '==', user.uid)) : null, [user, firestore]);
-  const { data: allSubstitutions, isLoading: substitutionsLoading } = useCollection<SubstitutionRecord>(substitutionsQuery);
-
+  const allSubstitutions = substitutions;
 
   const timeSlots: TimeSlot[] = useMemo(() => {
     if (settingsCollection) {
@@ -347,7 +347,7 @@ export default function Timetable({}: TimetableProps) {
         });
     };
 
-  const isLoading = teachersLoading || settingsLoading || classesLoading || substitutionsLoading;
+  const isLoading = teachersLoading || settingsLoading || classesLoading;
 
   if (isLoading) {
       return <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>

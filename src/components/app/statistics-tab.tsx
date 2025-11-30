@@ -18,22 +18,13 @@ import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Loader2, BarChart3 } from 'lucide-react';
 
-export default function StatisticsTab() {
-  const { user } = useUser();
-  const firestore = useFirestore();
+interface StatisticsTabProps {
+  substitutions: SubstitutionRecord[];
+}
 
-  const substitutionsQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(
-      collection(firestore, 'substitutions'),
-      where('userId', '==', user.uid),
-      orderBy('date', 'desc')
-    );
-  }, [user, firestore]);
-
-  const { data: substitutions, isLoading } = useCollection<SubstitutionRecord>(substitutionsQuery);
-
-  if (isLoading) {
+export default function StatisticsTab({ substitutions }: StatisticsTabProps) {
+  
+  if (!substitutions) {
     return (
       <div className="flex justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

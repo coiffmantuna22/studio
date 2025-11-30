@@ -556,7 +556,7 @@ export default function Home() {
                     transition={{ duration: 0.3 }}
                     className="mt-0"
                   >
-                    <Timetable/>
+                    <Timetable substitutions={allSubstitutions} />
                   </motion.div>
                 )}
 
@@ -595,7 +595,7 @@ export default function Home() {
                     transition={{ duration: 0.3 }}
                     className="mt-0"
                   >
-                    <StatisticsTab />
+                    <StatisticsTab substitutions={allSubstitutions} />
                   </motion.div>
                 )}
               </AnimatePresence>
