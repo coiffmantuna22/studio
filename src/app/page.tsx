@@ -47,6 +47,9 @@ const StatisticsTab = dynamic(() => import('@/components/app/statistics-tab'), {
 const MajorsTab = dynamic(() => import('@/components/app/majors-tab'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
 });
+const NeededSubstitutePanel = dynamic(() => import('@/components/app/needed-substitutes-panel'), {
+  loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
+});
 
 
 export default function Home() {
@@ -418,6 +421,46 @@ export default function Home() {
     }
   };
 
+  const handleAssignSubstituteFromPanel = async (lesson: any) => {
+      if (!lesson || !teachers || !timeSlots) return;
+      
+      const substitutePool = teachers.filter(t => t.id !== lesson.absentTeacherId);
+      const date = startOfDay(new Date(lesson.date));
+      
+      try {
+          const subResult = await findSubstitute(
+              { subject: lesson.subject, date, time: lesson.time },
+              substitutePool,
+              allClasses,
+              timeSlots
+          );
+
+          setRecommendation({
+              results: [{
+                  classId: lesson.classId,
+                  className: lesson.className,
+                  date,
+                  time: lesson.time,
+                  lesson: { ...lesson, teacherId: lesson.absentTeacherId }, // Reconstruct minimal lesson object
+                  recommendation: subResult.recommendation,
+                  recommendationId: subResult.recommendationId,
+                  reasoning: subResult.reasoning,
+                  substituteOptions: subResult.substituteOptions,
+              }],
+              absentTeacher: teachers.find(t => t.id === lesson.absentTeacherId) as Teacher,
+              absenceDays: [{ date: date.toISOString(), startTime: "08:00", endTime: "16:00", isAllDay: true, reason: "Generated from panel" }] // Dummy absence day for context
+          });
+
+      } catch (error) {
+          console.error("Error finding substitute:", error);
+          toast({
+              variant: "destructive",
+              title: "שגיאה",
+              description: "אירעה שגיאה בחיפוש מחליף.",
+          });
+      }
+  };
+
 
   const isLoading = isUserLoading || teachersLoading || settingsLoading || classesLoading || substitutionsLoading;
 
@@ -571,6 +614,14 @@ export default function Home() {
             </Card>
           )}
         </div>
+
+        <NeededSubstitutePanel 
+            teachers={teachers}
+            classes={allClasses}
+            substitutions={allSubstitutions}
+            timeSlots={timeSlots}
+            onAssignSubstitute={handleAssignSubstituteFromPanel}
+        />
 
 
         <div className="space-y-6">
