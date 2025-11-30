@@ -79,5 +79,13 @@ service cloud.firestore {
     match /events {
       allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
     }
+    
+    match /majors/{majorId} {
+      allow read, update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isCreatingOwnResource();
+    }
+    match /majors {
+      allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
+    }
   }
 }
