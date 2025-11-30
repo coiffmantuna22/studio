@@ -304,37 +304,24 @@ export default function Home() {
 
     const batch = writeBatch(firestore);
     const teacherRef = doc(firestore, 'teachers', absentTeacher.id);
-
+    
     // Get the dates of the new/edited absences
     const newAbsenceDates = new Set(
         absenceDays.map(d => startOfDay(new Date(d.date)).getTime())
     );
-    
-    // Absences that are being edited (and thus should be removed/replaced)
-    const absencesBeingEdited = teacherToMarkAbsent?.existingAbsences || [];
 
+    // Filter out any existing absences on the days we are editing.
     const updatedAbsences = (absentTeacher.absences || []).filter(
       (existing) => {
-         let existingDate: Date;
+         let existingDate;
          try {
             existingDate = typeof existing.date === 'string' ? new Date(existing.date) : existing.date;
-            if (isNaN(existingDate.getTime())) return true;
+            if (isNaN(existingDate.getTime())) return true; // Keep malformed data to avoid losing it
          } catch (e) {
-            return true;
+            return true; // Keep if date is unparsable
          }
          
-         // Check if this is one of the absences we are editing (by value comparison)
-         const isBeingEdited = absencesBeingEdited.some(edited => {
-            const editedDate = typeof edited.date === 'string' ? new Date(edited.date) : edited.date;
-            return isSameDay(existingDate, editedDate) && 
-                   existing.startTime === edited.startTime && 
-                   existing.endTime === edited.endTime && 
-                   existing.isAllDay === edited.isAllDay;
-         });
-
-         if (isBeingEdited) return false;
-
-         // Check if it conflicts with new dates
+         // If the existing absence is NOT on one of the dates we are editing, keep it.
          return !newAbsenceDates.has(startOfDay(existingDate).getTime());
       }
     );
@@ -647,3 +634,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
