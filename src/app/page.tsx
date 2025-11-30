@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -92,90 +93,7 @@ export default function Home() {
     return [];
   }, [settingsCollection, user]);
 
-  const todaysAffectedLessons = useAbsences({
-    teachers: teachers,
-    classes: allClasses,
-    substitutions: allSubstitutions,
-    timeSlots: timeSlots,
-  });
-
-  const todaysAbsences = useMemo(() => {
-    const absenceMap = new Map<string, { teacher: Teacher; absences: AbsenceDay[]; affectedLessons: AffectedLesson[] }>();
-
-    (teachers || []).forEach(teacher => {
-        const today = startOfDay(new Date());
-        const teacherAbsencesToday = (teacher.absences || []).filter(absence => {
-            try {
-                return isSameDay(startOfDay(new Date(absence.date)), today);
-            } catch (e) { return false; }
-        });
-
-        if (teacherAbsencesToday.length > 0) {
-            if (!absenceMap.has(teacher.id)) {
-                absenceMap.set(teacher.id, {
-                    teacher: teacher,
-                    absences: teacherAbsencesToday,
-                    affectedLessons: []
-                });
-            }
-        }
-    });
-
-    todaysAffectedLessons.forEach(lesson => {
-        if (isSameDay(startOfDay(lesson.date), startOfDay(new Date()))) {
-            const entry = absenceMap.get(lesson.absentTeacherId);
-            if (entry) {
-                entry.affectedLessons.push(lesson);
-            }
-        }
-    });
-
-    return Array.from(absenceMap.values());
-  }, [teachers, todaysAffectedLessons]);
-
-  const affectedClasses = useMemo(() => {
-    const affected = new Map<string, { classId: string; className: string; lessons: any[] }>();
-    const uncoveredLessons = todaysAffectedLessons.filter(l => !l.isCovered && isSameDay(l.date, new Date()));
-
-    uncoveredLessons.forEach(lesson => {
-      if (!affected.has(lesson.classId)) {
-        affected.set(lesson.classId, {
-          classId: lesson.classId,
-          className: lesson.className,
-          lessons: [],
-        });
-      }
-      affected.get(lesson.classId)!.lessons.push(lesson);
-    });
-
-    const fullyCoveredClasses = new Set<string>();
-    todaysAffectedLessons.forEach(lesson => {
-        if(lesson.isCovered && isSameDay(lesson.date, new Date()) && !uncoveredLessons.some(ul => ul.classId === lesson.classId)) {
-            fullyCoveredClasses.add(lesson.classId);
-        }
-    });
-
-    const result = Array.from(affected.values()).map(classData => ({
-        ...classData,
-        isFullyCovered: false,
-    }));
-    
-    fullyCoveredClasses.forEach(classId => {
-        const classInfo = allClasses.find(c => c.id === classId);
-        if(classInfo && !affected.has(classId)) {
-            result.push({
-                classId: classId,
-                className: classInfo.name,
-                lessons: [],
-                isFullyCovered: true
-            })
-        }
-    })
-
-    return result;
-  }, [todaysAffectedLessons, allClasses]);
-
-  const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
+    const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
       
       const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
@@ -292,6 +210,7 @@ export default function Home() {
                             date,
                             time,
                             lesson,
+                            absentTeacherName: absentTeacher.name,
                             recommendation: subResult.recommendation,
                             recommendationId: subResult.recommendationId,
                             reasoning: subResult.reasoning,
@@ -367,6 +286,16 @@ export default function Home() {
       
       const substitutePool = teachers.filter(t => t.id !== lesson.absentTeacherId);
       const date = startOfDay(new Date(lesson.date));
+      const absentTeacher = teachers.find(t => t.id === lesson.absentTeacherId);
+
+      if (!absentTeacher) {
+          toast({
+              variant: "destructive",
+              title: "שגיאה",
+              description: "לא ניתן למצוא את המורה החסר.",
+          });
+          return;
+      }
       
       try {
           const subResult = await findSubstitute(
@@ -383,12 +312,13 @@ export default function Home() {
                   date,
                   time: lesson.time,
                   lesson: { ...lesson, teacherId: lesson.absentTeacherId }, // Reconstruct minimal lesson object
+                  absentTeacherName: absentTeacher.name,
                   recommendation: subResult.recommendation,
                   recommendationId: subResult.recommendationId,
                   reasoning: subResult.reasoning,
                   substituteOptions: subResult.substituteOptions,
               }],
-              absentTeacher: teachers.find(t => t.id === lesson.absentTeacherId) as Teacher,
+              absentTeacher: absentTeacher,
               absenceDays: [{ date: date.toISOString(), startTime: "08:00", endTime: "16:00", isAllDay: true, reason: "Generated from panel" }] // Dummy absence day for context
           });
 
@@ -438,6 +368,89 @@ export default function Home() {
           });
       }
   };
+
+  const todaysAffectedLessons = useAbsences({
+    teachers: teachers,
+    classes: allClasses,
+    substitutions: allSubstitutions,
+    timeSlots: timeSlots,
+  });
+
+  const todaysAbsences = useMemo(() => {
+    const absenceMap = new Map<string, { teacher: Teacher; absences: AbsenceDay[]; affectedLessons: AffectedLesson[] }>();
+
+    (teachers || []).forEach(teacher => {
+        const today = startOfDay(new Date());
+        const teacherAbsencesToday = (teacher.absences || []).filter(absence => {
+            try {
+                return isSameDay(startOfDay(new Date(absence.date)), today);
+            } catch (e) { return false; }
+        });
+
+        if (teacherAbsencesToday.length > 0) {
+            if (!absenceMap.has(teacher.id)) {
+                absenceMap.set(teacher.id, {
+                    teacher: teacher,
+                    absences: teacherAbsencesToday,
+                    affectedLessons: []
+                });
+            }
+        }
+    });
+
+    todaysAffectedLessons.forEach(lesson => {
+        if (isSameDay(startOfDay(lesson.date), startOfDay(new Date()))) {
+            const entry = absenceMap.get(lesson.absentTeacherId);
+            if (entry) {
+                entry.affectedLessons.push(lesson);
+            }
+        }
+    });
+
+    return Array.from(absenceMap.values());
+  }, [teachers, todaysAffectedLessons]);
+
+  const affectedClasses = useMemo(() => {
+    const affected = new Map<string, { classId: string; className: string; lessons: any[] }>();
+    const uncoveredLessons = todaysAffectedLessons.filter(l => !l.isCovered && isSameDay(l.date, new Date()));
+
+    uncoveredLessons.forEach(lesson => {
+      if (!affected.has(lesson.classId)) {
+        affected.set(lesson.classId, {
+          classId: lesson.classId,
+          className: lesson.className,
+          lessons: [],
+        });
+      }
+      affected.get(lesson.classId)!.lessons.push(lesson);
+    });
+
+    const fullyCoveredClasses = new Set<string>();
+    todaysAffectedLessons.forEach(lesson => {
+        if(lesson.isCovered && isSameDay(lesson.date, new Date()) && !uncoveredLessons.some(ul => ul.classId === lesson.classId)) {
+            fullyCoveredClasses.add(lesson.classId);
+        }
+    });
+
+    const result = Array.from(affected.values()).map(classData => ({
+        ...classData,
+        isFullyCovered: false,
+    }));
+    
+    fullyCoveredClasses.forEach(classId => {
+        const classInfo = allClasses.find(c => c.id === classId);
+        if(classInfo && !affected.has(classId)) {
+            result.push({
+                classId: classId,
+                className: classInfo.name,
+                lessons: [],
+                isFullyCovered: true
+            })
+        }
+    })
+
+    return result;
+  }, [todaysAffectedLessons, allClasses]);
   
   useEffect(() => {
     if (!isUserLoading && !user) {
