@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { collection, query, where, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { Loader2, AlertTriangle, CheckCircle, UserX, School, Edit } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, UserX, School, Edit, BookCopy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { format, isSameDay, startOfDay } from 'date-fns';
@@ -105,30 +105,42 @@ export default function Home() {
   });
 
   const todaysAbsences = useMemo(() => {
-    if (todaysAffectedLessons.length === 0) return [];
-  
-    const absencesByTeacher = new Map<string, { teacher: Teacher; absences: AbsenceDay[]; affectedLessons: any[] }>();
-  
-    todaysAffectedLessons.forEach(lesson => {
-      const teacher = teachers.find(t => t.id === lesson.absentTeacherId);
-      if (!teacher) return;
-  
-      if (!absencesByTeacher.has(teacher.id)) {
-        absencesByTeacher.set(teacher.id, {
-          teacher,
-          absences: (teacher.absences || []).filter(a => isSameDay(startOfDay(new Date(a.date)), startOfDay(new Date()))),
-          affectedLessons: [],
+    const absenceMap = new Map<string, { teacher: Teacher; absences: AbsenceDay[]; affectedLessons: AffectedLesson[] }>();
+
+    (teachers || []).forEach(teacher => {
+        const today = startOfDay(new Date());
+        const teacherAbsencesToday = (teacher.absences || []).filter(absence => {
+            try {
+                return isSameDay(startOfDay(new Date(absence.date)), today);
+            } catch (e) { return false; }
         });
-      }
-      absencesByTeacher.get(teacher.id)!.affectedLessons.push(lesson);
+
+        if (teacherAbsencesToday.length > 0) {
+            if (!absenceMap.has(teacher.id)) {
+                absenceMap.set(teacher.id, {
+                    teacher: teacher,
+                    absences: teacherAbsencesToday,
+                    affectedLessons: []
+                });
+            }
+        }
     });
-  
-    return Array.from(absencesByTeacher.values());
-  }, [todaysAffectedLessons, teachers]);
+
+    todaysAffectedLessons.forEach(lesson => {
+        if (isSameDay(startOfDay(lesson.date), startOfDay(new Date()))) {
+            const entry = absenceMap.get(lesson.absentTeacherId);
+            if (entry) {
+                entry.affectedLessons.push(lesson);
+            }
+        }
+    });
+
+    return Array.from(absenceMap.values());
+  }, [teachers, todaysAffectedLessons]);
 
   const affectedClasses = useMemo(() => {
     const affected = new Map<string, { classId: string; className: string; lessons: any[] }>();
-    const uncoveredLessons = todaysAffectedLessons.filter(l => !l.isCovered);
+    const uncoveredLessons = todaysAffectedLessons.filter(l => !l.isCovered && isSameDay(l.date, new Date()));
 
     uncoveredLessons.forEach(lesson => {
       if (!affected.has(lesson.classId)) {
@@ -143,7 +155,7 @@ export default function Home() {
 
     const fullyCoveredClasses = new Set<string>();
     todaysAffectedLessons.forEach(lesson => {
-        if(lesson.isCovered && !uncoveredLessons.some(ul => ul.classId === lesson.classId)) {
+        if(lesson.isCovered && isSameDay(lesson.date, new Date()) && !uncoveredLessons.some(ul => ul.classId === lesson.classId)) {
             fullyCoveredClasses.add(lesson.classId);
         }
     });
@@ -200,7 +212,7 @@ export default function Home() {
         getDocs(teacherQuery),
         getDocs(classQuery),
         getDocs(subsQuery),
-        getDocs(majorsQuery)
+        getDocs(majorsSnapshot)
       ]);
 
       // Reset schedules and absences for all teachers
@@ -567,9 +579,10 @@ export default function Home() {
 
         <div className="space-y-6">
               <div className="w-full">
-              <div className="grid w-full grid-cols-2 sm:grid-cols-6 max-w-4xl mx-auto h-auto p-1 bg-muted/50 backdrop-blur-sm rounded-full mb-8 overflow-x-auto">
+              <div className="grid w-full grid-cols-2 sm:grid-cols-7 max-w-4xl mx-auto h-auto p-1 bg-muted/50 backdrop-blur-sm rounded-full mb-8 overflow-x-auto">
                 <Button variant="ghost" onClick={() => setActiveTab("teachers")} className={`rounded-full py-2.5 transition-all ${activeTab === "teachers" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>פרופילי מורים</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("classes")} className={`rounded-full py-2.5 transition-all ${activeTab === "classes" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>כיתות לימוד</Button>
+                <Button variant="ghost" onClick={() => setActiveTab("majors")} className={`rounded-full py-2.5 transition-all ${activeTab === "majors" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>מגמות</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("timetable")} className={`rounded-full py-2.5 transition-all ${activeTab === "timetable" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>זמינות מחליפים</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("calendar")} className={`rounded-full py-2.5 transition-all ${activeTab === "calendar" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>לוח שנה</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("statistics")} className={`rounded-full py-2.5 transition-all ${activeTab === "statistics" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>סטטיסטיקות</Button>
@@ -602,6 +615,23 @@ export default function Home() {
                     className="mt-0"
                   >
                     <ClassList />
+                  </motion.div>
+                )}
+                
+                {activeTab === "majors" && (
+                  <motion.div
+                    key="majors"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="mt-0"
+                  >
+                    <MajorsTab 
+                        teachers={teachers}
+                        classes={allClasses}
+                        timeSlots={timeSlots}
+                    />
                   </motion.div>
                 )}
 

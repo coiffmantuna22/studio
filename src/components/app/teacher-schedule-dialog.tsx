@@ -74,10 +74,7 @@ const parseTimeToNumber = (time: string) => {
 function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAbsent, onToggleAbsence }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
     
-    // Safeguard: Ensure lessons is always an array
     const safeLessons = Array.isArray(lessons) ? lessons : [];
-
-    // Filter out major lessons for editing purposes
     const majorLessons = safeLessons.filter(l => l.majorId);
     const [regularLessons, setRegularLessons] = useState<Lesson[]>([]);
 
