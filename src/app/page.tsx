@@ -103,7 +103,7 @@ export default function Home() {
 
   const todaysAbsences = useMemo(() => {
     const today = startOfDay(new Date());
-    if (!teachers || teachers.length === 0) return [];
+    if (!teachers || teachers.length === 0 || !timeSlots || timeSlots.length === 0) return [];
   
     return teachers
       .map(teacher => {
@@ -129,12 +129,16 @@ export default function Home() {
             
             return lessons.map(lesson => {
                 if (lesson && lesson.classId) {
+                  const lessonSlot = timeSlots.find(ts => ts.start === time);
+                  if (!lessonSlot) return null;
+
                   const isAbsentDuringLesson = todaysTeacherAbsences.some(absence => {
                     if (absence.isAllDay) return true;
-                    const lessonStart = parseTimeToNumber(time);
+                    const lessonStart = parseTimeToNumber(lessonSlot.start);
+                    const lessonEnd = parseTimeToNumber(lessonSlot.end);
                     const absenceStart = parseTimeToNumber(absence.startTime);
                     const absenceEnd = parseTimeToNumber(absence.endTime);
-                    return lessonStart >= absenceStart && lessonStart < absenceEnd;
+                    return lessonStart < absenceEnd && lessonEnd > absenceStart;
                   });
       
                   if (isAbsentDuringLesson) {
@@ -156,7 +160,7 @@ export default function Home() {
         return { teacher, absences: todaysTeacherAbsences, affectedLessons };
       })
       .filter(item => item !== null && item.absences.length > 0) as { teacher: Teacher, absences: AbsenceDay[], affectedLessons: any[] }[];
-  }, [teachers, allClasses, allSubstitutions]);
+  }, [teachers, allClasses, allSubstitutions, timeSlots]);
 
 
   const affectedClasses = useMemo(() => {
@@ -174,12 +178,16 @@ export default function Home() {
             lessons.forEach((lesson: Lesson) => {
                 if (!lesson || !lesson.classId) return;
 
+                const lessonSlot = timeSlots.find(ts => ts.start === time);
+                if (!lessonSlot) return;
+
                 const isAbsentDuringLesson = absences.some(absence => {
                     if (absence.isAllDay) return true;
-                    const lessonStart = parseTimeToNumber(time);
+                    const lessonStart = parseTimeToNumber(lessonSlot.start);
+                    const lessonEnd = parseTimeToNumber(lessonSlot.end);
                     const absenceStart = parseTimeToNumber(absence.startTime);
                     const absenceEnd = parseTimeToNumber(absence.endTime);
-                    return lessonStart >= absenceStart && lessonStart < absenceEnd;
+                    return lessonStart < absenceEnd && lessonEnd > absenceStart;
                 });
                 
                 if (isAbsentDuringLesson) {
@@ -217,7 +225,7 @@ export default function Home() {
             lessons: uncoveredLessons,
         };
     });
-}, [todaysAbsences, allClasses, allSubstitutions]);
+}, [todaysAbsences, allClasses, allSubstitutions, timeSlots]);
 
 
   const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
@@ -316,16 +324,13 @@ export default function Home() {
                       const lessons = Array.isArray(lessonsData) ? lessonsData : (lessonsData ? [lessonsData] : []);
                       lessons.forEach((lesson: Lesson) => {
                           if (lesson?.teacherId === absentTeacher.id) {
-                              const lessonStart = parseTimeToNumber(time);
                               const lessonSlot = timeSlots.find(ts => ts.start === time);
                               if (!lessonSlot) return;
     
-                              const lessonEnd = parseTimeToNumber(lessonSlot.end);
-      
                               const isAffected = absence.isAllDay || 
                                   (
-                                      lessonEnd > parseTimeToNumber(absence.startTime) && 
-                                      lessonStart < parseTimeToNumber(absence.endTime)
+                                      parseTimeToNumber(lessonSlot.start) < parseTimeToNumber(absence.endTime) && 
+                                      parseTimeToNumber(lessonSlot.end) > parseTimeToNumber(absence.startTime)
                                   );
       
                               if (isAffected) {
