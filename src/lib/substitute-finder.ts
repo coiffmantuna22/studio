@@ -64,7 +64,9 @@ export function getTeacherAvailabilityStatus(teacher: Teacher, date: Date, timeS
     }
     
     // 3. Is the teacher teaching a scheduled lesson now?
-    if (teacher.schedule?.[dayOfWeek]?.[currentSlot.start]) {
+    const lessonsData = teacher.schedule?.[dayOfWeek]?.[currentSlot.start];
+    const lessons = Array.isArray(lessonsData) ? lessonsData : (lessonsData ? [lessonsData] : []);
+    if (lessons && lessons.length > 0) {
         return 'teaching';
     }
 
@@ -90,8 +92,9 @@ export function isTeacherAvailable(teacher: Teacher, date: Date, time: string, t
 
   if (!isPresent) return false;
   
-  const isTeaching = teacher.schedule?.[dayOfWeek]?.[time];
-  if (isTeaching) return false;
+  const lessonsData = teacher.schedule?.[dayOfWeek]?.[time];
+  const lessons = Array.isArray(lessonsData) ? lessonsData : (lessonsData ? [lessonsData] : []);
+  if (lessons && lessons.length > 0) return false;
 
   const todaysAbsences = (teacher.absences || []).filter(absence => isSameDay(startOfDay(new Date(absence.date)), startOfDay(date)));
    if (todaysAbsences.length > 0) {
@@ -112,8 +115,9 @@ export function isTeacherAlreadyScheduled(teacherId: string, date: Date, time: s
     
     return allClasses.some(schoolClass => {
         if (schoolClass.id === ignoreClassId) return false;
-        const lesson = schoolClass.schedule[dayOfWeek]?.[time];
-        return lesson?.teacherId === teacherId;
+        const lessonsData = schoolClass.schedule[dayOfWeek]?.[time];
+        const lessons = Array.isArray(lessonsData) ? lessonsData : (lessonsData ? [lessonsData] : []);
+        return lessons && lessons.some(lesson => lesson.teacherId === teacherId);
     });
 }
 

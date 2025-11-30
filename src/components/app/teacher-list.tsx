@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import type { Teacher, SchoolClass, TimeSlot, TeacherAvailabilityStatus, AbsenceDay } from '@/lib/types';
+import type { Teacher, SchoolClass, TimeSlot, TeacherAvailabilityStatus, AbsenceDay, Lesson } from '@/lib/types';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Plus, Search } from 'lucide-react';
 import TeacherCard from './teacher-card';
@@ -50,10 +50,12 @@ export default function TeacherList({
   const [searchTerm, setSearchTerm] = useState('');
 
   const teachersQuery = useMemoFirebase(() => user ? query(collection(firestore, 'teachers'), where('userId', '==', user.uid)) : null, [user, firestore]);
-  const { data: teachers = [], isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
+  const { data: teachersData, isLoading: teachersLoading } = useCollection<Teacher>(teachersQuery);
+  const teachers = teachersData || [];
 
   const classesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'classes'), where('userId', '==', user.uid)) : null, [user, firestore]);
-  const { data: allClasses = [] } = useCollection<SchoolClass>(classesQuery);
+  const { data: allClassesData } = useCollection<SchoolClass>(classesQuery);
+  const allClasses = allClassesData || [];
 
   const settingsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'settings'), where('userId', '==', user.uid)) : null, [user, firestore]);
   const { data: settingsCollection } = useCollection(settingsQuery);
@@ -126,17 +128,22 @@ export default function TeacherList({
         classesQuerySnapshot.forEach(classDoc => {
           const schoolClass = { id: classDoc.id, ...classDoc.data() } as SchoolClass;
           let classWasModified = false;
-          const newSchedule = { ...schoolClass.schedule };
+          const newSchedule = JSON.parse(JSON.stringify(schoolClass.schedule || {}));
 
           Object.keys(newSchedule).forEach(day => {
             if (newSchedule[day]) {
               Object.keys(newSchedule[day] as object).forEach(time => {
-                const lesson = newSchedule[day]?.[time];
-                if (lesson && lesson.teacherId === teacherId) {
-                  (newSchedule[day] as any)[time] = null; 
-                  classWasModified = true;
+                const lessons = newSchedule[day]?.[time];
+                if (Array.isArray(lessons)) {
+                    const originalLength = lessons.length;
+                    newSchedule[day][time] = lessons.filter((l: Lesson) => l.teacherId !== teacherId);
+                    if (newSchedule[day][time].length !== originalLength) {
+                        classWasModified = true;
+                    }
+                    if (newSchedule[day][time].length === 0) delete newSchedule[day][time];
                 }
               });
+              if (Object.keys(newSchedule[day]).length === 0) delete newSchedule[day];
             }
           });
 
@@ -194,9 +201,13 @@ export default function TeacherList({
         const allRelevantClassIds = new Set<string>();
         for (const schedule of [oldSchedule, newSchedule]) {
             Object.values(schedule || {}).forEach(day => 
-                Object.values(day || {}).forEach(lesson => 
-                    lesson?.classId && allRelevantClassIds.add(lesson.classId)
-                )
+                Object.values(day || {}).forEach(lessons => {
+                    if (Array.isArray(lessons)) {
+                        lessons.forEach((lesson: Lesson) => {
+                             if (lesson?.classId && !lesson.majorId) allRelevantClassIds.add(lesson.classId);
+                        });
+                    }
+                })
             )
         }
         
@@ -212,17 +223,35 @@ export default function TeacherList({
             daysOfWeek.forEach(day => {
                 (timeSlots || []).forEach(slot => {
                     const time = slot.start;
-                    const oldLesson = oldSchedule[day]?.[time];
-                    const newLesson = newSchedule[day]?.[time];
+                    const oldLessons = oldSchedule[day]?.[time] || [];
+                    const newLessons = newSchedule[day]?.[time] || [];
 
-                    if (oldLesson?.classId === classId && (!newLesson || newLesson.classId !== classId)) {
-                        if (updatedClassSchedule[day]?.[time]?.teacherId === teacherId) {
-                            (updatedClassSchedule[day] as any)[time] = null;
-                        }
+                     // Filter out major lessons
+                    const oldRegularLessons = Array.isArray(oldLessons) ? oldLessons.filter((l: Lesson) => !l.majorId) : [];
+                    const newRegularLessons = Array.isArray(newLessons) ? newLessons.filter((l: Lesson) => !l.majorId) : [];
+
+                    const oldLesson = oldRegularLessons.find((l: Lesson) => l.classId === classId);
+                    const newLesson = newRegularLessons.find((l: Lesson) => l.classId === classId);
+
+
+                    if (oldLesson && !newLesson) {
+                         // Removed
+                         const currentClassLessons = updatedClassSchedule[day]?.[time] || [];
+                         if (Array.isArray(currentClassLessons)) {
+                             updatedClassSchedule[day][time] = currentClassLessons.filter((l: Lesson) => l.teacherId !== teacherId);
+                             if (updatedClassSchedule[day][time].length === 0) delete updatedClassSchedule[day][time];
+                         }
                     }
-                    if (newLesson?.classId === classId) {
+                    if (newLesson) {
+                        // Added or Updated
                         updatedClassSchedule[day] = updatedClassSchedule[day] || {};
-                        updatedClassSchedule[day][time] = { ...(newLesson as any), teacherId: teacherId };
+                        const currentClassLessons = updatedClassSchedule[day][time] || [];
+                         // Remove existing lesson for this teacher if any
+                        const otherLessons = Array.isArray(currentClassLessons) 
+                            ? currentClassLessons.filter((l: Lesson) => l.teacherId !== teacherId) 
+                            : [];
+                        
+                        updatedClassSchedule[day][time] = [...otherLessons, { ...newLesson, teacherId: teacherId }];
                     }
                 });
             });

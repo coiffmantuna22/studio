@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -47,8 +46,8 @@ interface TeacherScheduleDialogProps {
 interface EditSlotPopoverProps {
     day: string;
     time: string;
-    lesson: Lesson | null;
-    onSave: (day: string, time: string, lesson: Lesson | null) => void;
+    lessons: Lesson[];
+    onSave: (day: string, time: string, lessons: Lesson[]) => void;
     teacher: Teacher;
     allClasses: SchoolClass[];
     isAbsent: boolean;
@@ -71,17 +70,22 @@ const parseTimeToNumber = (time: string) => {
 };
 
 
-function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses, isAbsent, onToggleAbsence }: EditSlotPopoverProps) {
+function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAbsent, onToggleAbsence }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [subject, setSubject] = useState(lesson?.subject || '');
-    const [classId, setClassId] = useState(lesson?.classId || null);
+    
+    // Filter out major lessons for editing purposes
+    const majorLessons = lessons.filter(l => l.majorId);
+    const regularLesson = lessons.find(l => !l.majorId) || null;
+
+    const [subject, setSubject] = useState(regularLesson?.subject || '');
+    const [classId, setClassId] = useState(regularLesson?.classId || null);
 
     useEffect(() => {
         if(isOpen) {
-            setSubject(lesson?.subject || '');
-            setClassId(lesson?.classId || null);
+            setSubject(regularLesson?.subject || '');
+            setClassId(regularLesson?.classId || null);
         }
-    }, [lesson, isOpen]);
+    }, [regularLesson, isOpen]);
     
     const teacherSubjects = useMemo(() => {
         return teacher.subjects.map(s => ({label: s, value: s}));
@@ -89,39 +93,48 @@ function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses, isAbs
 
 
     const handleSave = () => {
+        const newLessons = [...majorLessons];
         if (subject && classId) {
-            onSave(day, time, { subject, teacherId: teacher.id, classId });
-        } else {
-             onSave(day, time, null);
+            newLessons.push({ subject, teacherId: teacher.id, classId });
         }
+        onSave(day, time, newLessons);
         setIsOpen(false);
     };
 
     const handleClear = () => {
-        onSave(day, time, null);
+        onSave(day, time, [...majorLessons]);
         setIsOpen(false);
     };
     
-    const currentClass = lesson?.classId ? allClasses.find(c => c.id === lesson.classId) : null;
+    const currentClass = regularLesson?.classId ? allClasses.find(c => c.id === regularLesson.classId) : null;
     
-    const canSave = (subject && classId) || (!subject && !classId && lesson !== null);
+    const canSave = (subject && classId) || (!subject && !classId && regularLesson !== null);
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
                  <div className={cn(
-                    "w-full h-full p-2 flex flex-col justify-center items-center text-center cursor-pointer min-h-[6rem] transition-colors rounded-md",
+                    "w-full h-full p-1 flex flex-col justify-start items-center text-center cursor-pointer min-h-[6rem] transition-colors rounded-md gap-1 overflow-y-auto",
                     isAbsent && 'bg-destructive/10',
-                    lesson ? 'bg-primary/10 hover:bg-primary/20' : 'bg-card hover:bg-muted',
-                    isAbsent && lesson && 'bg-destructive/20 hover:bg-destructive/30'
+                    lessons.length > 0 ? 'bg-primary/5 hover:bg-primary/10' : 'bg-card hover:bg-muted',
+                    isAbsent && lessons.length > 0 && 'bg-destructive/20 hover:bg-destructive/30'
                 )}>
-                    {lesson && currentClass ? (
-                        <>
-                            <p className="font-bold text-sm">{lesson.subject}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{currentClass?.name}</p>
-                        </>
-                    ) : <span className="text-muted-foreground text-xs">ריקה</span>}
-                     {isAbsent && <Badge variant="destructive" className="mt-2">נעדר/ת</Badge>}
+                    {lessons.length === 0 && <span className="text-muted-foreground text-xs mt-2">ריקה</span>}
+                    {isAbsent && <Badge variant="destructive" className="mt-1 mb-1">נעדר/ת</Badge>}
+                    
+                    {lessons.map((lesson, idx) => {
+                         const schoolClass = allClasses.find(c => c.id === lesson.classId);
+                         return (
+                            <div key={idx} className={cn(
+                                "w-full p-1 rounded text-xs border",
+                                lesson.majorId ? "bg-amber-100 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800" : "bg-background border-border"
+                            )}>
+                                <p className="font-bold truncate">{lesson.subject}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">{schoolClass?.name}</p>
+                                {lesson.majorId && <Badge variant="secondary" className="text-[8px] h-3 px-1 mt-0.5">מגמה</Badge>}
+                            </div>
+                         )
+                    })}
                 </div>
             </PopoverTrigger>
             <PopoverContent className="w-80">
@@ -139,10 +152,23 @@ function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses, isAbs
                             onCheckedChange={onToggleAbsence}
                         />
                     </div>
+                    
+                    {majorLessons.length > 0 && (
+                        <div className="bg-muted p-2 rounded-md text-xs space-y-1">
+                            <p className="font-medium">שיעורי מגמה (לא ניתן לערוך כאן):</p>
+                            {majorLessons.map((l, i) => (
+                                <div key={i} className="flex justify-between">
+                                    <span>{l.subject}</span>
+                                    <span className="text-muted-foreground">{allClasses.find(c => c.id === l.classId)?.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     <Separator />
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2"><Book className='w-4 h-4 text-muted-foreground'/>מקצוע</label>
+                        <label className="text-sm font-medium flex items-center gap-2"><Book className='w-4 h-4 text-muted-foreground'/>מקצוע (רגיל)</label>
                         <Combobox
                             items={teacherSubjects}
                             value={subject}
@@ -167,7 +193,7 @@ function EditSlotPopover({ day, time, lesson, onSave, teacher, allClasses, isAbs
                     <div className="flex justify-between items-center">
                          <Button variant="ghost" size="sm" onClick={handleClear} className="text-destructive hover:text-destructive">
                             <X className="w-4 h-4 ml-2"/>
-                            נקה שיבוץ
+                            נקה שיבוץ רגיל
                         </Button>
                         <Button size="sm" onClick={handleSave} disabled={!canSave}>שמור</Button>
                     </div>
@@ -202,18 +228,12 @@ export default function TeacherScheduleDialog({
 
   if (!teacher) return null;
 
-  const handleSaveSlot = (day: string, time: string, lesson: Lesson | null) => {
+  const handleSaveSlot = (day: string, time: string, lessons: Lesson[]) => {
     setLocalSchedule(prev => {
         const newSchedule = { ...prev };
         if (!newSchedule[day]) newSchedule[day] = {};
         
-        if(lesson === null){
-            if(newSchedule[day] && newSchedule[day][time]) {
-              newSchedule[day][time] = null;
-            }
-        } else {
-             newSchedule[day][time] = lesson;
-        }
+        newSchedule[day][time] = lessons;
 
         return newSchedule;
     })
@@ -313,7 +333,7 @@ export default function TeacherScheduleDialog({
                                 {slot.type === 'break' && <Badge variant="outline" className='mt-1'>הפסקה</Badge>}
                             </td>
                             {daysOfWeek.map(day => {
-                                const lesson = localSchedule?.[day]?.[slot.start] || null;
+                                const lessons = localSchedule?.[day]?.[slot.start] || [];
                                 const isBreak = slot.type === 'break';
                                 const isAbsent = isSlotAbsent(day, slot.start);
                                 return (
@@ -322,7 +342,7 @@ export default function TeacherScheduleDialog({
                                         <EditSlotPopover 
                                             day={day} 
                                             time={slot.start}
-                                            lesson={lesson}
+                                            lessons={lessons}
                                             onSave={handleSaveSlot}
                                             teacher={teacher}
                                             allClasses={allClasses}

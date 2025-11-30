@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -48,8 +47,8 @@ interface ClassTimetableDialogProps {
 interface EditSlotPopoverProps {
     day: string;
     time: string;
-    lesson: Lesson | null;
-    onSave: (day: string, time: string, lesson: Lesson | null) => void;
+    lessons: Lesson[];
+    onSave: (day: string, time: string, lessons: Lesson[]) => void;
     allTeachers: Teacher[];
     allClasses: SchoolClass[];
     schoolClass: SchoolClass;
@@ -66,25 +65,30 @@ const getStartOfWeek = (date: Date): Date => {
 }
 
 
-function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, schoolClass, timeSlots }: EditSlotPopoverProps) {
+function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, schoolClass, timeSlots }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [subject, setSubject] = useState(lesson?.subject || '');
-    const [teacherId, setTeacherId] = useState(lesson?.teacherId || null);
+    // We only allow editing the "regular" lesson (not part of a major) for now, or adding one.
+    // Filter out major lessons for editing purposes, but display them.
+    const majorLessons = lessons.filter(l => l.majorId);
+    const regularLesson = lessons.find(l => !l.majorId) || null;
+
+    const [subject, setSubject] = useState(regularLesson?.subject || '');
+    const [teacherId, setTeacherId] = useState(regularLesson?.teacherId || null);
 
     useEffect(() => {
         if(isOpen) {
-            setSubject(lesson?.subject || '');
-            setTeacherId(lesson?.teacherId || null);
+            setSubject(regularLesson?.subject || '');
+            setTeacherId(regularLesson?.teacherId || null);
         }
-    }, [lesson, isOpen]);
+    }, [regularLesson, isOpen]);
 
     const availableTeachersForSlot = useMemo(() => {
         return allTeachers.filter(t => {
             const isScheduledElsewhere = isTeacherAlreadyScheduled(t.id, new Date(), time, allClasses, schoolClass.id);
-            const isCurrentTeacher = t.id === lesson?.teacherId;
+            const isCurrentTeacher = t.id === regularLesson?.teacherId;
             return !isScheduledElsewhere || isCurrentTeacher;
         });
-    }, [time, allTeachers, allClasses, schoolClass.id, lesson?.teacherId]);
+    }, [time, allTeachers, allClasses, schoolClass.id, regularLesson?.teacherId]);
 
 
     const qualifiedTeachersForSlot = useMemo(() => {
@@ -100,35 +104,45 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
 
 
     const handleSave = () => {
+        const newLessons = [...majorLessons];
         if (subject && teacherId) {
-            onSave(day, time, { subject, teacherId, classId: schoolClass.id });
-        } else {
-             onSave(day, time, null);
+            newLessons.push({ subject, teacherId, classId: schoolClass.id });
         }
+        onSave(day, time, newLessons);
         setIsOpen(false);
     };
 
     const handleClear = () => {
-        onSave(day, time, null);
+        // Only clear the regular lesson
+        onSave(day, time, [...majorLessons]);
         setIsOpen(false);
     };
     
-    const currentTeacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
+    const currentTeacher = regularLesson?.teacherId ? allTeachers.find(t => t.id === regularLesson.teacherId) : null;
     const canSave = (subject && teacherId) || (!subject && !teacherId);
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
                 <div className={cn(
-                    "w-full h-full p-2 flex flex-col justify-center items-center text-center cursor-pointer min-h-[6rem] transition-colors rounded-md",
-                    lesson ? 'bg-primary/10 hover:bg-primary/20' : 'bg-card hover:bg-muted'
+                    "w-full h-full p-1 flex flex-col justify-start items-center text-center cursor-pointer min-h-[6rem] transition-colors rounded-md gap-1 overflow-y-auto",
+                    lessons.length > 0 ? 'bg-primary/5 hover:bg-primary/10' : 'bg-card hover:bg-muted'
                 )}>
-                    {lesson && currentTeacher ? (
-                        <>
-                            <p className="font-bold text-sm">{lesson.subject}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{currentTeacher?.name}</p>
-                        </>
-                    ) : <span className="text-muted-foreground text-xs">ריקה</span>}
+                    {lessons.length === 0 && <span className="text-muted-foreground text-xs mt-2">ריקה</span>}
+                    
+                    {lessons.map((lesson, idx) => {
+                         const teacher = allTeachers.find(t => t.id === lesson.teacherId);
+                         return (
+                            <div key={idx} className={cn(
+                                "w-full p-1 rounded text-xs border",
+                                lesson.majorId ? "bg-amber-100 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800" : "bg-background border-border"
+                            )}>
+                                <p className="font-bold truncate">{lesson.subject}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">{teacher?.name}</p>
+                                {lesson.majorId && <Badge variant="secondary" className="text-[8px] h-3 px-1 mt-0.5">מגמה</Badge>}
+                            </div>
+                         )
+                    })}
                 </div>
             </PopoverTrigger>
             <PopoverContent className="w-80">
@@ -137,15 +151,27 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
                          <h4 className="font-semibold">עריכת שיבוץ</h4>
                          <p className='text-sm text-muted-foreground'>{schoolClass.name} - {day}, {time}</p>
                     </div>
+                    
+                    {majorLessons.length > 0 && (
+                        <div className="bg-muted p-2 rounded-md text-xs space-y-1">
+                            <p className="font-medium">שיעורי מגמה (לא ניתן לערוך כאן):</p>
+                            {majorLessons.map((l, i) => (
+                                <div key={i} className="flex justify-between">
+                                    <span>{l.subject}</span>
+                                    <span className="text-muted-foreground">{allTeachers.find(t => t.id === l.teacherId)?.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     <Separator />
                     <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2"><Book className='w-4 h-4 text-muted-foreground'/>מקצוע</label>
+                        <label className="text-sm font-medium flex items-center gap-2"><Book className='w-4 h-4 text-muted-foreground'/>מקצוע (רגיל)</label>
                         <Combobox
                             items={allSubjects}
                             value={subject}
                             onChange={(newSubject) => {
                                 setSubject(newSubject);
-                                // If the currently selected teacher cannot teach the new subject, clear the teacher selection.
                                 const currentTeacher = allTeachers.find(t => t.id === teacherId);
                                 if (currentTeacher && newSubject && !currentTeacher.subjects.includes(newSubject)) {
                                     setTeacherId(null);
@@ -171,7 +197,7 @@ function EditSlotPopover({ day, time, lesson, onSave, allTeachers, allClasses, s
                     <div className="flex justify-between items-center">
                          <Button variant="ghost" size="sm" onClick={handleClear} className="text-destructive hover:text-destructive">
                             <X className="w-4 h-4 ml-2"/>
-                            נקה שיבוץ
+                            נקה שיבוץ רגיל
                         </Button>
                         <Button size="sm" onClick={handleSave} disabled={!canSave}>שמור</Button>
                     </div>
@@ -204,18 +230,12 @@ export default function ClassTimetableDialog({
 
   if (!schoolClass) return null;
 
-  const handleSaveSlot = (day: string, time: string, lesson: Lesson | null) => {
+  const handleSaveSlot = (day: string, time: string, lessons: Lesson[]) => {
     setLocalSchedule(prev => {
         const newSchedule = { ...prev };
         if (!newSchedule[day]) newSchedule[day] = {};
         
-        if(lesson === null){
-            if(newSchedule[day]) {
-              newSchedule[day][time] = null;
-            }
-        } else {
-             newSchedule[day][time] = lesson;
-        }
+        newSchedule[day][time] = lessons;
 
         return newSchedule;
     })
@@ -243,8 +263,7 @@ export default function ClassTimetableDialog({
         </thead>
         <tbody>
           {timeSlots.map(slot => {
-            const lesson = localSchedule?.[day]?.[slot.start] || null;
-            const teacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
+            const lessons = localSchedule?.[day]?.[slot.start] || [];
             const isBreak = slot.type === 'break';
             return (
               <tr key={slot.id} className="border-t">
@@ -257,7 +276,7 @@ export default function ClassTimetableDialog({
                         <EditSlotPopover 
                             day={day} 
                             time={slot.start}
-                            lesson={lesson}
+                            lessons={lessons}
                             onSave={handleSaveSlot}
                             allTeachers={allTeachers}
                             allClasses={allClasses}
@@ -265,19 +284,28 @@ export default function ClassTimetableDialog({
                             timeSlots={timeSlots}
                         />
                     ) : (
-                        <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-center">
-                        {isBreak ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
-                            lesson && teacher ? (
-                                <div className="bg-secondary/50 rounded-md p-2 text-right h-full flex flex-col justify-center">
-                                <div className="flex items-center gap-2">
-                                    <BookOpen className="h-4 w-4 text-primary shrink-0" />
-                                    <p className="font-semibold text-primary">{lesson.subject}</p>
-                                </div>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                                    <p className="text-sm text-muted-foreground">{teacher.name}</p>
-                                </div>
-                                </div>
+                        <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-start gap-1">
+                        {isBreak ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground mt-4' /> : (
+                            lessons.length > 0 ? (
+                                lessons.map((lesson, idx) => {
+                                    const teacher = allTeachers.find(t => t.id === lesson.teacherId);
+                                    return (
+                                        <div key={idx} className={cn(
+                                            "bg-secondary/50 rounded-md p-2 text-right flex flex-col justify-center",
+                                            lesson.majorId && "border border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-800"
+                                        )}>
+                                            <div className="flex items-center gap-2">
+                                                <BookOpen className="h-3 w-3 text-primary shrink-0" />
+                                                <p className="font-semibold text-primary text-xs">{lesson.subject}</p>
+                                                {lesson.majorId && <Badge variant="secondary" className="text-[8px] h-3 px-1 mr-auto">מגמה</Badge>}
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <User className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                <p className="text-xs text-muted-foreground">{teacher?.name}</p>
+                                            </div>
+                                        </div>
+                                    )
+                                })
                             ) : (
                                 <div className="flex items-center justify-center h-full">
                                     <span className="text-muted-foreground text-xs">--</span>
@@ -345,8 +373,7 @@ export default function ClassTimetableDialog({
                                             {slot.type === 'break' && <Badge variant="outline" className='mt-1'>הפסקה</Badge>}
                                         </td>
                                         {daysOfWeek.map(day => {
-                                            const lesson = localSchedule?.[day]?.[slot.start] || null;
-                                            const teacher = lesson?.teacherId ? allTeachers.find(t => t.id === lesson.teacherId) : null;
+                                            const lessons = localSchedule?.[day]?.[slot.start] || [];
                                             const isBreak = slot.type === 'break';
                                             return (
                                             <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30')}>
@@ -354,7 +381,7 @@ export default function ClassTimetableDialog({
                                                     <EditSlotPopover 
                                                         day={day} 
                                                         time={slot.start}
-                                                        lesson={lesson}
+                                                        lessons={lessons}
                                                         onSave={handleSaveSlot}
                                                         allTeachers={allTeachers}
                                                         allClasses={allClasses}
@@ -362,19 +389,28 @@ export default function ClassTimetableDialog({
                                                         timeSlots={timeSlots}
                                                     />
                                                 ) : (
-                                                    <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-center">
-                                                    {isBreak ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground' /> : (
-                                                        lesson && teacher ? (
-                                                            <div className="bg-secondary/50 rounded-md p-2 text-right h-full flex flex-col justify-center">
-                                                            <div className="flex items-center gap-2">
-                                                                <BookOpen className="h-4 w-4 text-primary shrink-0" />
-                                                                <p className="font-semibold text-primary">{lesson.subject}</p>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 mt-1">
-                                                                <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                                                                <p className="text-sm text-muted-foreground">{teacher.name}</p>
-                                                            </div>
-                                                            </div>
+                                                    <div className="p-1.5 h-full min-h-[6rem] flex flex-col justify-start gap-1">
+                                                    {isBreak ? <Coffee className='w-5 h-5 mx-auto text-muted-foreground mt-4' /> : (
+                                                        lessons.length > 0 ? (
+                                                            lessons.map((lesson, idx) => {
+                                                                const teacher = allTeachers.find(t => t.id === lesson.teacherId);
+                                                                return (
+                                                                    <div key={idx} className={cn(
+                                                                        "bg-secondary/50 rounded-md p-2 text-right flex flex-col justify-center",
+                                                                        lesson.majorId && "border border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-800"
+                                                                    )}>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <BookOpen className="h-3 w-3 text-primary shrink-0" />
+                                                                            <p className="font-semibold text-primary text-xs">{lesson.subject}</p>
+                                                                            {lesson.majorId && <Badge variant="secondary" className="text-[8px] h-3 px-1 mr-auto">מגמה</Badge>}
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                            <User className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                                            <p className="text-xs text-muted-foreground">{teacher?.name}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                )
+                                                            })
                                                         ) : (
                                                             <div className="flex items-center justify-center h-full">
                                                                 <span className="text-muted-foreground text-xs">--</span>

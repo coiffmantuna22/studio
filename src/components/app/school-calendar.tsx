@@ -19,6 +19,8 @@ import { collection, query, where, doc, writeBatch, deleteDoc } from 'firebase/f
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
+import { SuccessAnimation } from '../ui/success-animation';
 
 interface CalendarEvent {
   id: string;
@@ -38,6 +40,7 @@ export default function SchoolCalendar() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Form state
   const [eventTitle, setEventTitle] = useState('');
@@ -108,7 +111,11 @@ export default function SchoolCalendar() {
         });
       }
       
-      setIsDialogOpen(false);
+      setShowSuccess(true);
+      setTimeout(() => {
+          setIsDialogOpen(false);
+          setShowSuccess(false);
+      }, 2000);
     } catch (error) {
       console.error("Error saving event:", error);
     } finally {
@@ -214,10 +221,29 @@ export default function SchoolCalendar() {
                 <p>לא נמצאו אירועים לתאריך זה</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <motion.div 
+                className="space-y-4"
+                initial="hidden"
+                animate="visible"
+                variants={{
+                  hidden: { opacity: 0 },
+                  visible: {
+                    opacity: 1,
+                    transition: {
+                      staggerChildren: 0.1
+                    }
+                  }
+                }}
+              >
+                <AnimatePresence mode="popLayout">
                 {selectedDateEvents.map(event => (
-                  <div 
+                  <motion.div 
                     key={event.id} 
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
                     className={cn(
                       "p-4 rounded-xl border flex flex-col gap-2 transition-all hover:shadow-md",
                       "bg-card"
@@ -258,9 +284,10 @@ export default function SchoolCalendar() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+                </AnimatePresence>
+              </motion.div>
             )}
           </ScrollArea>
         </CardContent>
@@ -268,74 +295,80 @@ export default function SchoolCalendar() {
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingEvent ? 'ערוך אירוע' : 'הוסף אירוע חדש'}</DialogTitle>
-            <DialogDescription>
-              {date && format(date, 'd בMMMM yyyy', { locale: he })}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="title">כותרת</Label>
-              <Input
-                id="title"
-                value={eventTitle}
-                onChange={(e) => setEventTitle(e.target.value)}
-                placeholder="טיול שנתי, מבחן במתמטיקה..."
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="type">סוג אירוע</Label>
-              <Select value={eventType} onValueChange={(val: any) => setEventType(val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="בחר סוג" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="event">אירוע</SelectItem>
-                  <SelectItem value="holiday">חופשה/חג</SelectItem>
-                  <SelectItem value="exam">מבחן</SelectItem>
-                  <SelectItem value="other">אחר</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="time">שעה (אופציונלי)</Label>
-                <Input
-                  id="time"
-                  type="time"
-                  value={eventTime}
-                  onChange={(e) => setEventTime(e.target.value)}
-                />
+          {showSuccess ? (
+             <SuccessAnimation message={editingEvent ? 'האירוע עודכן בהצלחה!' : 'האירוע נוצר בהצלחה!'} />
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>{editingEvent ? 'ערוך אירוע' : 'הוסף אירוע חדש'}</DialogTitle>
+                <DialogDescription>
+                  {date && format(date, 'd בMMMM yyyy', { locale: he })}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="title">כותרת</Label>
+                  <Input
+                    id="title"
+                    value={eventTitle}
+                    onChange={(e) => setEventTitle(e.target.value)}
+                    placeholder="טיול שנתי, מבחן במתמטיקה..."
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="type">סוג אירוע</Label>
+                  <Select value={eventType} onValueChange={(val: any) => setEventType(val)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="בחר סוג" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="event">אירוע</SelectItem>
+                      <SelectItem value="holiday">חופשה/חג</SelectItem>
+                      <SelectItem value="exam">מבחן</SelectItem>
+                      <SelectItem value="other">אחר</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="time">שעה (אופציונלי)</Label>
+                    <Input
+                      id="time"
+                      type="time"
+                      value={eventTime}
+                      onChange={(e) => setEventTime(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="location">מיקום (אופציונלי)</Label>
+                    <Input
+                      id="location"
+                      value={eventLocation}
+                      onChange={(e) => setEventLocation(e.target.value)}
+                      placeholder="חדר 101, חצר..."
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="description">תיאור (אופציונלי)</Label>
+                  <Textarea
+                    id="description"
+                    value={eventDescription}
+                    onChange={(e) => setEventDescription(e.target.value)}
+                    placeholder="פרטים נוספים..."
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="location">מיקום (אופציונלי)</Label>
-                <Input
-                  id="location"
-                  value={eventLocation}
-                  onChange={(e) => setEventLocation(e.target.value)}
-                  placeholder="חדר 101, חצר..."
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="description">תיאור (אופציונלי)</Label>
-              <Textarea
-                id="description"
-                value={eventDescription}
-                onChange={(e) => setEventDescription(e.target.value)}
-                placeholder="פרטים נוספים..."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">ביטול</Button>
-            </DialogClose>
-            <Button onClick={handleSaveEvent} disabled={!eventTitle.trim() || isSubmitting}>
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingEvent ? 'שמור שינויים' : 'צור אירוע')}
-            </Button>
-          </DialogFooter>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="outline">ביטול</Button>
+                </DialogClose>
+                <Button onClick={handleSaveEvent} disabled={!eventTitle.trim() || isSubmitting}>
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingEvent ? 'שמור שינויים' : 'צור אירוע')}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

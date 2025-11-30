@@ -6,6 +6,7 @@ import Header from '@/components/app/header';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, doc, writeBatch, getDocs } from 'firebase/firestore';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Loader2, AlertTriangle, CheckCircle, UserX, School, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,12 @@ const ClassTimetableDialog = dynamic(() => import('@/components/app/class-timeta
     loading: () => null
 });
 const SchoolCalendar = dynamic(() => import('@/components/app/school-calendar'), {
+  loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
+});
+const StatisticsTab = dynamic(() => import('@/components/app/statistics-tab'), {
+  loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
+});
+const MajorsTab = dynamic(() => import('@/components/app/majors-tab'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
 });
 
@@ -114,31 +121,35 @@ export default function Home() {
         const teacherScheduleForToday = teacher.schedule?.[dayOfWeek] || {};
         
         const affectedLessons: any[] = Object.entries(teacherScheduleForToday)
-          .map(([time, lesson]) => {
-            if (lesson && lesson.classId) {
-              const isAbsentDuringLesson = todaysTeacherAbsences.some(absence => {
-                if (absence.isAllDay) return true;
-                const lessonStart = parseTimeToNumber(time);
-                const absenceStart = parseTimeToNumber(absence.startTime);
-                const absenceEnd = parseTimeToNumber(absence.endTime);
-                return lessonStart >= absenceStart && lessonStart < absenceEnd;
-              });
-  
-              if (isAbsentDuringLesson) {
-                const schoolClass = allClasses.find(c => c.id === lesson.classId);
-                if (schoolClass) {
-                  const isCovered = (allSubstitutions || []).some(sub => 
-                    isSameDay(startOfDay(new Date(sub.date)), today) &&
-                    sub.time === time &&
-                    sub.classId === lesson.classId
-                  );
-                  return { ...lesson, time, className: schoolClass.name, isCovered, absentTeacherName: teacher.name };
+          .flatMap(([time, lessonsData]) => {
+            const lessons = Array.isArray(lessonsData) ? lessonsData : (lessonsData ? [lessonsData] : []);
+            if (!lessons || lessons.length === 0) return [];
+            
+            return lessons.map(lesson => {
+                if (lesson && lesson.classId) {
+                  const isAbsentDuringLesson = todaysTeacherAbsences.some(absence => {
+                    if (absence.isAllDay) return true;
+                    const lessonStart = parseTimeToNumber(time);
+                    const absenceStart = parseTimeToNumber(absence.startTime);
+                    const absenceEnd = parseTimeToNumber(absence.endTime);
+                    return lessonStart >= absenceStart && lessonStart < absenceEnd;
+                  });
+      
+                  if (isAbsentDuringLesson) {
+                    const schoolClass = allClasses.find(c => c.id === lesson.classId);
+                    if (schoolClass) {
+                      const isCovered = (allSubstitutions || []).some(sub => 
+                        isSameDay(startOfDay(new Date(sub.date)), today) &&
+                        sub.time === time &&
+                        sub.classId === lesson.classId
+                      );
+                      return { ...lesson, time, className: schoolClass.name, isCovered, absentTeacherName: teacher.name };
+                    }
+                  }
                 }
-              }
-            }
-            return null;
-          })
-          .filter(Boolean);
+                return null;
+            }).filter(Boolean);
+          });
   
         return { teacher, absences: todaysTeacherAbsences, affectedLessons };
       })
@@ -154,34 +165,39 @@ export default function Home() {
         const dayOfWeek = daysOfWeek[today.getDay()];
         const teacherSchedule = teacher.schedule?.[dayOfWeek] || {};
 
-        Object.entries(teacherSchedule).forEach(([time, lesson]) => {
-            if (!lesson || !lesson.classId) return;
+        Object.entries(teacherSchedule).forEach(([time, lessonsData]) => {
+            const lessons = Array.isArray(lessonsData) ? lessonsData : (lessonsData ? [lessonsData] : []);
+            if (!lessons || lessons.length === 0) return;
 
-            const isAbsentDuringLesson = absences.some(absence => {
-                if (absence.isAllDay) return true;
-                const lessonStart = parseTimeToNumber(time);
-                const absenceStart = parseTimeToNumber(absence.startTime);
-                const absenceEnd = parseTimeToNumber(absence.endTime);
-                return lessonStart >= absenceStart && lessonStart < absenceEnd;
-            });
-            
-            if (isAbsentDuringLesson) {
-                 const schoolClass = (allClasses || []).find(c => c.id === lesson.classId);
-                 if (schoolClass) {
-                    if (!affected.has(schoolClass.id)) {
-                        affected.set(schoolClass.id, {
-                            classId: schoolClass.id,
-                            className: schoolClass.name,
-                            lessons: [],
+            lessons.forEach((lesson: Lesson) => {
+                if (!lesson || !lesson.classId) return;
+
+                const isAbsentDuringLesson = absences.some(absence => {
+                    if (absence.isAllDay) return true;
+                    const lessonStart = parseTimeToNumber(time);
+                    const absenceStart = parseTimeToNumber(absence.startTime);
+                    const absenceEnd = parseTimeToNumber(absence.endTime);
+                    return lessonStart >= absenceStart && lessonStart < absenceEnd;
+                });
+                
+                if (isAbsentDuringLesson) {
+                     const schoolClass = (allClasses || []).find(c => c.id === lesson.classId);
+                     if (schoolClass) {
+                        if (!affected.has(schoolClass.id)) {
+                            affected.set(schoolClass.id, {
+                                classId: schoolClass.id,
+                                className: schoolClass.name,
+                                lessons: [],
+                            });
+                        }
+                        affected.get(schoolClass.id)!.lessons.push({
+                            ...lesson,
+                            time,
+                            absentTeacherName: teacher.name,
                         });
-                    }
-                    affected.get(schoolClass.id)!.lessons.push({
-                        ...lesson,
-                        time,
-                        absentTeacherName: teacher.name,
-                    });
-                 }
-            }
+                     }
+                }
+            });
         });
     });
 
@@ -236,42 +252,45 @@ export default function Home() {
           allClasses.forEach(schoolClass => {
               const daySchedule = schoolClass.schedule?.[dayOfWeek];
               if (daySchedule) {
-                  Object.entries(daySchedule).forEach(([time, lesson]) => {
-                      if (lesson?.teacherId === absentTeacher.id) {
-                          const lessonStart = parseTimeToNumber(time);
-                          const lessonSlot = timeSlots.find(ts => ts.start === time);
-                          if (!lessonSlot) return;
-
-                          const lessonEnd = parseTimeToNumber(lessonSlot.end);
-  
-                          const isAffected = absence.isAllDay || 
-                              (
-                                  lessonEnd > parseTimeToNumber(absence.startTime) && 
-                                  lessonStart < parseTimeToNumber(absence.endTime)
-                              );
-  
-                          if (isAffected) {
-                              const promise = findSubstitute(
-                                  { subject: lesson.subject, date, time },
-                                  substitutePool,
-                                  allClasses,
-                                  timeSlots
-                              ).then(subResult => {
-                                affected.push({
-                                      classId: schoolClass.id,
-                                      className: schoolClass.name,
-                                      date,
-                                      time,
-                                      lesson,
-                                      recommendation: subResult.recommendation,
-                                      recommendationId: subResult.recommendationId,
-                                      reasoning: subResult.reasoning,
-                                      substituteOptions: subResult.substituteOptions,
+                  Object.entries(daySchedule).forEach(([time, lessonsData]) => {
+                      const lessons = Array.isArray(lessonsData) ? lessonsData : (lessonsData ? [lessonsData] : []);
+                      lessons.forEach((lesson: Lesson) => {
+                          if (lesson?.teacherId === absentTeacher.id) {
+                              const lessonStart = parseTimeToNumber(time);
+                              const lessonSlot = timeSlots.find(ts => ts.start === time);
+                              if (!lessonSlot) return;
+    
+                              const lessonEnd = parseTimeToNumber(lessonSlot.end);
+      
+                              const isAffected = absence.isAllDay || 
+                                  (
+                                      lessonEnd > parseTimeToNumber(absence.startTime) && 
+                                      lessonStart < parseTimeToNumber(absence.endTime)
+                                  );
+      
+                              if (isAffected) {
+                                  const promise = findSubstitute(
+                                      { subject: lesson.subject, date, time },
+                                      substitutePool,
+                                      allClasses,
+                                      timeSlots
+                                  ).then(subResult => {
+                                    affected.push({
+                                          classId: schoolClass.id,
+                                          className: schoolClass.name,
+                                          date,
+                                          time,
+                                          lesson,
+                                          recommendation: subResult.recommendation,
+                                          recommendationId: subResult.recommendationId,
+                                          reasoning: subResult.reasoning,
+                                          substituteOptions: subResult.substituteOptions,
+                                      });
                                   });
-                              });
-                              promises.push(promise);
+                                  promises.push(promise);
+                              }
                           }
-                      }
+                      });
                   });
               }
           });
@@ -511,37 +530,74 @@ export default function Home() {
                 <Button variant="ghost" onClick={() => setActiveTab("settings")} className={`rounded-full py-2.5 transition-all ${activeTab === "settings" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>הגדרות</Button>
               </div>
 
-              {activeTab === "teachers" && (
-                <div className="mt-0">
-                  <TeacherList
-                    onMarkAbsent={(teacher) => setTeacherToMarkAbsent({teacher})}
-                  />
-                </div>
-              )}
+              <AnimatePresence mode="wait">
+                {activeTab === "teachers" && (
+                  <motion.div
+                    key="teachers"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="mt-0"
+                  >
+                    <TeacherList
+                      onMarkAbsent={(teacher) => setTeacherToMarkAbsent({teacher})}
+                    />
+                  </motion.div>
+                )}
 
-              {activeTab === "classes" && (
-                <div className="mt-0">
-                  <ClassList />
-                </div>
-              )}
+                {activeTab === "classes" && (
+                  <motion.div
+                    key="classes"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="mt-0"
+                  >
+                    <ClassList />
+                  </motion.div>
+                )}
 
-              {activeTab === "timetable" && (
-                <div className="mt-0">
-                  <Timetable/>
-                </div>
-              )}
+                {activeTab === "timetable" && (
+                  <motion.div
+                    key="timetable"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="mt-0"
+                  >
+                    <Timetable/>
+                  </motion.div>
+                )}
 
-              {activeTab === "calendar" && (
-                <div className="mt-0">
-                  <SchoolCalendar />
-                </div>
-              )}
+                {activeTab === "calendar" && (
+                  <motion.div
+                    key="calendar"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="mt-0"
+                  >
+                    <SchoolCalendar />
+                  </motion.div>
+                )}
 
-              {activeTab === "settings" && (
-                <div className="mt-0">
-                  <SettingsTab timeSlots={timeSlots} onUpdate={handleTimetableSettingsUpdate}/>
-                </div>
-              )}
+                {activeTab === "settings" && (
+                  <motion.div
+                    key="settings"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="mt-0"
+                  >
+                    <SettingsTab timeSlots={timeSlots} onUpdate={handleTimetableSettingsUpdate}/>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
         </div>
       </main>

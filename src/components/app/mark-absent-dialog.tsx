@@ -15,10 +15,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Calendar as CalendarIcon, Loader2, Trash2, Clock, CheckCircle2 } from 'lucide-react';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
+import { SuccessAnimation } from '../ui/success-animation';
 
 const timeRegex = /^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/;
 
@@ -59,16 +61,17 @@ interface MarkAbsentDialogProps {
   onConfirm: (teacher: Teacher, absenceDays: AbsenceDay[]) => void;
 }
 
-
 export default function MarkAbsentDialog({
   isOpen,
   onOpenChange,
   teacher,
   existingAbsences,
-  onConfirm,
+  onConfirm
 }: MarkAbsentDialogProps) {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const isEditMode = !!existingAbsences && existingAbsences.length > 0;
 
   const form = useForm<FormValues>({
@@ -79,7 +82,7 @@ export default function MarkAbsentDialog({
     },
   });
 
-  // Helper to sync calendar selection with form state
+  // ... (helper functions remain the same)
   const selectedDates = useMemo(() => {
     return form.watch('absencePeriods').map(p => p.date);
   }, [form.watch('absencePeriods')]);
@@ -117,11 +120,11 @@ export default function MarkAbsentDialog({
       form.setValue('absencePeriods', newPeriods, { shouldValidate: true });
   };
 
-
   useEffect(() => {
     if (!isOpen) {
       form.reset({ reason: '', absencePeriods: [] });
       setIsSubmitting(false);
+      setShowSuccess(false);
     } else {
        if (isEditMode && existingAbsences) {
             const absencesToEdit = existingAbsences.map(abs => {
@@ -135,8 +138,6 @@ export default function MarkAbsentDialog({
             });
             form.reset({ reason: '', absencePeriods: absencesToEdit });
        } else {
-            // Default to today if not editing
-            // form.reset({ reason: '', absencePeriods: [{ date: startOfDay(new Date()), isAllDay: true, startTime: '08:00', endTime: '16:00' }] });
             form.reset({ reason: '', absencePeriods: [] });
        }
     }
@@ -147,12 +148,16 @@ export default function MarkAbsentDialog({
   const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
     try {
-      await onConfirm(teacher, values.absencePeriods);
-      toast({
-        title: isEditMode ? 'היעדרות עודכנה' : 'היעדרות נרשמה',
-        description: `ההיעדרות של ${teacher.name} עודכנה במערכת.`,
-      });
-      onOpenChange(false);
+      const absencesWithIds = values.absencePeriods.map(p => ({
+        ...p,
+        id: Math.random().toString(36).substring(2, 9)
+      }));
+      await onConfirm(teacher, absencesWithIds);
+      setShowSuccess(true);
+      setTimeout(() => {
+          onOpenChange(false);
+          setShowSuccess(false);
+      }, 2000);
     } catch (error) {
       console.error('שגיאה ברישום היעדרות:', error);
       toast({
@@ -166,6 +171,17 @@ export default function MarkAbsentDialog({
   };
   
   const absencePeriods = form.watch('absencePeriods');
+  const ListContainer = isMobile ? 'div' : ScrollArea;
+
+  if (showSuccess) {
+      return (
+          <Dialog open={isOpen} onOpenChange={onOpenChange}>
+              <DialogContent className="sm:max-w-md">
+                  <SuccessAnimation message={isEditMode ? 'ההיעדרות עודכנה בהצלחה!' : 'ההיעדרות נרשמה בהצלחה!'} />
+              </DialogContent>
+          </Dialog>
+      )
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -179,9 +195,9 @@ export default function MarkAbsentDialog({
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            <div className={cn("flex-1 flex flex-col md:flex-row", isMobile ? "overflow-y-auto" : "overflow-hidden")}>
                 {/* Left Side: Calendar */}
-                <div className="p-6 pt-2 border-b md:border-b-0 md:border-l flex flex-col items-center justify-start bg-muted/10">
+                <div className="p-6 pt-2 border-b md:border-b-0 md:border-l flex flex-col items-center justify-start bg-muted/10 shrink-0">
                     <h3 className="font-medium mb-4 self-start flex items-center gap-2">
                         <CalendarIcon className="w-4 h-4 text-primary"/>
                         בחירת תאריכים
@@ -199,13 +215,13 @@ export default function MarkAbsentDialog({
                 </div>
 
                 {/* Right Side: Configuration List */}
-                <div className="flex-1 flex flex-col p-6 pt-2 overflow-hidden bg-background">
+                <div className={cn("flex-1 flex flex-col p-6 pt-2 bg-background", isMobile ? "" : "overflow-hidden")}>
                      <h3 className="font-medium mb-4 flex items-center gap-2">
                         <Clock className="w-4 h-4 text-primary"/>
                         פרטי היעדרות
                     </h3>
                     
-                    <ScrollArea className="flex-1 -mr-4 pr-4">
+                    <ListContainer className={cn("flex-1", isMobile ? "" : "-mr-4 pr-4")}>
                         {absencePeriods.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-64 text-muted-foreground border-2 border-dashed rounded-xl">
                                 <CalendarIcon className="h-10 w-10 mb-2 opacity-20" />
@@ -307,7 +323,7 @@ export default function MarkAbsentDialog({
                                 ))}
                             </div>
                         )}
-                    </ScrollArea>
+                    </ListContainer>
                     
                      <div className="mt-4 pt-4 border-t space-y-4">
                         <FormField

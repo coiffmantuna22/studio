@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -185,8 +184,9 @@ export default function Timetable({}: TimetableProps) {
         const daySchedule = teacher.schedule?.[dayOfWeek] || {};
 
         Object.keys(daySchedule).forEach(time => {
-          const lesson = daySchedule[time];
-          if(lesson) {
+          const lessonsData = daySchedule[time];
+          const lessons = Array.isArray(lessonsData) ? lessonsData : (lessonsData ? [lessonsData] : []);
+          if(lessons && lessons.length > 0) {
             const slotStartNum = parseTimeToNumber(time);
             const isAbsentDuringLesson = absence.isAllDay || (
               slotStartNum >= parseTimeToNumber(absence.startTime) && 
@@ -194,20 +194,23 @@ export default function Timetable({}: TimetableProps) {
             );
 
             if (isAbsentDuringLesson) {
-               const isCovered = allSubstitutions.some(sub => 
-                  isSameDay(startOfDay(new Date(sub.date)), absenceDate) &&
-                  sub.time === time &&
-                  sub.classId === lesson.classId &&
-                  sub.absentTeacherId === teacher.id
-                );
-
-                if (!isCovered) {
-                  const key = `${dayOfWeek}-${time}`;
-                  if (!uncovered.has(key)) {
-                    uncovered.set(key, []);
-                  }
-                  uncovered.get(key)!.push({ teacher, lesson });
-                }
+                // Iterate over all lessons in this slot
+                lessons.forEach(lesson => {
+                    const isCovered = allSubstitutions.some(sub => 
+                        isSameDay(startOfDay(new Date(sub.date)), absenceDate) &&
+                        sub.time === time &&
+                        sub.classId === lesson.classId &&
+                        sub.absentTeacherId === teacher.id
+                      );
+      
+                      if (!isCovered) {
+                        const key = `${dayOfWeek}-${time}`;
+                        if (!uncovered.has(key)) {
+                          uncovered.set(key, []);
+                        }
+                        uncovered.get(key)!.push({ teacher, lesson });
+                      }
+                });
             }
           }
         });
@@ -242,7 +245,10 @@ export default function Timetable({}: TimetableProps) {
             if (slot.type === 'lesson') {
                 const slotStartNum = parseTimeToNumber(slot.start);
 
-                const isTeaching = teacher.schedule?.[day]?.[slot.start];
+                const teachingLessonsData = teacher.schedule?.[day]?.[slot.start];
+                const teachingLessons = Array.isArray(teachingLessonsData) ? teachingLessonsData : (teachingLessonsData ? [teachingLessonsData] : []);
+                const isTeaching = teachingLessons && teachingLessons.length > 0;
+                
                 if(isTeaching) return; // Skip if they are teaching
 
                 let isAbsent = false;
@@ -591,7 +597,3 @@ export default function Timetable({}: TimetableProps) {
     </>
   );
 }
-
-    
-
-    
