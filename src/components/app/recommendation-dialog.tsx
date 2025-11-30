@@ -15,7 +15,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { Lightbulb, UserCheck, ArrowRight, Users, BookOpen, CalendarDays } from 'lucide-react';
+import { Lightbulb, UserCheck, ArrowLeft, Users, BookOpen, CalendarDays } from 'lucide-react';
 import { groupBy } from 'lodash';
 import {
   Accordion,
@@ -101,13 +101,13 @@ export default function RecommendationDialog({
                                         <p className="font-bold text-muted-foreground mt-1">אין מחליף</p>
                                     )}
                                 </div>
-                                <ArrowRight className="h-4 w-4 text-muted-foreground mx-auto my-2 sm:my-0" />
-                                 <div className='flex flex-col items-center'>
+                                <div className='flex flex-col items-center'>
                                     <span className="text-sm text-muted-foreground">מורה מקורי</span>
                                     <p className="font-bold text-destructive/80 flex items-center justify-center gap-2 mt-1">
                                         {absentTeacher.name}
                                     </p>
                                 </div>
+                                <ArrowLeft className="h-4 w-4 text-muted-foreground mx-auto my-2 sm:my-0" />
                             </div>
                             {recommendation && res.reasoning && (
                               <div className="mt-3 p-2 rounded-md bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 text-xs flex items-start gap-2 text-right">
@@ -141,5 +141,3 @@ export default function RecommendationDialog({
     </Dialog>
   );
 }
-
-
