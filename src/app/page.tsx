@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -280,7 +281,7 @@ export default function Home() {
 
                   const isAffected = absence.isAllDay || 
                       (
-                        lessonEnd > parseTimeToNumber(absence.startTime) && lessonStart < parseTimeToNumber(absence.endTime)
+                        lessonStart < parseTimeToNumber(absence.endTime) && lessonEnd > parseTimeToNumber(absence.startTime)
                       );
                   
                   const schoolClass = allClasses.find(c => c.id === lesson.classId);
@@ -440,7 +441,7 @@ export default function Home() {
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {todaysAbsences && todaysAbsences.length > 0 && (
             <Card className="border-l-4 border-l-destructive shadow-md h-full">
                 <CardHeader className="pb-3">
@@ -703,3 +704,4 @@ export default function Home() {
     </div>
   );
 }
+
