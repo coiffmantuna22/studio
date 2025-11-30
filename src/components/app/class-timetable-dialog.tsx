@@ -67,34 +67,38 @@ const getStartOfWeek = (date: Date): Date => {
 
 function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, schoolClass, timeSlots }: EditSlotPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
-    // We only allow editing the "regular" lesson (not part of a major) for now, or adding one.
-    // Filter out major lessons for editing purposes, but display them.
+    
     const majorLessons = lessons.filter(l => l.majorId);
-    const regularLesson = lessons.find(l => !l.majorId) || null;
+    const [regularLessons, setRegularLessons] = useState<Lesson[]>([]);
 
-    const [subject, setSubject] = useState(regularLesson?.subject || '');
-    const [teacherId, setTeacherId] = useState(regularLesson?.teacherId || null);
+    // New lesson state
+    const [newSubject, setNewSubject] = useState('');
+    const [newTeacherId, setNewTeacherId] = useState<string | null>(null);
 
     useEffect(() => {
         if(isOpen) {
-            setSubject(regularLesson?.subject || '');
-            setTeacherId(regularLesson?.teacherId || null);
+            setRegularLessons(lessons.filter(l => !l.majorId));
+            setNewSubject('');
+            setNewTeacherId(null);
         }
-    }, [regularLesson, isOpen]);
+    }, [lessons, isOpen]);
 
     const availableTeachersForSlot = useMemo(() => {
         return allTeachers.filter(t => {
             const isScheduledElsewhere = isTeacherAlreadyScheduled(t.id, new Date(), time, allClasses, schoolClass.id);
-            const isCurrentTeacher = t.id === regularLesson?.teacherId;
-            return !isScheduledElsewhere || isCurrentTeacher;
+            // If the teacher is already in one of the regular lessons we are editing, they are technically "busy" in this slot, 
+            // but since we are editing THIS slot, we might want to allow re-selecting them if we are modifying that specific lesson.
+            // However, for adding a NEW lesson, they should be free.
+            // Simplified: Filter out teachers who are busy elsewhere.
+            return !isScheduledElsewhere;
         });
-    }, [time, allTeachers, allClasses, schoolClass.id, regularLesson?.teacherId]);
+    }, [time, allTeachers, allClasses, schoolClass.id]);
 
 
     const qualifiedTeachersForSlot = useMemo(() => {
-        if (!subject) return availableTeachersForSlot;
-        return availableTeachersForSlot.filter(t => t.subjects.includes(subject));
-    }, [subject, availableTeachersForSlot]);
+        if (!newSubject) return availableTeachersForSlot;
+        return availableTeachersForSlot.filter(t => t.subjects.includes(newSubject));
+    }, [newSubject, availableTeachersForSlot]);
     
     const allSubjects = useMemo(() => {
         const subjects = new Set<string>();
@@ -103,23 +107,36 @@ function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, 
     }, [allTeachers]);
 
 
-    const handleSave = () => {
-        const newLessons = [...majorLessons];
-        if (subject && teacherId) {
-            newLessons.push({ subject, teacherId, classId: schoolClass.id });
+    const handleAddLesson = () => {
+        if (newSubject && newTeacherId) {
+            setRegularLessons(prev => [...prev, { subject: newSubject, teacherId: newTeacherId!, classId: schoolClass.id }]);
+            setNewSubject('');
+            setNewTeacherId(null);
         }
-        onSave(day, time, newLessons);
+    };
+
+    const handleRemoveLesson = (index: number) => {
+        setRegularLessons(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleSave = () => {
+        // If there's a pending new lesson that hasn't been added, we could auto-add it, or ignore it.
+        // Let's ignore it to avoid accidental adds, but maybe warn? 
+        // For now, just save the list of regular lessons + major lessons.
+        const finalLessons = [...majorLessons, ...regularLessons];
+        if (newSubject && newTeacherId) {
+             finalLessons.push({ subject: newSubject, teacherId: newTeacherId, classId: schoolClass.id });
+        }
+        onSave(day, time, finalLessons);
         setIsOpen(false);
     };
 
-    const handleClear = () => {
-        // Only clear the regular lesson
+    const handleClearAllRegular = () => {
         onSave(day, time, [...majorLessons]);
         setIsOpen(false);
     };
     
-    const currentTeacher = regularLesson?.teacherId ? allTeachers.find(t => t.id === regularLesson.teacherId) : null;
-    const canSave = (subject && teacherId) || (!subject && !teacherId);
+    const canAdd = newSubject && newTeacherId;
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -164,42 +181,64 @@ function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, 
                         </div>
                     )}
 
-                    <Separator />
                     <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2"><Book className='w-4 h-4 text-muted-foreground'/>מקצוע (רגיל)</label>
-                        <Combobox
-                            items={allSubjects}
-                            value={subject}
-                            onChange={(newSubject) => {
-                                setSubject(newSubject);
-                                const currentTeacher = allTeachers.find(t => t.id === teacherId);
-                                if (currentTeacher && newSubject && !currentTeacher.subjects.includes(newSubject)) {
-                                    setTeacherId(null);
-                                }
-                            }}
-                            placeholder="בחר או צור מקצוע..."
-                            searchPlaceholder="חיפוש מקצוע..."
-                            noItemsMessage="לא נמצאו מקצועות."
-                        />
+                        <p className="text-xs font-medium text-muted-foreground">שיעורים רגילים:</p>
+                        {regularLessons.length === 0 ? (
+                            <p className="text-xs text-muted-foreground italic text-center py-2">אין שיעורים רגילים</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {regularLessons.map((l, i) => (
+                                    <div key={i} className="flex items-center justify-between bg-secondary/30 p-2 rounded-md text-sm">
+                                        <div className="flex flex-col">
+                                            <span className="font-medium">{l.subject}</span>
+                                            <span className="text-xs text-muted-foreground">{allTeachers.find(t => t.id === l.teacherId)?.name}</span>
+                                        </div>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => handleRemoveLesson(i)}>
+                                            <X className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                     <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2"><User className='w-4 h-4 text-muted-foreground'/>מורה</label>
-                        <Select onValueChange={(v) => setTeacherId(v)} value={teacherId || ''} disabled={!subject}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="בחר מורה" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {qualifiedTeachersForSlot.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
+
+                    <Separator />
+
+                    <div className="space-y-3 bg-muted/30 p-2 rounded-md">
+                        <p className="text-xs font-medium">הוספת שיעור:</p>
+                        <div className="space-y-2">
+                            <Combobox
+                                items={allSubjects}
+                                value={newSubject}
+                                onChange={(val) => {
+                                    setNewSubject(val);
+                                    setNewTeacherId(null);
+                                }}
+                                placeholder="בחר מקצוע..."
+                                searchPlaceholder="חיפוש..."
+                                noItemsMessage="לא נמצא"
+                            />
+                            <Select onValueChange={setNewTeacherId} value={newTeacherId || ''} disabled={!newSubject}>
+                                <SelectTrigger className="h-9">
+                                    <SelectValue placeholder="בחר מורה" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {qualifiedTeachersForSlot.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Button size="sm" variant="secondary" className="w-full h-8" onClick={handleAddLesson} disabled={!canAdd}>
+                                <Book className="w-3 h-3 mr-2" />
+                                הוסף לשיבוץ
+                            </Button>
+                        </div>
                     </div>
-                     <Separator />
+                    
+                    <Separator />
                     <div className="flex justify-between items-center">
-                         <Button variant="ghost" size="sm" onClick={handleClear} className="text-destructive hover:text-destructive">
-                            <X className="w-4 h-4 ml-2"/>
-                            נקה שיבוץ רגיל
+                         <Button variant="ghost" size="sm" onClick={handleClearAllRegular} className="text-destructive hover:text-destructive text-xs">
+                            נקה הכל
                         </Button>
-                        <Button size="sm" onClick={handleSave} disabled={!canSave}>שמור</Button>
+                        <Button size="sm" onClick={handleSave}>שמור שינויים</Button>
                     </div>
                 </div>
             </PopoverContent>

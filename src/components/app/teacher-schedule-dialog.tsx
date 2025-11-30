@@ -75,40 +75,51 @@ function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAb
     
     // Filter out major lessons for editing purposes
     const majorLessons = lessons.filter(l => l.majorId);
-    const regularLesson = lessons.find(l => !l.majorId) || null;
+    const [regularLessons, setRegularLessons] = useState<Lesson[]>([]);
 
-    const [subject, setSubject] = useState(regularLesson?.subject || '');
-    const [classId, setClassId] = useState(regularLesson?.classId || null);
+    const [newSubject, setNewSubject] = useState('');
+    const [newClassId, setNewClassId] = useState<string | null>(null);
 
     useEffect(() => {
         if(isOpen) {
-            setSubject(regularLesson?.subject || '');
-            setClassId(regularLesson?.classId || null);
+            setRegularLessons(lessons.filter(l => !l.majorId));
+            setNewSubject('');
+            setNewClassId(null);
         }
-    }, [regularLesson, isOpen]);
+    }, [lessons, isOpen]);
     
     const teacherSubjects = useMemo(() => {
         return teacher.subjects.map(s => ({label: s, value: s}));
     }, [teacher.subjects]);
 
 
-    const handleSave = () => {
-        const newLessons = [...majorLessons];
-        if (subject && classId) {
-            newLessons.push({ subject, teacherId: teacher.id, classId });
+    const handleAddLesson = () => {
+        if (newSubject && newClassId) {
+            setRegularLessons(prev => [...prev, { subject: newSubject, teacherId: teacher.id, classId: newClassId! }]);
+            setNewSubject('');
+            setNewClassId(null);
         }
-        onSave(day, time, newLessons);
+    };
+
+    const handleRemoveLesson = (index: number) => {
+        setRegularLessons(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleSave = () => {
+        const finalLessons = [...majorLessons, ...regularLessons];
+        if (newSubject && newClassId) {
+            finalLessons.push({ subject: newSubject, teacherId: teacher.id, classId: newClassId });
+        }
+        onSave(day, time, finalLessons);
         setIsOpen(false);
     };
 
-    const handleClear = () => {
+    const handleClearAllRegular = () => {
         onSave(day, time, [...majorLessons]);
         setIsOpen(false);
     };
     
-    const currentClass = regularLesson?.classId ? allClasses.find(c => c.id === regularLesson.classId) : null;
-    
-    const canSave = (subject && classId) || (!subject && !classId && regularLesson !== null);
+    const canAdd = newSubject && newClassId;
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -165,37 +176,64 @@ function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAb
                         </div>
                     )}
 
+                    <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">שיעורים רגילים:</p>
+                        {regularLessons.length === 0 ? (
+                            <p className="text-xs text-muted-foreground italic text-center py-2">אין שיעורים רגילים</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {regularLessons.map((l, i) => (
+                                    <div key={i} className="flex items-center justify-between bg-secondary/30 p-2 rounded-md text-sm">
+                                        <div className="flex flex-col">
+                                            <span className="font-medium">{l.subject}</span>
+                                            <span className="text-xs text-muted-foreground">{allClasses.find(c => c.id === l.classId)?.name}</span>
+                                        </div>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => handleRemoveLesson(i)}>
+                                            <X className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     <Separator />
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2"><Book className='w-4 h-4 text-muted-foreground'/>מקצוע (רגיל)</label>
-                        <Combobox
-                            items={teacherSubjects}
-                            value={subject}
-                            onChange={(newSubject) => setSubject(newSubject)}
-                            placeholder="בחר מקצוע..."
-                            searchPlaceholder="חיפוש מקצוע..."
-                            noItemsMessage="לא נמצאו מקצועות."
-                        />
+                    <div className="space-y-3 bg-muted/30 p-2 rounded-md">
+                        <p className="text-xs font-medium">הוספת שיעור:</p>
+                        <div className="space-y-2">
+                            <Combobox
+                                items={teacherSubjects}
+                                value={newSubject}
+                                onChange={(newSubject) => {
+                                    setNewSubject(newSubject);
+                                    setNewClassId(null);
+                                }}
+                                placeholder="בחר מקצוע..."
+                                searchPlaceholder="חיפוש..."
+                                noItemsMessage="לא נמצא"
+                            />
+                            <Select onValueChange={setNewClassId} value={newClassId || ''} disabled={!newSubject}>
+                                <SelectTrigger className="h-9">
+                                    <SelectValue placeholder="בחר כיתה" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {allClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                             <Button size="sm" variant="secondary" className="w-full h-8" onClick={handleAddLesson} disabled={!canAdd}>
+                                <Book className="w-3 h-3 mr-2" />
+                                הוסף לשיבוץ
+                            </Button>
+                        </div>
                     </div>
-                     <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2"><Home className='w-4 h-4 text-muted-foreground'/>כיתה</label>
-                        <Select onValueChange={(v) => setClassId(v)} value={classId || ''} disabled={!subject}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="בחר כיתה" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {allClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
+
                      <Separator />
                     <div className="flex justify-between items-center">
-                         <Button variant="ghost" size="sm" onClick={handleClear} className="text-destructive hover:text-destructive">
-                            <X className="w-4 h-4 ml-2"/>
-                            נקה שיבוץ רגיל
+                         <Button variant="ghost" size="sm" onClick={handleClearAllRegular} className="text-destructive hover:text-destructive text-xs">
+                            נקה הכל
                         </Button>
-                        <Button size="sm" onClick={handleSave} disabled={!canSave}>שמור</Button>
+                        <Button size="sm" onClick={handleSave}>שמור שינויים</Button>
                     </div>
                 </div>
             </PopoverContent>

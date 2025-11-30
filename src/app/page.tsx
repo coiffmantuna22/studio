@@ -598,6 +598,19 @@ export default function Home() {
                     <SettingsTab timeSlots={timeSlots} onUpdate={handleTimetableSettingsUpdate}/>
                   </motion.div>
                 )}
+
+                {activeTab === "statistics" && (
+                  <motion.div
+                    key="statistics"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="mt-0"
+                  >
+                    <StatisticsTab />
+                  </motion.div>
+                )}
               </AnimatePresence>
             </div>
         </div>

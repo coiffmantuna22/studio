@@ -27,7 +27,7 @@ export default function StatisticsTab() {
     return query(
       collection(firestore, 'substitutions'),
       where('userId', '==', user.uid),
-      orderBy('date', 'desc') // Order by date descending
+      orderBy('date', 'desc')
     );
   }, [user, firestore]);
 
