@@ -174,39 +174,6 @@ export default function Home() {
 
     return result;
   }, [todaysAffectedLessons, allClasses]);
-  
-  useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, isUserLoading, router]);
-
-  const isLoading = isUserLoading || teachersLoading || settingsLoading || classesLoading || substitutionsLoading;
-  const isInitialSetup = !isLoading && user && timeSlots.length === 0;
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (isInitialSetup) {
-      return (
-         <div className="flex flex-col min-h-screen bg-background">
-            <Header />
-            <main className="flex-1 p-4 sm:p-6 md:p-8">
-               <SettingsTab
-                  timeSlots={[]}
-                  onUpdate={handleTimetableSettingsUpdate}
-                  isInitialSetup={isInitialSetup}
-                  onStartNewYear={handleStartNewYear}
-               />
-            </main>
-         </div>
-      );
-  }
 
   const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
@@ -309,7 +276,6 @@ export default function Home() {
                   const absenceStart = parseTimeToNumber(absence.startTime);
                   const absenceEnd = parseTimeToNumber(absence.endTime);
                   
-                  // Corrected overlap logic
                   const isAffected = absence.isAllDay || (lessonStart < absenceEnd && lessonEnd > absenceStart);
                   
                   const schoolClass = allClasses.find(c => c.id === lesson.classId);
@@ -472,7 +438,39 @@ export default function Home() {
           });
       }
   };
+  
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
 
+  const isLoading = isUserLoading || teachersLoading || settingsLoading || classesLoading || substitutionsLoading;
+  const isInitialSetup = !isLoading && user && timeSlots.length === 0;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isInitialSetup) {
+      return (
+         <div className="flex flex-col min-h-screen bg-background">
+            <Header />
+            <main className="flex-1 p-4 sm:p-6 md:p-8">
+               <SettingsTab
+                  timeSlots={[]}
+                  onUpdate={handleTimetableSettingsUpdate}
+                  isInitialSetup={isInitialSetup}
+                  onStartNewYear={handleStartNewYear}
+               />
+            </main>
+         </div>
+      );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
