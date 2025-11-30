@@ -537,61 +537,6 @@ export default function Home() {
             />
         </div>
 
-        <div className="space-y-6">
-          {affectedClasses.length > 0 && (
-            <Card className="border-l-4 border-l-amber-500 shadow-md">
-              <CardHeader className="pb-3">
-                  <CardTitle className="text-xl flex items-center gap-2">
-                  <School className="text-amber-500 h-5 w-5" />
-                  כיתות דורשות שיבוץ
-                  </CardTitle>
-                  <CardDescription>כיתות עם שיעורים לא מכוסים להיום. לחץ על כיתה לצפייה במערכת.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
-                  {affectedClasses.map(({ classId, className, lessons, isFullyCovered }) => {
-                      const schoolClass = (allClasses || []).find(c => c.id === classId);
-                      return (
-                      <div 
-                          key={classId} 
-                          className={cn(
-                            "flex flex-col justify-between p-4 rounded-xl border-2 transition-colors hover:bg-secondary/50 cursor-pointer",
-                            isFullyCovered 
-                              ? "border-green-500/50 bg-green-500/5"
-                              : "border-destructive/50 bg-destructive/5"
-                          )}
-                          onClick={() => schoolClass && setClassToView(schoolClass)}
-                      >
-                          <span className="font-semibold text-lg block">{className}</span>
-                          {isFullyCovered ? (
-                              <div className="mt-3 flex items-center gap-2 text-green-600 dark:text-green-400">
-                                  <CheckCircle className="h-5 w-5"/>
-                                  <span className="font-medium">כל השיעורים מכוסים</span>
-                              </div>
-                          ) : (
-                              <div className="mt-3 space-y-2 text-sm">
-                              <h4 className="font-medium text-muted-foreground">שיעורים לא מכוסים:</h4>
-                              <ul className="space-y-1">
-                                  {(lessons || []).map((lesson, index) => (
-                                  <li key={index} className="flex items-center justify-between">
-                                      <span>{lesson.subject} ({lesson.time})</span>
-                                      <span className="text-xs text-muted-foreground">
-                                      עם {lesson.absentTeacherName}
-                                      </span>
-                                  </li>
-                                  ))}
-                              </ul>
-                              </div>
-                          )}
-                      </div>
-                      )
-                  })}
-                  </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
 
         <div className="space-y-6">
               <div className="w-full">
@@ -735,6 +680,8 @@ export default function Home() {
     </div>
   );
 }
+
+    
 
     
 
