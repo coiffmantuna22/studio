@@ -6,7 +6,7 @@ import { FirebaseClientProvider } from '@/firebase';
 import ToasterClient from '@/components/app/toaster-client';
 
 export const metadata: Metadata = {
-  title: 'SubFinder',
+  title: 'מורה מחליף',
   description: 'אפליקציה לניהול משאבי מורים המיועדת להמלצה על מורים מחליפים.',
 };
 
