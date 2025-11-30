@@ -380,7 +380,7 @@ export default function TeacherScheduleDialog({
                     <table className="w-full text-sm text-center table-fixed min-w-[900px]">
                         <thead className='bg-muted/40'>
                         <tr className='bg-muted/40'>
-                            <th className="sticky left-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
+                            <th className="sticky right-0 top-0 bg-muted/40 p-2 w-40 z-20">שעה</th>
                             {daysOfWeek.map((day, dayIndex) => {
                                 const date = addDays(weekStartDate, dayIndex);
                                 return (
@@ -395,7 +395,7 @@ export default function TeacherScheduleDialog({
                         <tbody>
                         {timeSlots.map(slot => (
                             <tr key={slot.id} className="border-t">
-                            <td className="sticky left-0 font-semibold bg-card p-2 w-40 z-10 text-center">
+                            <td className="sticky right-0 font-semibold bg-card p-2 w-40 z-10 text-center">
                                 <div>{slot.start} - {slot.end}</div>
                                 {slot.type === 'break' && <Badge variant="outline" className='mt-1'>הפסקה</Badge>}
                             </td>
@@ -408,7 +408,7 @@ export default function TeacherScheduleDialog({
                                 const isAbsent = isStaged ? stagedAbsenceChanges[key] : initialAbsencesSet.has(key);
 
                                 return (
-                                <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30')}>
+                                <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-l", isBreak && 'bg-muted/30')}>
                                     {!isBreak ? (
                                         <EditSlotPopover 
                                             day={day} 

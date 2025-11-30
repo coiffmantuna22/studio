@@ -52,7 +52,7 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
   const isMobile = useIsMobile();
   
   return (
-    <Card className="flex flex-col transition-all hover:shadow-lg">
+    <Card className="flex flex-col">
       <CardHeader className="flex flex-row items-start gap-4">
         <Avatar className="h-12 w-12 border-2 border-primary/20">
           <AvatarFallback className='bg-primary/10 text-primary font-bold'>{teacher.avatar.fallback}</AvatarFallback>
@@ -72,16 +72,16 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={onViewSchedule}>
-              <CalendarClock className="ml-2 h-4 w-4" />
+              <CalendarClock className="me-2 h-4 w-4" />
               צפה במערכת
             </DropdownMenuItem>
              <DropdownMenuItem onClick={onMarkAbsent} className="text-amber-600 focus:text-amber-700 dark:text-amber-500 dark:focus:text-amber-600">
-              <UserX className="ml-2 h-4 w-4" />
+              <UserX className="me-2 h-4 w-4" />
               סמן היעדרות
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onEdit}>
-              <Pencil className="ml-2 h-4 w-4" />
+              <Pencil className="me-2 h-4 w-4" />
               עריכת פרופיל
             </DropdownMenuItem>
              <DropdownMenuSeparator />
@@ -89,7 +89,7 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
               onClick={onDelete}
               className="text-destructive focus:text-destructive"
             >
-              <Trash2 className="ml-2 h-4 w-4" />
+              <Trash2 className="me-2 h-4 w-4" />
               מחק
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -109,11 +109,11 @@ export default function TeacherCard({ teacher, onMarkAbsent, onEdit, onDelete, o
       {!isMobile && (
         <CardFooter className="grid grid-cols-2 gap-2">
           <Button variant="outline" className="w-full" onClick={onViewSchedule}>
-            <CalendarClock className="ml-2 h-4 w-4" />
+            <CalendarClock className="me-2 h-4 w-4" />
             צפה במערכת
           </Button>
           <Button variant="secondary" className="w-full" onClick={onMarkAbsent}>
-             <UserX className="ml-2 h-4 w-4 text-amber-600 dark:text-amber-500" />
+             <UserX className="me-2 h-4 w-4 text-amber-600 dark:text-amber-500" />
             <span className="text-amber-600 dark:text-amber-500">סמן היעדרות</span>
           </Button>
         </CardFooter>

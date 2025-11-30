@@ -483,16 +483,18 @@ export default function Timetable({ substitutions }: TimetableProps) {
 
         {/* Mobile View */}
         <div className="md:hidden space-y-4">
-            <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar">
+            <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar -mx-4 px-4">
                 {daysOfWeek.map((day, index) => {
                     const date = addDays(weekStartDate, index);
-                    const isSelected = index === new Date().getDay(); // Default to today, but we need state for this
-                    // For now, let's just use a simple state or default to Sunday if no state
+                    const isSelected = selectedDay === day;
                     return (
                          <Button
                             key={day}
-                            variant={selectedDay === day ? "default" : "outline"}
-                            className="flex-shrink-0 flex flex-col items-center h-auto py-2 px-4"
+                            variant={isSelected ? "default" : "outline"}
+                            className={cn(
+                                "flex-shrink-0 flex flex-col items-center h-auto py-2 px-4 min-w-[80px]",
+                                isSelected ? "border-primary" : "border-border"
+                            )}
                             onClick={() => setSelectedDay(day)}
                         >
                             <span className="font-bold">{day}</span>
@@ -522,7 +524,7 @@ export default function Timetable({ substitutions }: TimetableProps) {
                      });
 
                     return (
-                        <div key={slot.id} className="border rounded-lg p-4 bg-card">
+                        <div key={slot.id} className="border rounded-lg p-4 bg-card shadow-sm">
                             <div className="flex justify-between items-center mb-3">
                                 <span className="font-semibold text-lg">{slot.start} - {slot.end}</span>
                                 {slot.type === 'break' && <Badge variant="outline">הפסקה</Badge>}
@@ -534,8 +536,11 @@ export default function Timetable({ substitutions }: TimetableProps) {
                                         <div className="space-y-2">
                                             {lessonsThatNeedCover.map(({ teacher, lesson }, index) => (
                                                 <div key={`${teacher.id}-${index}`} className="flex items-center justify-between p-2 rounded-md bg-destructive/10 text-destructive border border-destructive/20">
-                                                    <span className="text-sm font-medium">דרוש מחליף: {teacher.name}</span>
-                                                    <span className="text-xs opacity-80">{lesson.subject}</span>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm font-medium">דרוש מחליף: {teacher.name}</span>
+                                                        <span className="text-xs opacity-80">{lesson.subject}</span>
+                                                    </div>
+                                                    <UserX className="h-4 w-4" />
                                                 </div>
                                             ))}
                                         </div>
@@ -544,7 +549,7 @@ export default function Timetable({ substitutions }: TimetableProps) {
                                     {substitutionsInSlot.length > 0 && (
                                         <div className="flex flex-wrap gap-2">
                                             {substitutionsInSlot.map(sub => (
-                                                <Badge key={sub.id} variant={'secondary'} className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">
+                                                <Badge key={sub.id} variant={'secondary'} className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 py-1 px-2">
                                                     <UserCheck className="h-3 w-3 ml-1" />
                                                     {sub.substituteTeacherName}
                                                 </Badge>
@@ -561,7 +566,7 @@ export default function Timetable({ substitutions }: TimetableProps) {
                                                         key={teacher.id} 
                                                         variant={teacher.isInSchool ? 'secondary' : 'outline'} 
                                                         size="sm" 
-                                                        className="h-auto px-2 py-1 text-xs"
+                                                        className="h-auto px-3 py-1.5 text-xs"
                                                         onClick={() => openAssignDialog(teacher, selectedDay, slot.start)}
                                                     >
                                                         {!teacher.isInSchool && <Home className="h-3 w-3 ml-1 text-muted-foreground"/>}

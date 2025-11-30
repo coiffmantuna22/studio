@@ -84,25 +84,25 @@ export default function NeededSubstitutePanel({
                 
                 return (
                     <div key={dateKey} className="space-y-3">
-                        <h3 className={cn("font-semibold text-sm flex items-center gap-2", isToday ? "text-orange-600" : "text-muted-foreground")}>
+                        <h3 className={cn("font-semibold text-sm flex items-center gap-2 sticky top-0 bg-background/95 backdrop-blur py-2 z-10", isToday ? "text-orange-600" : "text-muted-foreground")}>
                             <span className="w-2 h-2 rounded-full bg-current"></span>
                             {format(localDate, 'EEEE, d בMMMM', { locale: he })}
                             {isToday && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full mr-2">היום</span>}
                         </h3>
-                        <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                             {lessons.map((lesson, index) => (
                                 <div key={`${dateKey}-${index}`} className="flex flex-col p-3 bg-secondary/30 rounded-lg border hover:bg-secondary/50 transition-colors">
                                     <div className="flex justify-between items-start mb-2">
-                                        <span className="font-medium">{lesson.className}</span>
+                                        <span className="font-medium text-sm sm:text-base">{lesson.className}</span>
                                         <span className="text-xs font-mono bg-background px-1.5 py-0.5 rounded border">
                                             {lesson.time}
                                         </span>
                                     </div>
                                     <div className="text-sm text-muted-foreground mb-3">
-                                        <div>{lesson.subject}</div>
+                                        <div className="line-clamp-1">{lesson.subject}</div>
                                         <div className="text-xs mt-1 flex items-center gap-1">
-                                            <UserX className="h-3 w-3" />
-                                            {lesson.absentTeacherName}
+                                            <UserX className="h-3 w-3 shrink-0" />
+                                            <span className="truncate">{lesson.absentTeacherName}</span>
                                         </div>
                                     </div>
                                     {onAssignSubstitute && (

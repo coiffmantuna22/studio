@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -37,8 +37,70 @@ export default function MajorsTab({ teachers, classes, timeSlots }: MajorsTabPro
 
   const handleDeleteMajor = async (majorId: string) => {
     if (!firestore) return;
+    const majorToDelete = majors?.find(m => m.id === majorId);
+    if (!majorToDelete) return;
+
     try {
-      await deleteDoc(doc(firestore, 'majors', majorId));
+      const batch = writeBatch(firestore);
+      
+      // 1. Remove from classes
+      majorToDelete.classIds.forEach(classId => {
+          const schoolClass = classes.find(c => c.id === classId);
+          if (schoolClass && schoolClass.schedule) {
+              const newSchedule = JSON.parse(JSON.stringify(schoolClass.schedule));
+              let hasChanges = false;
+              
+              Object.keys(newSchedule).forEach(day => {
+                  Object.keys(newSchedule[day] || {}).forEach(time => {
+                      const lessons = newSchedule[day][time];
+                      if (Array.isArray(lessons)) {
+                          const filtered = lessons.filter((l: any) => l.majorId !== majorId);
+                          if (filtered.length !== lessons.length) {
+                              newSchedule[day][time] = filtered;
+                              if (newSchedule[day][time].length === 0) delete newSchedule[day][time];
+                              hasChanges = true;
+                          }
+                      }
+                  });
+                  if (Object.keys(newSchedule[day]).length === 0) delete newSchedule[day];
+              });
+
+              if (hasChanges) {
+                  batch.update(doc(firestore, 'classes', classId), { schedule: newSchedule });
+              }
+          }
+      });
+
+      // 2. Remove from teacher
+      const teacher = teachers.find(t => t.id === majorToDelete.teacherId);
+      if (teacher && teacher.schedule) {
+          const newSchedule = JSON.parse(JSON.stringify(teacher.schedule));
+          let hasChanges = false;
+
+          Object.keys(newSchedule).forEach(day => {
+              Object.keys(newSchedule[day] || {}).forEach(time => {
+                  const lessons = newSchedule[day][time];
+                  if (Array.isArray(lessons)) {
+                      const filtered = lessons.filter((l: any) => l.majorId !== majorId);
+                      if (filtered.length !== lessons.length) {
+                          newSchedule[day][time] = filtered;
+                          if (newSchedule[day][time].length === 0) delete newSchedule[day][time];
+                          hasChanges = true;
+                      }
+                  }
+              });
+              if (Object.keys(newSchedule[day]).length === 0) delete newSchedule[day];
+          });
+
+          if (hasChanges) {
+              batch.update(doc(firestore, 'teachers', teacher.id), { schedule: newSchedule });
+          }
+      }
+
+      // 3. Delete the major
+      batch.delete(doc(firestore, 'majors', majorId));
+
+      await batch.commit();
     } catch (error) {
       console.error("Error deleting major:", error);
     }

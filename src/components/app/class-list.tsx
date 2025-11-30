@@ -35,6 +35,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Loader2 } from 'lucide-react';
 import { daysOfWeek } from '@/lib/constants';
+import MajorsTab from './majors-tab';
 
 interface ClassListProps {}
 
@@ -46,6 +47,7 @@ export default function ClassList({}: ClassListProps) {
   const [classToView, setClassToView] = useState<SchoolClass | null>(null);
   const [classToEditSchedule, setClassToEditSchedule] = useState<SchoolClass | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'classes' | 'majors'>('classes');
 
   const classesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'classes'), where('userId', '==', user.uid)) : null, [user, firestore]);
   const { data: initialClassesData, isLoading: classesLoading } = useCollection<SchoolClass>(classesQuery);
@@ -251,90 +253,127 @@ export default function ClassList({}: ClassListProps) {
       <CardHeader>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
           <div className='flex-1'>
-              <CardTitle className="text-xl">כיתות לימוד</CardTitle>
-              <CardDescription>ניהול מערכת השעות הכיתתית.</CardDescription>
+              <CardTitle className="text-xl">ניהול כיתות ומגמות</CardTitle>
+              <CardDescription>צפה ונהל את כיתות האם ומגמות הלימוד.</CardDescription>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <Button onClick={() => setCreateClassOpen(true)} className='shrink-0'>
-                <Plus className="ml-2 h-4 w-4" />
-                הוסף כיתה
-              </Button>
-              <div className="relative flex-grow">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                      type="search"
-                      placeholder="חיפוש כיתה..."
-                      className="w-full pl-9"
-                      value={searchTerm}
-                      onChange={e => setSearchTerm(e.target.value)}
-                  />
-              </div>
+          <div className="flex bg-muted p-1 rounded-lg shrink-0">
+            <button
+              onClick={() => setActiveTab('classes')}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                activeTab === 'classes'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              כיתות אם
+            </button>
+            <button
+              onClick={() => setActiveTab('majors')}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                activeTab === 'majors'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              מגמות
+            </button>
           </div>
         </div>
+        
+        {activeTab === 'classes' && (
+            <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-4'>
+            <div className='flex-1'>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button onClick={() => setCreateClassOpen(true)} className='shrink-0'>
+                    <Plus className="ml-2 h-4 w-4" />
+                    הוסף כיתה
+                </Button>
+                <div className="relative flex-grow">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="search"
+                        placeholder="חיפוש כיתה..."
+                        className="w-full pl-9"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                    />
+                </div>
+            </div>
+            </div>
+        )}
       </CardHeader>
 
       <CardContent>
-        {initialClasses && initialClasses.length > 0 ? (
-          filteredClasses.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredClasses.map((schoolClass) => (
-                <Card key={schoolClass.id} className="transition-all hover:shadow-md">
-                  <CardHeader>
-                    <CardTitle>{schoolClass.name}</CardTitle>
-                    <CardDescription>
-                      לחץ לצפייה או עריכת מערכת השעות.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardFooter className="grid grid-cols-3 gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setClassToView(schoolClass)}>
-                      <Eye className="ml-1 h-4 w-4" />
-                      צפה
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={() => setClassToEditSchedule(schoolClass)}>
-                      <Edit className="ml-1 h-4 w-4" />
-                      ערוך
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm">
-                          <Trash2 className="ml-1 h-4 w-4" />
-                          מחק
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            פעולה זו תמחק את הכיתה ואת כל השיבוצים המשוייכים אליה ממערכות המורים לצמיתות. לא ניתן לבטל את הפעולה.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>ביטול</AlertDialogCancel>
-                          <AlertDialogAction className={buttonVariants({ variant: "destructive" })} onClick={() => handleDeleteClass(schoolClass.id)}>
-                            מחק
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-12 text-center">
-              <h3 className="text-lg font-semibold text-foreground">לא נמצאו כיתות תואמות</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                  נסה מונח חיפוש אחר.
-              </p>
-            </div>
-          )
+        {activeTab === 'majors' ? (
+            <MajorsTab 
+                teachers={allTeachers}
+                classes={initialClasses}
+                timeSlots={timeSlots}
+            />
         ) : (
-          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-12 text-center">
-            <h3 className="text-lg font-semibold text-foreground">לא נמצאו כיתות</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              התחל על ידי יצירת כיתה חדשה.
-            </p>
-          </div>
+            initialClasses && initialClasses.length > 0 ? (
+            filteredClasses.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {filteredClasses.map((schoolClass) => (
+                    <Card key={schoolClass.id} className="transition-all hover:shadow-md">
+                    <CardHeader>
+                        <CardTitle>{schoolClass.name}</CardTitle>
+                        <CardDescription>
+                        לחץ לצפייה או עריכת מערכת השעות.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardFooter className="grid grid-cols-3 gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setClassToView(schoolClass)}>
+                        <Eye className="ml-1 h-4 w-4" />
+                        צפה
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={() => setClassToEditSchedule(schoolClass)}>
+                        <Edit className="ml-1 h-4 w-4" />
+                        ערוך
+                        </Button>
+                        <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm">
+                            <Trash2 className="ml-1 h-4 w-4" />
+                            מחק
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                            <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                פעולה זו תמחק את הכיתה ואת כל השיבוצים המשוייכים אליה ממערכות המורים לצמיתות. לא ניתן לבטל את הפעולה.
+                            </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                            <AlertDialogCancel>ביטול</AlertDialogCancel>
+                            <AlertDialogAction className={buttonVariants({ variant: "destructive" })} onClick={() => handleDeleteClass(schoolClass.id)}>
+                                מחק
+                            </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                        </AlertDialog>
+                    </CardFooter>
+                    </Card>
+                ))}
+                </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-12 text-center">
+                <h3 className="text-lg font-semibold text-foreground">לא נמצאו כיתות תואמות</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                    נסה מונח חיפוש אחר.
+                </p>
+                </div>
+            )
+            ) : (
+            <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-12 text-center">
+                <h3 className="text-lg font-semibold text-foreground">לא נמצאו כיתות</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                התחל על ידי יצירת כיתה חדשה.
+                </p>
+            </div>
+            )
         )}
       </CardContent>
 

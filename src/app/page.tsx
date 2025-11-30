@@ -52,6 +52,7 @@ const MajorsTab = dynamic(() => import('@/components/app/majors-tab'), {
 });
 
 
+
 export default function Home() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
@@ -474,8 +475,7 @@ export default function Home() {
       );
   }
 
-  return (
-    <div className="flex flex-col min-h-screen bg-background">
+  return <div className="flex flex-col min-h-screen bg-background">
       <Header />
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
@@ -539,16 +539,17 @@ export default function Home() {
 
 
         <div className="space-y-6">
-              <div className="w-full">
-              <div className="grid w-full grid-cols-2 sm:grid-cols-7 max-w-4xl mx-auto h-auto p-1 bg-muted/50 backdrop-blur-sm rounded-full mb-8 overflow-x-auto">
-                <Button variant="ghost" onClick={() => setActiveTab("teachers")} className={`rounded-full py-2.5 transition-all ${activeTab === "teachers" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>פרופילי מורים</Button>
-                <Button variant="ghost" onClick={() => setActiveTab("classes")} className={`rounded-full py-2.5 transition-all ${activeTab === "classes" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>כיתות לימוד</Button>
-                <Button variant="ghost" onClick={() => setActiveTab("majors")} className={`rounded-full py-2.5 transition-all ${activeTab === "majors" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>מגמות</Button>
-                <Button variant="ghost" onClick={() => setActiveTab("timetable")} className={`rounded-full py-2.5 transition-all ${activeTab === "timetable" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>זמינות מחליפים</Button>
-                <Button variant="ghost" onClick={() => setActiveTab("calendar")} className={`rounded-full py-2.5 transition-all ${activeTab === "calendar" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>לוח שנה</Button>
-                <Button variant="ghost" onClick={() => setActiveTab("statistics")} className={`rounded-full py-2.5 transition-all ${activeTab === "statistics" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>סטטיסטיקות</Button>
-                <Button variant="ghost" onClick={() => setActiveTab("settings")} className={`rounded-full py-2.5 transition-all ${activeTab === "settings" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>הגדרות</Button>
+        <div className="sticky top-[57px] z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-2 -mx-4 px-4 sm:mx-0 sm:px-0 mb-6 border-b sm:border-none">
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 no-scrollbar sm:grid sm:w-full sm:grid-cols-6 sm:max-w-4xl sm:mx-auto sm:h-auto sm:p-1 sm:bg-muted/50 sm:backdrop-blur-sm sm:rounded-full">
+                <Button variant={activeTab === "teachers" ? "secondary" : "ghost"} onClick={() => setActiveTab("teachers")} className={`rounded-full whitespace-nowrap px-4 py-2 h-auto text-sm sm:text-base sm:py-2.5 transition-all ${activeTab === "teachers" ? "bg-secondary text-secondary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"}`}>פרופילי מורים</Button>
+                <Button variant={activeTab === "classes" ? "secondary" : "ghost"} onClick={() => setActiveTab("classes")} className={`rounded-full whitespace-nowrap px-4 py-2 h-auto text-sm sm:text-base sm:py-2.5 transition-all ${activeTab === "classes" ? "bg-secondary text-secondary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"}`}>כיתות לימוד</Button>
+                <Button variant={activeTab === "timetable" ? "secondary" : "ghost"} onClick={() => setActiveTab("timetable")} className={`rounded-full whitespace-nowrap px-4 py-2 h-auto text-sm sm:text-base sm:py-2.5 transition-all ${activeTab === "timetable" ? "bg-secondary text-secondary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"}`}>זמינות מחליפים</Button>
+                <Button variant={activeTab === "calendar" ? "secondary" : "ghost"} onClick={() => setActiveTab("calendar")} className={`rounded-full whitespace-nowrap px-4 py-2 h-auto text-sm sm:text-base sm:py-2.5 transition-all ${activeTab === "calendar" ? "bg-secondary text-secondary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"}`}>לוח שנה</Button>
+                <Button variant={activeTab === "statistics" ? "secondary" : "ghost"} onClick={() => setActiveTab("statistics")} className={`rounded-full whitespace-nowrap px-4 py-2 h-auto text-sm sm:text-base sm:py-2.5 transition-all ${activeTab === "statistics" ? "bg-secondary text-secondary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"}`}>סטטיסטיקות</Button>
+                <Button variant={activeTab === "settings" ? "secondary" : "ghost"} onClick={() => setActiveTab("settings")} className={`rounded-full whitespace-nowrap px-4 py-2 h-auto text-sm sm:text-base sm:py-2.5 transition-all ${activeTab === "settings" ? "bg-secondary text-secondary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"}`}>הגדרות</Button>
+
               </div>
+        </div>
 
               <AnimatePresence mode="wait">
                 {activeTab === "teachers" && (
@@ -647,8 +648,9 @@ export default function Home() {
                     <StatisticsTab substitutions={allSubstitutions} />
                   </motion.div>
                 )}
+
+
               </AnimatePresence>
-            </div>
         </div>
       </main>
 
@@ -678,7 +680,7 @@ export default function Home() {
       />
 
     </div>
-  );
+  ;
 }
 
     

@@ -128,9 +128,16 @@ export default function MarkAbsentDialog({
     } else {
        if (isEditMode && existingAbsences) {
             const absencesToEdit = existingAbsences.map(abs => {
-              const date = typeof abs.date === 'string' ? startOfDay(parseISO(abs.date)) : startOfDay(abs.date);
+              let date = abs.date;
+              // Handle Firestore Timestamp
+              if (date && typeof date === 'object' && 'toDate' in date && typeof (date as any).toDate === 'function') {
+                  date = (date as any).toDate();
+              } else if (typeof date === 'string') {
+                  date = parseISO(date);
+              }
+              
               return {
-                date,
+                date: startOfDay(date as Date),
                 isAllDay: abs.isAllDay,
                 startTime: abs.startTime,
                 endTime: abs.endTime

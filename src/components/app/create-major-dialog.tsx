@@ -81,9 +81,45 @@ export default function CreateMajorDialog({
     });
   };
 
+  const [error, setError] = useState<string | null>(null);
+
+  const checkConflicts = (teacherId: string, scheduleToCheck: { [day: string]: string[] }) => {
+    for (const day of Object.keys(scheduleToCheck)) {
+      const times = scheduleToCheck[day];
+      for (const time of times) {
+        // Check all classes for this teacher at this time
+        for (const schoolClass of classes) {
+           const daySchedule = schoolClass.schedule?.[day];
+           if (!daySchedule) continue;
+           
+           const lessons = daySchedule[time];
+           if (Array.isArray(lessons)) {
+             const conflictingLesson = lessons.find(l => 
+               l.teacherId === teacherId && 
+               l.majorId !== majorToEdit?.id // Ignore lessons from the major we are currently editing
+             );
+             
+             if (conflictingLesson) {
+               return `המורה ${teachers.find(t => t.id === teacherId)?.name} כבר מלמד/ת ב${day} בשעה ${time} בכיתה ${schoolClass.name} (${conflictingLesson.subject})`;
+             }
+           }
+        }
+      }
+    }
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !firestore) return;
+    setError(null);
+
+    // Check for conflicts
+    const conflictError = checkConflicts(teacherId, schedule);
+    if (conflictError) {
+      setError(conflictError);
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -245,6 +281,12 @@ export default function CreateMajorDialog({
             מגמות מאפשרות לשבץ שיעורים למספר כיתות במקביל.
           </DialogDescription>
         </DialogHeader>
+
+        {error && (
+            <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md mb-4">
+                {error}
+            </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">

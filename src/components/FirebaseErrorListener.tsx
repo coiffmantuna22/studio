@@ -31,7 +31,8 @@ export function FirebaseErrorListener() {
 
   // On re-render, if an error exists in state, throw it.
   if (error) {
-    throw error;
+    console.error("FirebaseErrorListener caught error:", error);
+    // throw error; // DEBUG: Prevent crash to see error
   }
 
   // This component renders nothing.
