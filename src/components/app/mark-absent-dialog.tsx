@@ -128,7 +128,7 @@ export default function MarkAbsentDialog({
     } else {
        if (isEditMode && existingAbsences) {
             const absencesToEdit = existingAbsences.map(abs => {
-              const date = typeof abs.date === 'string' ? startOfDay(new Date(abs.date)) : startOfDay(abs.date);
+              const date = typeof abs.date === 'string' ? startOfDay(parseISO(abs.date)) : startOfDay(abs.date);
               return {
                 date,
                 isAllDay: abs.isAllDay,
@@ -202,13 +202,15 @@ export default function MarkAbsentDialog({
                         <CalendarIcon className="w-4 h-4 text-primary"/>
                         בחירת תאריכים
                     </h3>
-                    <Calendar
-                        mode="multiple"
-                        selected={selectedDates}
-                        onSelect={handleDateSelect}
-                        className="rounded-md border shadow bg-card"
-                        locale={he}
-                    />
+                    <ScrollArea className="h-[360px]">
+                      <Calendar
+                          mode="multiple"
+                          selected={selectedDates}
+                          onSelect={handleDateSelect}
+                          className="rounded-md border shadow bg-card"
+                          locale={he}
+                      />
+                    </ScrollArea>
                     <div className="mt-4 text-sm text-muted-foreground text-center">
                         {selectedDates.length === 0 ? 'לא נבחרו תאריכים' : `נבחרו ${selectedDates.length} ימים`}
                     </div>
