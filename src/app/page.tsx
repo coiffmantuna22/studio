@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -93,7 +92,80 @@ export default function Home() {
     return [];
   }, [settingsCollection, user]);
 
-    const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
+  const todaysAffectedLessons = useAbsences({
+    teachers: teachers,
+    classes: allClasses,
+    substitutions: allSubstitutions,
+    timeSlots: timeSlots,
+  });
+
+  const todaysAbsences = useMemo(() => {
+    const absenceMap = new Map<string, { teacher: Teacher; absences: AbsenceDay[]; }>();
+
+    (teachers || []).forEach(teacher => {
+        const today = startOfDay(new Date());
+        const teacherAbsencesToday = (teacher.absences || []).filter(absence => {
+            try {
+                return isSameDay(startOfDay(new Date(absence.date)), today);
+            } catch (e) { return false; }
+        });
+
+        if (teacherAbsencesToday.length > 0) {
+            if (!absenceMap.has(teacher.id)) {
+                absenceMap.set(teacher.id, {
+                    teacher: teacher,
+                    absences: teacherAbsencesToday,
+                });
+            }
+        }
+    });
+
+    return Array.from(absenceMap.values());
+  }, [teachers, todaysAffectedLessons]);
+  
+  const affectedClasses = useMemo(() => {
+    const affected = new Map<string, { classId: string; className: string; lessons: any[] }>();
+    const uncoveredLessons = todaysAffectedLessons.filter(l => !l.isCovered && isSameDay(l.date, new Date()));
+
+    uncoveredLessons.forEach(lesson => {
+      if (!affected.has(lesson.classId)) {
+        affected.set(lesson.classId, {
+          classId: lesson.classId,
+          className: lesson.className,
+          lessons: [],
+        });
+      }
+      affected.get(lesson.classId)!.lessons.push(lesson);
+    });
+
+    const fullyCoveredClasses = new Set<string>();
+    todaysAffectedLessons.forEach(lesson => {
+        if(lesson.isCovered && isSameDay(lesson.date, new Date()) && !uncoveredLessons.some(ul => ul.classId === lesson.classId)) {
+            fullyCoveredClasses.add(lesson.classId);
+        }
+    });
+
+    const result = Array.from(affected.values()).map(classData => ({
+        ...classData,
+        isFullyCovered: false,
+    }));
+    
+    fullyCoveredClasses.forEach(classId => {
+        const classInfo = allClasses.find(c => c.id === classId);
+        if(classInfo && !affected.has(classId)) {
+            result.push({
+                classId: classId,
+                className: classInfo.name,
+                lessons: [],
+                isFullyCovered: true
+            })
+        }
+    })
+
+    return result;
+  }, [todaysAffectedLessons, allClasses]);
+
+  const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
       
       const settingsRef = doc(firestore, 'settings', `timetable_${user.uid}`);
@@ -368,89 +440,6 @@ export default function Home() {
           });
       }
   };
-
-  const todaysAffectedLessons = useAbsences({
-    teachers: teachers,
-    classes: allClasses,
-    substitutions: allSubstitutions,
-    timeSlots: timeSlots,
-  });
-
-  const todaysAbsences = useMemo(() => {
-    const absenceMap = new Map<string, { teacher: Teacher; absences: AbsenceDay[]; affectedLessons: AffectedLesson[] }>();
-
-    (teachers || []).forEach(teacher => {
-        const today = startOfDay(new Date());
-        const teacherAbsencesToday = (teacher.absences || []).filter(absence => {
-            try {
-                return isSameDay(startOfDay(new Date(absence.date)), today);
-            } catch (e) { return false; }
-        });
-
-        if (teacherAbsencesToday.length > 0) {
-            if (!absenceMap.has(teacher.id)) {
-                absenceMap.set(teacher.id, {
-                    teacher: teacher,
-                    absences: teacherAbsencesToday,
-                    affectedLessons: []
-                });
-            }
-        }
-    });
-
-    todaysAffectedLessons.forEach(lesson => {
-        if (isSameDay(startOfDay(lesson.date), startOfDay(new Date()))) {
-            const entry = absenceMap.get(lesson.absentTeacherId);
-            if (entry) {
-                entry.affectedLessons.push(lesson);
-            }
-        }
-    });
-
-    return Array.from(absenceMap.values());
-  }, [teachers, todaysAffectedLessons]);
-
-  const affectedClasses = useMemo(() => {
-    const affected = new Map<string, { classId: string; className: string; lessons: any[] }>();
-    const uncoveredLessons = todaysAffectedLessons.filter(l => !l.isCovered && isSameDay(l.date, new Date()));
-
-    uncoveredLessons.forEach(lesson => {
-      if (!affected.has(lesson.classId)) {
-        affected.set(lesson.classId, {
-          classId: lesson.classId,
-          className: lesson.className,
-          lessons: [],
-        });
-      }
-      affected.get(lesson.classId)!.lessons.push(lesson);
-    });
-
-    const fullyCoveredClasses = new Set<string>();
-    todaysAffectedLessons.forEach(lesson => {
-        if(lesson.isCovered && isSameDay(lesson.date, new Date()) && !uncoveredLessons.some(ul => ul.classId === lesson.classId)) {
-            fullyCoveredClasses.add(lesson.classId);
-        }
-    });
-
-    const result = Array.from(affected.values()).map(classData => ({
-        ...classData,
-        isFullyCovered: false,
-    }));
-    
-    fullyCoveredClasses.forEach(classId => {
-        const classInfo = allClasses.find(c => c.id === classId);
-        if(classInfo && !affected.has(classId)) {
-            result.push({
-                classId: classId,
-                className: classInfo.name,
-                lessons: [],
-                isFullyCovered: true
-            })
-        }
-    })
-
-    return result;
-  }, [todaysAffectedLessons, allClasses]);
   
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -496,14 +485,14 @@ export default function Home() {
                     <AlertTriangle className="text-destructive h-5 w-5" />
                     מורים חסרים היום
                     </CardTitle>
-                    <CardDescription>סקירה מהירה של ההיעדרויות והשיעורים המושפעים להיום.</CardDescription>
+                    <CardDescription>סקירה מהירה של ההיעדרויות להיום.</CardDescription>
                 </CardHeader>
                 <CardContent>
                 {todaysAbsences && todaysAbsences.length > 0 ? (
                     <div className="grid gap-4 sm:grid-cols-1">
                         {todaysAbsences.map((item) => {
                             if (!item) return null;
-                            const { teacher, absences, affectedLessons } = item;
+                            const { teacher, absences } = item;
                             const absenceTime = absences.map(a => a.isAllDay ? `יום שלם` : `${a.startTime}-${a.endTime}`).join('; ');
                             
                             return (
@@ -525,29 +514,6 @@ export default function Home() {
                                             <span className="mr-1">ערוך</span>
                                         </Button>
                                     </div>
-                                    {affectedLessons.length > 0 && (
-                                        <div className="mt-3 space-y-2 text-sm">
-                                        <h4 className="font-medium text-muted-foreground">שיעורים מושפעים:</h4>
-                                        <ul className="space-y-1">
-                                            {affectedLessons.map((lesson, index) => (
-                                            <li key={index} className="flex items-center justify-between">
-                                                <span>{lesson.className} - {lesson.subject} ({lesson.time})</span>
-                                                {lesson.isCovered ? (
-                                                <span className="flex items-center text-green-600 dark:text-green-400">
-                                                    <CheckCircle className="ml-1 h-4 w-4" />
-                                                    מכוסה
-                                                </span>
-                                                ) : (
-                                                <span className="flex items-center text-destructive">
-                                                    <UserX className="ml-1 h-4 w-4" />
-                                                    דרוש מחליף
-                                                </span>
-                                                )}
-                                            </li>
-                                            ))}
-                                        </ul>
-                                        </div>
-                                    )}
                                 </div>
                             );
                         })}
@@ -769,5 +735,7 @@ export default function Home() {
     </div>
   );
 }
+
+    
 
     
