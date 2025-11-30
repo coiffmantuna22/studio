@@ -48,10 +48,6 @@ export default function NeededSubstitutePanel({
       .sort((a, b) => a.date.getTime() - b.date.getTime() || a.time.localeCompare(b.time));
   }, [allAffectedLessons]);
 
-  if (uncoveredLessons.length === 0) {
-    return null;
-  }
-
   // Group by date for better display
   const groupedLessons = useMemo(() => {
       const groups: Record<string, typeof uncoveredLessons> = {};
@@ -62,6 +58,10 @@ export default function NeededSubstitutePanel({
       });
       return groups;
   }, [uncoveredLessons]);
+
+  if (uncoveredLessons.length === 0) {
+    return null;
+  }
 
   return (
     <Card className="border-l-4 border-l-orange-500 shadow-md">
