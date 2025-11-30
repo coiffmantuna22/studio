@@ -130,7 +130,7 @@ function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAb
                     safeLessons.length > 0 ? 'bg-primary/5 hover:bg-primary/10' : 'bg-card hover:bg-muted',
                     isAbsent && safeLessons.length > 0 && 'bg-destructive/20 hover:bg-destructive/30'
                 )}>
-                    {safeLessons.length === 0 && <span className="text-muted-foreground text-xs mt-2">ריקה</span>}
+                    {safeLessons.length === 0 && !isAbsent && <span className="text-muted-foreground text-xs mt-2">ריקה</span>}
                     {isAbsent && <Badge variant="destructive" className="mt-1 mb-1">נעדר/ת</Badge>}
                     
                     {safeLessons.map((lesson, idx) => {
@@ -239,21 +239,51 @@ export default function TeacherScheduleDialog({
 }: TeacherScheduleDialogProps) {
   
   const [localSchedule, setLocalSchedule] = useState<ClassSchedule>({});
-  const [localAbsences, setLocalAbsences] = useState<AbsenceDay[]>([]);
   const [stagedAbsenceChanges, setStagedAbsenceChanges] = useState<Record<string, boolean>>({});
+  const weekStartDate = useMemo(() => getStartOfWeek(new Date()), []);
+
+  const initialAbsencesSet = useMemo(() => {
+    if (!teacher?.absences) return new Set<string>();
+
+    const absenceSet = new Set<string>();
+    const teacherAbsences = teacher.absences || [];
+
+    daysOfWeek.forEach((day, dayIndex) => {
+      const currentDate = addDays(weekStartDate, dayIndex);
+      const todaysAbsences = teacherAbsences.filter(absence => {
+          try {
+              return isSameDay(startOfDay(new Date(absence.date)), currentDate);
+          } catch (e) {
+              return false;
+          }
+      });
+      
+      if (todaysAbsences.length === 0) return;
+
+      timeSlots.forEach(slot => {
+        const slotStartNum = parseTimeToNumber(slot.start);
+        const isAbsent = todaysAbsences.some(absence => {
+          if (absence.isAllDay) return true;
+          const absenceStart = parseTimeToNumber(absence.startTime);
+          const absenceEnd = parseTimeToNumber(absence.endTime);
+          return slotStartNum >= absenceStart && slotStartNum < absenceEnd;
+        });
+        if (isAbsent) {
+          absenceSet.add(`${day}_${slot.start}`);
+        }
+      });
+    });
+    
+    return absenceSet;
+  }, [teacher, weekStartDate, timeSlots]);
+
 
   useEffect(() => {
     if(teacher) {
         setLocalSchedule(JSON.parse(JSON.stringify(teacher.schedule || {})));
-        const initialAbsences = JSON.parse(JSON.stringify(teacher.absences || []));
-        setLocalAbsences(initialAbsences);
-        
-        // Reset staged changes
         setStagedAbsenceChanges({});
     }
   }, [teacher, isOpen]);
-  
-  const weekStartDate = useMemo(() => getStartOfWeek(new Date()), []);
 
   if (!teacher) return null;
 
@@ -269,78 +299,67 @@ export default function TeacherScheduleDialog({
   }
 
   const handleSaveChanges = () => {
-    let finalAbsences = [...localAbsences];
+    const originalAbsences = teacher.absences || [];
+    let finalAbsences = [...originalAbsences];
 
-    Object.entries(stagedAbsenceChanges).forEach(([key, isAbsent]) => {
-      const [day, time] = key.split('_');
-      const slot = timeSlots.find(s => s.start === time);
-      if (!slot) return;
-      
-      const dayIndex = daysOfWeek.indexOf(day);
-      const date = addDays(weekStartDate, dayIndex);
-      const absenceId = `absence-${date.toISOString()}-${slot.start}`;
-
-      if (isAbsent) {
-        // Add or update absence
-        const existingIndex = finalAbsences.findIndex(a => a.id === absenceId);
-        const newAbsence: AbsenceDay = {
-            id: absenceId,
-            date: date.toISOString(),
-            isAllDay: false,
-            startTime: slot.start,
-            endTime: slot.end,
-        };
-        if (existingIndex > -1) {
-          finalAbsences[existingIndex] = newAbsence;
-        } else {
-          finalAbsences.push(newAbsence);
-        }
-      } else {
-        // Remove absence
-        finalAbsences = finalAbsences.filter(a => a.id !== absenceId);
-      }
+    // Create a set of keys for all slots in the week for efficient lookup
+    const allWeekSlots = new Set<string>();
+    daysOfWeek.forEach(day => {
+        timeSlots.forEach(slot => {
+            allWeekSlots.add(`${day}_${slot.start}`);
+        });
     });
 
+    // Process both staged changes and initial state to build final absence list
+    allWeekSlots.forEach(key => {
+        const [day, time] = key.split('_');
+        const slot = timeSlots.find(s => s.start === time);
+        if (!slot) return;
+
+        const isInitiallyAbsent = initialAbsencesSet.has(key);
+        const isStaged = stagedAbsenceChanges.hasOwnProperty(key);
+        const isFinallyAbsent = isStaged ? stagedAbsenceChanges[key] : isInitiallyAbsent;
+        
+        const dayIndex = daysOfWeek.indexOf(day);
+        const date = addDays(weekStartDate, dayIndex);
+        const absenceId = `absence-${date.toISOString()}-${slot.start}`;
+
+        // Find if an absence for this specific slot already exists
+        const existingAbsenceIndex = finalAbsences.findIndex(a => a.id === absenceId);
+
+        if (isFinallyAbsent) {
+            // Add or update absence
+            const newAbsence: AbsenceDay = {
+                id: absenceId,
+                date: date.toISOString(),
+                isAllDay: false,
+                startTime: slot.start,
+                endTime: slot.end,
+            };
+            if (existingAbsenceIndex > -1) {
+                finalAbsences[existingAbsenceIndex] = newAbsence;
+            } else {
+                finalAbsences.push(newAbsence);
+            }
+        } else {
+            // Remove absence if it exists
+            if (existingAbsenceIndex > -1) {
+                finalAbsences.splice(existingAbsenceIndex, 1);
+            }
+        }
+    });
+
+    // Filter out any potential duplicates from manual editing, just in case
+    const uniqueAbsences = Array.from(new Map(finalAbsences.map(item => [item.id, item])).values());
+    
     onUpdateSchedule(teacher.id, localSchedule);
-    onUpdateAbsences(teacher.id, finalAbsences);
+    onUpdateAbsences(teacher.id, uniqueAbsences);
     onOpenChange(false);
   }
 
   const handleToggleAbsence = (day: string, time: string, markAbsent: boolean) => {
     const key = `${day}_${time}`;
     setStagedAbsenceChanges(prev => ({ ...prev, [key]: markAbsent }));
-  };
-
-  const isSlotAbsent = (day: string, slotTime: string): boolean => {
-    const key = `${day}_${slotTime}`;
-    if (stagedAbsenceChanges.hasOwnProperty(key)) {
-        return stagedAbsenceChanges[key];
-    }
-    
-    if (localAbsences.length === 0) {
-      return false;
-    }
-    const dayIndex = daysOfWeek.indexOf(day);
-    const date = addDays(weekStartDate, dayIndex);
-
-    const todaysAbsences = localAbsences.filter(absence => {
-        try {
-            return isSameDay(startOfDay(new Date(absence.date)), startOfDay(date))
-        } catch (e) {
-            return false;
-        }
-    });
-    
-    if (todaysAbsences.length === 0) return false;
-
-    const slotStartNum = parseTimeToNumber(slotTime);
-
-    return todaysAbsences.some(absence => {
-      if (absence.isAllDay) return true;
-      const absenceStart = parseTimeToNumber(absence.startTime);
-      const absenceEnd = parseTimeToNumber(absence.endTime);
-      return slotStartNum >= absenceStart && slotStartNum < absenceEnd;
-    });
   };
 
   return (
@@ -383,7 +402,11 @@ export default function TeacherScheduleDialog({
                             {daysOfWeek.map(day => {
                                 const lessons = localSchedule?.[day]?.[slot.start] || [];
                                 const isBreak = slot.type === 'break';
-                                const isAbsent = isSlotAbsent(day, slot.start);
+                                
+                                const key = `${day}_${slot.start}`;
+                                const isStaged = stagedAbsenceChanges.hasOwnProperty(key);
+                                const isAbsent = isStaged ? stagedAbsenceChanges[key] : initialAbsencesSet.has(key);
+
                                 return (
                                 <td key={`${day}-${slot.start}`} className={cn("p-0 align-top border-r", isBreak && 'bg-muted/30')}>
                                     {!isBreak ? (
@@ -427,5 +450,3 @@ export default function TeacherScheduleDialog({
     </Dialog>
   );
 }
-
-    
