@@ -116,12 +116,7 @@ export default function TeacherList({
     const batch = writeBatch(firestore);
     try {
         const teacherRef = doc(firestore, 'teachers', teacherId);
-        const teacherSnap = await getDoc(teacherRef);
-        if (!teacherSnap.exists()) return;
-
-        // Clear schedule for the teacher being deleted
-        batch.update(teacherRef, { schedule: {} });
-
+        
         // Remove teacher from any class schedules
         const classesQuerySnapshot = await getDocs(query(collection(firestore, 'classes'), where('userId', '==', user.uid)));
         
@@ -202,11 +197,10 @@ export default function TeacherList({
         for (const schedule of [oldSchedule, newSchedule]) {
             Object.values(schedule || {}).forEach(day => 
                 Object.values(day || {}).forEach(lessons => {
-                    if (Array.isArray(lessons)) {
-                        lessons.forEach((lesson: Lesson) => {
-                             if (lesson?.classId) allRelevantClassIds.add(lesson.classId);
-                        });
-                    }
+                    const safeLessons = Array.isArray(lessons) ? lessons : [];
+                    safeLessons.forEach((lesson: Lesson) => {
+                         if (lesson?.classId) allRelevantClassIds.add(lesson.classId);
+                    });
                 })
             )
         }
@@ -226,8 +220,11 @@ export default function TeacherList({
                     const oldLessons = oldSchedule[day]?.[time] || [];
                     const newLessons = newSchedule[day]?.[time] || [];
 
-                    const oldLesson = Array.isArray(oldLessons) ? oldLessons.find((l: Lesson) => l.classId === classId) : undefined;
-                    const newLesson = Array.isArray(newLessons) ? newLessons.find((l: Lesson) => l.classId === classId) : undefined;
+                    const safeOldLessons = Array.isArray(oldLessons) ? oldLessons : [];
+                    const safeNewLessons = Array.isArray(newLessons) ? newLessons : [];
+
+                    const oldLesson = safeOldLessons.find((l: Lesson) => l.classId === classId);
+                    const newLesson = safeNewLessons.find((l: Lesson) => l.classId === classId);
 
 
                     if (oldLesson && !newLesson) {

@@ -84,56 +84,64 @@ export default function ClassList({}: ClassListProps) {
   const handleDeleteClass = async (classId: string) => {
     if (!firestore || !user) return;
     const batch = writeBatch(firestore);
-     try {
-        const classRef = doc(firestore, "classes", classId);
-        const classSnap = await getDoc(classRef);
-        if (!classSnap.exists()) return;
+    try {
+      const classRef = doc(firestore, "classes", classId);
+      const classSnap = await getDoc(classRef);
+      if (!classSnap.exists()) return;
 
-        const schoolClass = classSnap.data() as SchoolClass;
+      const teacherDocs = await getDocs(query(collection(firestore, 'teachers'), where('userId', '==', user.uid)));
 
-        const teacherIds = new Set<string>();
-        Object.values(schoolClass.schedule || {}).forEach(daySchedule => {
-            Object.values(daySchedule).forEach(lessons => {
-                if (Array.isArray(lessons)) {
-                    lessons.forEach(lesson => {
-                        if (lesson) teacherIds.add(lesson.teacherId);
-                    });
+      // Iterate through ALL teachers to clean up their schedules
+      teacherDocs.forEach(teacherDoc => {
+        const teacher = teacherDoc.data() as Teacher;
+        const schedule = teacher.schedule;
+        if (!schedule) return;
+
+        let teacherScheduleModified = false;
+        const newSchedule = JSON.parse(JSON.stringify(schedule));
+
+        Object.keys(newSchedule).forEach(day => {
+          Object.keys(newSchedule[day] || {}).forEach(time => {
+            const lessons = newSchedule[day][time];
+            if (Array.isArray(lessons)) {
+              const originalLength = lessons.length;
+              const filteredLessons = lessons.filter((l: Lesson) => l.classId !== classId);
+              
+              if (filteredLessons.length < originalLength) {
+                teacherScheduleModified = true;
+                if (filteredLessons.length === 0) {
+                  delete newSchedule[day][time];
+                } else {
+                  newSchedule[day][time] = filteredLessons;
                 }
-            });
+              }
+            }
+          });
+          if (Object.keys(newSchedule[day]).length === 0) {
+            delete newSchedule[day];
+          }
         });
 
-        for (const teacherId of teacherIds) {
-            const teacherRef = doc(firestore, "teachers", teacherId);
-            const teacherSnap = await getDoc(teacherRef);
-            if (teacherSnap.exists()) {
-                const teacher = teacherSnap.data() as Teacher;
-                const newSchedule = JSON.parse(JSON.stringify(teacher.schedule || {}));
-                Object.keys(newSchedule).forEach(day => {
-                    Object.keys(newSchedule[day] || {}).forEach(time => {
-                        const lessons = newSchedule[day][time];
-                        if (Array.isArray(lessons)) {
-                             newSchedule[day][time] = lessons.filter((l: Lesson) => l.classId !== classId);
-                             if (newSchedule[day][time].length === 0) delete newSchedule[day][time];
-                        }
-                    });
-                    if (Object.keys(newSchedule[day]).length === 0) delete newSchedule[day];
-                });
-                batch.update(teacherRef, { schedule: newSchedule });
-            }
+        if (teacherScheduleModified) {
+          batch.update(teacherDoc.ref, { schedule: newSchedule });
         }
-        batch.delete(classRef);
-        await commitBatchWithContext(batch, {
-            operation: 'delete',
-            path: `classes/${classId} and related teachers`,
-        });
+      });
+      
+      // Finally, delete the class itself
+      batch.delete(classRef);
+
+      await commitBatchWithContext(batch, {
+        operation: 'delete',
+        path: `classes/${classId} and related teachers`,
+      });
     } catch (e) {
       if (!(e instanceof FirestorePermissionError)) {
-          const permissionError = new FirestorePermissionError({
-            operation: 'delete',
-            path: `classes/${classId} and related teachers`,
-          });
-          errorEmitter.emit('permission-error', permissionError);
-          throw permissionError;
+        const permissionError = new FirestorePermissionError({
+          operation: 'delete',
+          path: `classes/${classId} and related teachers`,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw permissionError;
       }
       throw e;
     }
@@ -155,11 +163,10 @@ export default function ClassList({}: ClassListProps) {
         for (const schedule of [oldSchedule, newSchedule]) {
             Object.values(schedule || {}).forEach(day => 
                 Object.values(day || {}).forEach(lessons => {
-                    if (Array.isArray(lessons)) {
-                        lessons.forEach((lesson: Lesson) => {
-                            if (lesson?.teacherId) allRelevantTeacherIds.add(lesson.teacherId);
-                        });
-                    }
+                    const safeLessons = Array.isArray(lessons) ? lessons : [];
+                    safeLessons.forEach((lesson: Lesson) => {
+                        if (lesson?.teacherId) allRelevantTeacherIds.add(lesson.teacherId);
+                    });
                 })
             )
         }
@@ -178,8 +185,11 @@ export default function ClassList({}: ClassListProps) {
                     const oldLessons = oldSchedule[day]?.[time] || [];
                     const newLessons = newSchedule[day]?.[time] || [];
 
-                    const oldLesson = Array.isArray(oldLessons) ? oldLessons.find((l: Lesson) => l.teacherId === teacherId) : undefined;
-                    const newLesson = Array.isArray(newLessons) ? newLessons.find((l: Lesson) => l.teacherId === teacherId) : undefined;
+                    const safeOldLessons = Array.isArray(oldLessons) ? oldLessons : [];
+                    const safeNewLessons = Array.isArray(newLessons) ? newLessons : [];
+
+                    const oldLesson = safeOldLessons.find((l: Lesson) => l.teacherId === teacherId);
+                    const newLesson = safeNewLessons.find((l: Lesson) => l.teacherId === teacherId);
 
                     if (oldLesson && !newLesson) {
                          // Removed

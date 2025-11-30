@@ -34,7 +34,7 @@ export interface Lesson {
 
 export type ClassSchedule = {
     [day: string]: {
-        [time: string]: Lesson[]; // Changed from Lesson | null to Lesson[]
+        [time: string]: Lesson[]; 
     }
 };
 
