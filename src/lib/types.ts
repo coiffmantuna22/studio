@@ -1,8 +1,4 @@
 
-
-
-
-
 export interface DayAvailability {
   day: string;
   slots: { start: string; end: string }[];
@@ -30,23 +26,10 @@ export interface AbsenceDay {
   endTime: string;
 }
 
-export interface Major {
-  id: string;
-  userId: string;
-  name: string;
-  subject: string;
-  teacherId: string;
-  classIds: string[];
-  schedule: {
-      [day: string]: string[]; // Array of time strings
-  };
-}
-
 export interface Lesson {
   subject: string;
   teacherId: string;
   classId: string;
-  majorId?: string; // Optional reference to a major
 }
 
 export type ClassSchedule = {

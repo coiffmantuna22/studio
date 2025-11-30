@@ -204,7 +204,7 @@ export default function TeacherList({
                 Object.values(day || {}).forEach(lessons => {
                     if (Array.isArray(lessons)) {
                         lessons.forEach((lesson: Lesson) => {
-                             if (lesson?.classId && !lesson.majorId) allRelevantClassIds.add(lesson.classId);
+                             if (lesson?.classId) allRelevantClassIds.add(lesson.classId);
                         });
                     }
                 })
@@ -226,12 +226,8 @@ export default function TeacherList({
                     const oldLessons = oldSchedule[day]?.[time] || [];
                     const newLessons = newSchedule[day]?.[time] || [];
 
-                     // Filter out major lessons
-                    const oldRegularLessons = Array.isArray(oldLessons) ? oldLessons.filter((l: Lesson) => !l.majorId) : [];
-                    const newRegularLessons = Array.isArray(newLessons) ? newLessons.filter((l: Lesson) => !l.majorId) : [];
-
-                    const oldLesson = oldRegularLessons.find((l: Lesson) => l.classId === classId);
-                    const newLesson = newRegularLessons.find((l: Lesson) => l.classId === classId);
+                    const oldLesson = Array.isArray(oldLessons) ? oldLessons.find((l: Lesson) => l.classId === classId) : undefined;
+                    const newLesson = Array.isArray(newLessons) ? newLessons.find((l: Lesson) => l.classId === classId) : undefined;
 
 
                     if (oldLesson && !newLesson) {
@@ -413,8 +409,3 @@ export default function TeacherList({
     </Card>
   );
 }
-
-
-
-
-    

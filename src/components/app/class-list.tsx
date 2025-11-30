@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -95,7 +96,7 @@ export default function ClassList({}: ClassListProps) {
             Object.values(daySchedule).forEach(lessons => {
                 if (Array.isArray(lessons)) {
                     lessons.forEach(lesson => {
-                        if (lesson && !lesson.majorId) teacherIds.add(lesson.teacherId);
+                        if (lesson) teacherIds.add(lesson.teacherId);
                     });
                 }
             });
@@ -111,7 +112,7 @@ export default function ClassList({}: ClassListProps) {
                     Object.keys(newSchedule[day] || {}).forEach(time => {
                         const lessons = newSchedule[day][time];
                         if (Array.isArray(lessons)) {
-                             newSchedule[day][time] = lessons.filter((l: Lesson) => l.classId !== classId || l.majorId);
+                             newSchedule[day][time] = lessons.filter((l: Lesson) => l.classId !== classId);
                              if (newSchedule[day][time].length === 0) delete newSchedule[day][time];
                         }
                     });
@@ -156,7 +157,7 @@ export default function ClassList({}: ClassListProps) {
                 Object.values(day || {}).forEach(lessons => {
                     if (Array.isArray(lessons)) {
                         lessons.forEach((lesson: Lesson) => {
-                            if (lesson?.teacherId && !lesson.majorId) allRelevantTeacherIds.add(lesson.teacherId);
+                            if (lesson?.teacherId) allRelevantTeacherIds.add(lesson.teacherId);
                         });
                     }
                 })
@@ -177,12 +178,8 @@ export default function ClassList({}: ClassListProps) {
                     const oldLessons = oldSchedule[day]?.[time] || [];
                     const newLessons = newSchedule[day]?.[time] || [];
 
-                    // Filter out major lessons
-                    const oldRegularLessons = Array.isArray(oldLessons) ? oldLessons.filter((l: Lesson) => !l.majorId) : [];
-                    const newRegularLessons = Array.isArray(newLessons) ? newLessons.filter((l: Lesson) => !l.majorId) : [];
-
-                    const oldLesson = oldRegularLessons.find((l: Lesson) => l.teacherId === teacherId);
-                    const newLesson = newRegularLessons.find((l: Lesson) => l.teacherId === teacherId);
+                    const oldLesson = Array.isArray(oldLessons) ? oldLessons.find((l: Lesson) => l.teacherId === teacherId) : undefined;
+                    const newLesson = Array.isArray(newLessons) ? newLessons.find((l: Lesson) => l.teacherId === teacherId) : undefined;
 
                     if (oldLesson && !newLesson) {
                          // Removed

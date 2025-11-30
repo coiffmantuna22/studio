@@ -70,7 +70,6 @@ function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, 
     const [isOpen, setIsOpen] = useState(false);
     
     const safeLessons = Array.isArray(lessons) ? lessons : [];
-    const majorLessons = safeLessons.filter(l => l.majorId);
     const [regularLessons, setRegularLessons] = useState<Lesson[]>([]);
 
     // New lesson state
@@ -79,7 +78,7 @@ function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, 
 
     useEffect(() => {
         if(isOpen) {
-            setRegularLessons(safeLessons.filter(l => !l.majorId));
+            setRegularLessons(safeLessons);
             setNewSubject('');
             setNewTeacherId(null);
         }
@@ -118,7 +117,7 @@ function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, 
     };
 
     const handleSave = () => {
-        const finalLessons = [...majorLessons, ...regularLessons];
+        const finalLessons = [...regularLessons];
         if (newSubject && newTeacherId) {
              finalLessons.push({ subject: newSubject, teacherId: newTeacherId, classId: schoolClass.id });
         }
@@ -127,7 +126,7 @@ function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, 
     };
 
     const handleClearAllRegular = () => {
-        onSave(day, time, [...majorLessons]);
+        onSave(day, time, []);
         setIsOpen(false);
     };
     
@@ -147,11 +146,10 @@ function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, 
                          return (
                             <div key={idx} className={cn(
                                 "w-full p-1 rounded text-xs border",
-                                lesson.majorId ? "bg-amber-100 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800" : "bg-background border-border"
+                                "bg-background border-border"
                             )}>
                                 <p className="font-bold truncate">{lesson.subject}</p>
                                 <p className="text-[10px] text-muted-foreground truncate">{teacher?.name}</p>
-                                {lesson.majorId && <Badge variant="secondary" className="text-[8px] h-3 px-1 mt-0.5">מגמה</Badge>}
                             </div>
                          )
                     })}
@@ -163,18 +161,6 @@ function EditSlotPopover({ day, time, lessons, onSave, allTeachers, allClasses, 
                          <h4 className="font-semibold">עריכת שיבוץ</h4>
                          <p className='text-sm text-muted-foreground'>{schoolClass.name} - {day}, {time}</p>
                     </div>
-                    
-                    {majorLessons.length > 0 && (
-                        <div className="bg-muted p-2 rounded-md text-xs space-y-1">
-                            <p className="font-medium">שיעורי מגמה (לא ניתן לערוך כאן):</p>
-                            {majorLessons.map((l, i) => (
-                                <div key={i} className="flex justify-between">
-                                    <span>{l.subject}</span>
-                                    <span className="text-muted-foreground">{allTeachers.find(t => t.id === l.teacherId)?.name}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
 
                     <div className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground">שיעורים רגילים:</p>
@@ -326,13 +312,11 @@ export default function ClassTimetableDialog({
                                     const teacher = allTeachers.find(t => t.id === lesson.teacherId);
                                     return (
                                         <div key={idx} className={cn(
-                                            "bg-secondary/50 rounded-md p-2 text-right flex flex-col justify-center",
-                                            lesson.majorId && "border border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-800"
+                                            "bg-secondary/50 rounded-md p-2 text-right flex flex-col justify-center"
                                         )}>
                                             <div className="flex items-center gap-2">
                                                 <BookOpen className="h-3 w-3 text-primary shrink-0" />
                                                 <p className="font-semibold text-primary text-xs">{lesson.subject}</p>
-                                                {lesson.majorId && <Badge variant="secondary" className="text-[8px] h-3 px-1 mr-auto">מגמה</Badge>}
                                             </div>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <User className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -432,13 +416,11 @@ export default function ClassTimetableDialog({
                                                                 const teacher = allTeachers.find(t => t.id === lesson.teacherId);
                                                                 return (
                                                                     <div key={idx} className={cn(
-                                                                        "bg-secondary/50 rounded-md p-2 text-right flex flex-col justify-center",
-                                                                        lesson.majorId && "border border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-800"
+                                                                        "bg-secondary/50 rounded-md p-2 text-right flex flex-col justify-center"
                                                                     )}>
                                                                         <div className="flex items-center gap-2">
                                                                             <BookOpen className="h-3 w-3 text-primary shrink-0" />
                                                                             <p className="font-semibold text-primary text-xs">{lesson.subject}</p>
-                                                                            {lesson.majorId && <Badge variant="secondary" className="text-[8px] h-3 px-1 mr-auto">מגמה</Badge>}
                                                                         </div>
                                                                         <div className="flex items-center gap-2 mt-1">
                                                                             <User className="h-3 w-3 text-muted-foreground shrink-0" />

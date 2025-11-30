@@ -75,7 +75,6 @@ function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAb
     const [isOpen, setIsOpen] = useState(false);
     
     const safeLessons = Array.isArray(lessons) ? lessons : [];
-    const majorLessons = safeLessons.filter(l => l.majorId);
     const [regularLessons, setRegularLessons] = useState<Lesson[]>([]);
 
     const [newSubject, setNewSubject] = useState('');
@@ -83,7 +82,7 @@ function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAb
 
     useEffect(() => {
         if(isOpen) {
-            setRegularLessons(safeLessons.filter(l => !l.majorId));
+            setRegularLessons(safeLessons);
             setNewSubject('');
             setNewClassId(null);
         }
@@ -107,7 +106,7 @@ function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAb
     };
 
     const handleSave = () => {
-        const finalLessons = [...majorLessons, ...regularLessons];
+        const finalLessons = [...regularLessons];
         if (newSubject && newClassId) {
             finalLessons.push({ subject: newSubject, teacherId: teacher.id, classId: newClassId });
         }
@@ -116,7 +115,7 @@ function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAb
     };
 
     const handleClearAllRegular = () => {
-        onSave(day, time, [...majorLessons]);
+        onSave(day, time, []);
         setIsOpen(false);
     };
     
@@ -139,11 +138,10 @@ function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAb
                          return (
                             <div key={idx} className={cn(
                                 "w-full p-1 rounded text-xs border",
-                                lesson.majorId ? "bg-amber-100 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800" : "bg-background border-border"
+                                "bg-background border-border"
                             )}>
                                 <p className="font-bold truncate">{lesson.subject}</p>
                                 <p className="text-[10px] text-muted-foreground truncate">{schoolClass?.name}</p>
-                                {lesson.majorId && <Badge variant="secondary" className="text-[8px] h-3 px-1 mt-0.5">מגמה</Badge>}
                             </div>
                          )
                     })}
@@ -165,18 +163,6 @@ function EditSlotPopover({ day, time, lessons, onSave, teacher, allClasses, isAb
                         />
                     </div>
                     
-                    {majorLessons.length > 0 && (
-                        <div className="bg-muted p-2 rounded-md text-xs space-y-1">
-                            <p className="font-medium">שיעורי מגמה (לא ניתן לערוך כאן):</p>
-                            {majorLessons.map((l, i) => (
-                                <div key={i} className="flex justify-between">
-                                    <span>{l.subject}</span>
-                                    <span className="text-muted-foreground">{allClasses.find(c => c.id === l.classId)?.name}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
                     <div className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground">שיעורים רגילים:</p>
                         {regularLessons.length === 0 ? (

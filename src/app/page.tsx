@@ -9,12 +9,12 @@ import { useRouter } from 'next/navigation';
 import { collection, query, where, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { Loader2, AlertTriangle, CheckCircle, UserX, School, Edit, BookCopy } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, UserX, School, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { format, isSameDay, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
-import type { Teacher, AbsenceDay, TimeSlot, AffectedLesson, SchoolClass, SubstitutionRecord, Lesson, Major } from '@/lib/types';
+import type { Teacher, AbsenceDay, TimeSlot, AffectedLesson, SchoolClass, SubstitutionRecord, Lesson } from '@/lib/types';
 import MarkAbsentDialog from '@/components/app/mark-absent-dialog';
 import RecommendationDialog from '@/components/app/recommendation-dialog';
 import { commitBatchWithContext } from '@/lib/firestore-utils';
@@ -42,9 +42,6 @@ const SchoolCalendar = dynamic(() => import('@/components/app/school-calendar'),
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
 });
 const StatisticsTab = dynamic(() => import('@/components/app/statistics-tab'), {
-  loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
-});
-const MajorsTab = dynamic(() => import('@/components/app/majors-tab'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
 });
 const NeededSubstitutePanel = dynamic(() => import('@/components/app/needed-substitutes-panel'), {
@@ -207,13 +204,11 @@ export default function Home() {
       const teacherQuery = query(collection(firestore, 'teachers'), where('userId', '==', user.uid));
       const classQuery = query(collection(firestore, 'classes'), where('userId', '==', user.uid));
       const subsQuery = query(collection(firestore, 'substitutions'), where('userId', '==', user.uid));
-      const majorsQuery = query(collection(firestore, 'majors'), where('userId', '==', user.uid));
 
-      const [teacherSnapshot, classSnapshot, subsSnapshot, majorsSnapshot] = await Promise.all([
+      const [teacherSnapshot, classSnapshot, subsSnapshot] = await Promise.all([
         getDocs(teacherQuery),
         getDocs(classQuery),
         getDocs(subsQuery),
-        getDocs(majorsQuery)
       ]);
 
       // Reset schedules and absences for all teachers
@@ -231,11 +226,6 @@ export default function Home() {
         batch.delete(subDoc.ref);
       });
         
-      // Delete all major records
-      majorsSnapshot.forEach(majorDoc => {
-        batch.delete(majorDoc.ref);
-      });
-
       await commitBatchWithContext(batch, {
         operation: 'delete',
         path: `user_data/${user.uid}/new_year_reset`,
@@ -285,10 +275,12 @@ export default function Home() {
                   const lessonSlot = timeSlots.find(ts => ts.start === time);
                   if (!lessonSlot) return;
 
+                  const lessonStart = parseTimeToNumber(lessonSlot.start);
+                  const lessonEnd = parseTimeToNumber(lessonSlot.end);
+
                   const isAffected = absence.isAllDay || 
                       (
-                          parseTimeToNumber(lessonSlot.start) < parseTimeToNumber(absence.endTime) && 
-                          parseTimeToNumber(lessonSlot.end) > parseTimeToNumber(absence.startTime)
+                        lessonEnd > parseTimeToNumber(absence.startTime) && lessonStart < parseTimeToNumber(absence.endTime)
                       );
                   
                   const schoolClass = allClasses.find(c => c.id === lesson.classId);
@@ -582,10 +574,9 @@ export default function Home() {
 
         <div className="space-y-6">
               <div className="w-full">
-              <div className="grid w-full grid-cols-2 sm:grid-cols-7 max-w-4xl mx-auto h-auto p-1 bg-muted/50 backdrop-blur-sm rounded-full mb-8 overflow-x-auto">
+              <div className="grid w-full grid-cols-2 sm:grid-cols-6 max-w-4xl mx-auto h-auto p-1 bg-muted/50 backdrop-blur-sm rounded-full mb-8 overflow-x-auto">
                 <Button variant="ghost" onClick={() => setActiveTab("teachers")} className={`rounded-full py-2.5 transition-all ${activeTab === "teachers" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>פרופילי מורים</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("classes")} className={`rounded-full py-2.5 transition-all ${activeTab === "classes" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>כיתות לימוד</Button>
-                <Button variant="ghost" onClick={() => setActiveTab("majors")} className={`rounded-full py-2.5 transition-all ${activeTab === "majors" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>מגמות</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("timetable")} className={`rounded-full py-2.5 transition-all ${activeTab === "timetable" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>זמינות מחליפים</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("calendar")} className={`rounded-full py-2.5 transition-all ${activeTab === "calendar" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>לוח שנה</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("statistics")} className={`rounded-full py-2.5 transition-all ${activeTab === "statistics" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>סטטיסטיקות</Button>
@@ -618,23 +609,6 @@ export default function Home() {
                     className="mt-0"
                   >
                     <ClassList />
-                  </motion.div>
-                )}
-                
-                {activeTab === "majors" && (
-                  <motion.div
-                    key="majors"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.3 }}
-                    className="mt-0"
-                  >
-                    <MajorsTab 
-                        teachers={teachers}
-                        classes={allClasses}
-                        timeSlots={timeSlots}
-                    />
                   </motion.div>
                 )}
 
