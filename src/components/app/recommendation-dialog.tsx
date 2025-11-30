@@ -15,7 +15,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { Lightbulb, UserCheck, ArrowLeft, Users, BookOpen, CalendarDays } from 'lucide-react';
+import { Lightbulb, UserCheck, ArrowLeft, Users, BookOpen, CalendarDays, Loader2 } from 'lucide-react';
 import { groupBy } from 'lodash';
 import {
   Accordion,
@@ -26,6 +26,9 @@ import {
 import { Badge } from '../ui/badge';
 import { daysOfWeek } from '@/lib/constants';
 import { ScrollArea } from '../ui/scroll-area';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Label } from '../ui/label';
+import { cn } from '@/lib/utils';
 
 
 interface RecommendationDialogProps {
@@ -36,19 +39,109 @@ interface RecommendationDialogProps {
     absentTeacher: Teacher;
     absenceDays: any[];
   } | null;
-  onConfirm: () => void;
+  onAssign: (substituteTeacher: Teacher, lesson: AffectedLesson) => Promise<void>;
 }
+
+const LessonRecommendation = ({ lesson, onAssign }: { lesson: AffectedLesson, onAssign: (substitute: Teacher, lesson: AffectedLesson) => Promise<void>}) => {
+    const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(lesson.recommendationId);
+    const [isAssigning, setIsAssigning] = useState(false);
+    const hasOptions = lesson.substituteOptions && lesson.substituteOptions.length > 0;
+    const absentTeacherName = lesson.absentTeacherName || 'לא ידוע';
+
+    const handleAssign = async () => {
+        if (!selectedTeacherId) return;
+        const selectedTeacher = lesson.substituteOptions.find(t => t.id === selectedTeacherId);
+        if (selectedTeacher) {
+            setIsAssigning(true);
+            await onAssign(selectedTeacher, lesson);
+            setIsAssigning(false);
+        }
+    }
+
+    return (
+        <div className="p-3 border rounded-lg bg-card/50">
+            <div className="font-semibold flex flex-col sm:flex-row items-start sm:items-center justify-between">
+                <div className='flex items-center gap-2'>
+                    <Users className="ml-2 h-4 w-4 text-muted-foreground" />
+                    <span>כיתה {lesson.className}</span>
+                </div>
+                <span className='text-sm text-muted-foreground font-normal mt-1 sm:mt-0'>{lesson.lesson.subject} בשעה {lesson.time}</span>
+            </div>
+            <Separator className="my-2" />
+            <div className='flex items-center justify-center gap-4 text-center my-3'>
+                <div className='flex flex-col items-center p-2 rounded-md'>
+                    <span className="text-sm text-muted-foreground">מורה חסר/ה</span>
+                    <p className="font-bold text-destructive/80 flex items-center justify-center gap-2 mt-1">
+                        {absentTeacherName}
+                    </p>
+                </div>
+            </div>
+
+            {hasOptions ? (
+                <>
+                <p className="text-sm text-muted-foreground mb-2 text-center">בחר/י מורה מחליף/ה מהרשימה:</p>
+                <RadioGroup 
+                    dir="rtl" 
+                    value={selectedTeacherId || ""} 
+                    onValueChange={setSelectedTeacherId} 
+                    className="space-y-2 max-h-48 overflow-y-auto pr-2"
+                >
+                    {lesson.substituteOptions.map(teacher => (
+                        <Label 
+                            key={teacher.id} 
+                            htmlFor={`${lesson.classId}-${lesson.time}-${teacher.id}`} 
+                            className={cn(
+                                "flex items-center justify-between p-3 rounded-md border cursor-pointer transition-all",
+                                selectedTeacherId === teacher.id ? "bg-primary/10 border-primary" : "hover:bg-muted/50"
+                            )}
+                        >
+                            <div className="flex items-center space-x-2 space-x-reverse">
+                                <RadioGroupItem value={teacher.id} id={`${lesson.classId}-${lesson.time}-${teacher.id}`} />
+                                <span className='font-medium'>{teacher.name}</span>
+                            </div>
+                            {teacher.id === lesson.recommendationId && <Badge variant="secondary" className='text-xs bg-green-100 text-green-800'>מומלץ</Badge>}
+                        </Label>
+                    ))}
+                </RadioGroup>
+
+                {lesson.reasoning && (
+                  <div className="mt-3 p-2 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2 text-right">
+                       <Lightbulb className="h-4 w-4 shrink-0 mt-0.5 ml-1" />
+                       <span>
+                        <strong>נימוק להמלצה:</strong> {lesson.reasoning}
+                       </span>
+                  </div>
+                )}
+                
+                <div className="mt-4 flex justify-end">
+                    <Button 
+                        size="sm" 
+                        onClick={handleAssign} 
+                        disabled={!selectedTeacherId || isAssigning}
+                    >
+                        {isAssigning ? <Loader2 className='w-4 h-4 ml-2 animate-spin' /> : <UserCheck className='w-4 h-4 ml-2' />}
+                        שבץ
+                    </Button>
+                </div>
+                </>
+            ) : (
+                <p className="text-sm text-center text-muted-foreground py-4">לא נמצאו מורים פנויים לשיעור זה.</p>
+            )}
+        </div>
+    )
+}
+
 
 export default function RecommendationDialog({
   isOpen,
   onOpenChange,
   recommendationResult,
-  onConfirm,
+  onAssign,
 }: RecommendationDialogProps) {
 
   if (!recommendationResult) return null;
 
-  const { results, absentTeacher, absenceDays } = recommendationResult;
+  const { results, absentTeacher } = recommendationResult;
   
   const lessonsByDay = groupBy(results, (res) => daysOfWeek[getDay(res.date)]);
   const orderedDays = daysOfWeek.filter(day => lessonsByDay[day]);
@@ -57,9 +150,9 @@ export default function RecommendationDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg md:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>שיעורים מושפעים עבור {absentTeacher.name}</DialogTitle>
+          <DialogTitle>שיבוץ מחליפים עבור {absentTeacher.name}</DialogTitle>
           <DialogDescription>
-            להלן השיעורים המושפעים מההיעדרות. לחץ על "אישור" כדי לעבור לטבלת הזמינות ולשבץ מחליפים.
+            להלן השיעורים המושפעים מההיעדרות. בחר/י מורה מחליף/ה לכל שיעור.
           </DialogDescription>
         </DialogHeader>
 
@@ -76,50 +169,9 @@ export default function RecommendationDialog({
                 </AccordionTrigger>
                 <AccordionContent>
                     <div className="space-y-4 p-2">
-                    {lessonsByDay[day].map((res, resIndex) => {
-                       const recommendation = res.substituteOptions?.find(sub => sub.id === res.recommendationId);
-
-                       return (
-                        <div key={resIndex} className="p-3 border rounded-lg bg-card">
-                            <div className="font-semibold flex flex-col sm:flex-row items-start sm:items-center justify-between">
-                                <div className='flex items-center gap-2'>
-                                    <Users className="ml-2 h-4 w-4 text-muted-foreground" />
-                                    <span>כיתה {res.className}</span>
-                                </div>
-                                <span className='text-sm text-muted-foreground font-normal mt-1 sm:mt-0'>{res.lesson.subject} בשעה {res.time}</span>
-                            </div>
-                            <Separator className="my-2" />
-                            <div className='grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4 text-center'>
-                                <div className='flex flex-col items-center p-2 rounded-md bg-secondary/50'>
-                                    <span className="text-sm text-muted-foreground">מחליף מומלץ</span>
-                                    {recommendation ? (
-                                        <p className="font-bold text-primary flex items-center justify-center gap-2 mt-1">
-                                            <UserCheck className="h-4 w-4" />
-                                            {recommendation.name}
-                                        </p>
-                                    ) : (
-                                        <p className="font-bold text-muted-foreground mt-1">אין מחליף</p>
-                                    )}
-                                </div>
-                                <div className='flex flex-col items-center'>
-                                    <span className="text-sm text-muted-foreground">מורה מקורי</span>
-                                    <p className="font-bold text-destructive/80 flex items-center justify-center gap-2 mt-1">
-                                        {absentTeacher.name}
-                                    </p>
-                                </div>
-                                <ArrowLeft className="h-4 w-4 text-muted-foreground mx-auto my-2 sm:my-0" />
-                            </div>
-                            {recommendation && res.reasoning && (
-                              <div className="mt-3 p-2 rounded-md bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 text-xs flex items-start gap-2 text-right">
-                                   <Lightbulb className="h-4 w-4 shrink-0 mt-0.5 ml-1" />
-                                   <span>
-                                    <strong>נימוק:</strong> {res.reasoning}
-                                   </span>
-                              </div>
-                            )}
-                        </div>
-                       )
-                    })}
+                    {lessonsByDay[day].map((res, resIndex) => (
+                       <LessonRecommendation key={resIndex} lesson={res} onAssign={onAssign} />
+                    ))}
                     </div>
                 </AccordionContent>
               </AccordionItem>
@@ -130,14 +182,13 @@ export default function RecommendationDialog({
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="secondary">
-              ביטול
+              סגור
             </Button>
           </DialogClose>
-           <Button type="button" onClick={onConfirm}>
-              אישור
-            </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
+    

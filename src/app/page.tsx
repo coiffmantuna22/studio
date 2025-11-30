@@ -47,6 +47,9 @@ const StatisticsTab = dynamic(() => import('@/components/app/statistics-tab'), {
 const NeededSubstitutePanel = dynamic(() => import('@/components/app/needed-substitutes-panel'), {
   loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
 });
+const MajorsTab = dynamic(() => import('@/components/app/majors-tab'), {
+  loading: () => <div className="p-4 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
+});
 
 
 export default function Home() {
@@ -89,12 +92,6 @@ export default function Home() {
     return [];
   }, [settingsCollection, user]);
 
-  useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, isUserLoading, router]);
-  
   const todaysAffectedLessons = useAbsences({
     teachers: teachers,
     classes: allClasses,
@@ -177,7 +174,39 @@ export default function Home() {
 
     return result;
   }, [todaysAffectedLessons, allClasses]);
+  
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
 
+  const isLoading = isUserLoading || teachersLoading || settingsLoading || classesLoading || substitutionsLoading;
+  const isInitialSetup = !isLoading && user && timeSlots.length === 0;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isInitialSetup) {
+      return (
+         <div className="flex flex-col min-h-screen bg-background">
+            <Header />
+            <main className="flex-1 p-4 sm:p-6 md:p-8">
+               <SettingsTab
+                  timeSlots={[]}
+                  onUpdate={handleTimetableSettingsUpdate}
+                  isInitialSetup={isInitialSetup}
+                  onStartNewYear={handleStartNewYear}
+               />
+            </main>
+         </div>
+      );
+  }
 
   const handleTimetableSettingsUpdate = async (newTimeSlots: TimeSlot[]) => {
       if (!firestore || !user) return;
@@ -407,34 +436,43 @@ export default function Home() {
       }
   };
 
+  const handleAssignSubstitute = async (substituteTeacher: Teacher, lesson: AffectedLesson) => {
+      if (!firestore || !user) return;
+      
+      const substitution: Omit<SubstitutionRecord, 'id' | 'createdAt'> = {
+          date: format(new Date(lesson.date), 'yyyy-MM-dd'),
+          time: lesson.time,
+          classId: lesson.classId,
+          className: lesson.className,
+          absentTeacherId: lesson.lesson.teacherId,
+          absentTeacherName: teachers.find(t => t.id === lesson.lesson.teacherId)?.name || 'לא ידוע',
+          substituteTeacherId: substituteTeacher.id,
+          substituteTeacherName: substituteTeacher.name,
+          subject: lesson.lesson.subject,
+          userId: user.uid,
+      };
 
-  const isLoading = isUserLoading || teachersLoading || settingsLoading || classesLoading || substitutionsLoading;
+      const newSubRef = doc(collection(firestore, 'substitutions'));
+      const batch = writeBatch(firestore);
+      batch.set(newSubRef, {...substitution, id: newSubRef.id, createdAt: new Date().toISOString()});
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    );
-  }
-  
-  const isInitialSetup = !isUserLoading && !settingsLoading && user && timeSlots.length === 0;
+      try {
+          await commitBatchWithContext(batch, { operation: 'create', path: newSubRef.path, data: substitution });
+          toast({
+              title: 'השיבוץ הושלם',
+              description: `${substituteTeacher.name} שובץ להחליף בשיעור ${lesson.lesson.subject} בכיתה ${lesson.className}.`,
+          });
+          setRecommendation(null); // Close the dialog on success
+      } catch (error) {
+          console.error("Error assigning substitute:", error);
+          toast({
+              variant: "destructive",
+              title: "שגיאת שיבוץ",
+              description: "לא ניתן היה לשבץ את המורה המחליף.",
+          });
+      }
+  };
 
-  if (isInitialSetup) {
-      return (
-         <div className="flex flex-col min-h-screen bg-background">
-            <Header />
-            <main className="flex-1 p-4 sm:p-6 md:p-8">
-               <SettingsTab
-                  timeSlots={[]}
-                  onUpdate={handleTimetableSettingsUpdate}
-                  isInitialSetup={isInitialSetup}
-                  onStartNewYear={handleStartNewYear}
-               />
-            </main>
-         </div>
-      );
-  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -580,9 +618,10 @@ export default function Home() {
 
         <div className="space-y-6">
               <div className="w-full">
-              <div className="grid w-full grid-cols-2 sm:grid-cols-6 max-w-4xl mx-auto h-auto p-1 bg-muted/50 backdrop-blur-sm rounded-full mb-8 overflow-x-auto">
+              <div className="grid w-full grid-cols-2 sm:grid-cols-7 max-w-4xl mx-auto h-auto p-1 bg-muted/50 backdrop-blur-sm rounded-full mb-8 overflow-x-auto">
                 <Button variant="ghost" onClick={() => setActiveTab("teachers")} className={`rounded-full py-2.5 transition-all ${activeTab === "teachers" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>פרופילי מורים</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("classes")} className={`rounded-full py-2.5 transition-all ${activeTab === "classes" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>כיתות לימוד</Button>
+                <Button variant="ghost" onClick={() => setActiveTab("majors")} className={`rounded-full py-2.5 transition-all ${activeTab === "majors" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>מגמות</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("timetable")} className={`rounded-full py-2.5 transition-all ${activeTab === "timetable" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>זמינות מחליפים</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("calendar")} className={`rounded-full py-2.5 transition-all ${activeTab === "calendar" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>לוח שנה</Button>
                 <Button variant="ghost" onClick={() => setActiveTab("statistics")} className={`rounded-full py-2.5 transition-all ${activeTab === "statistics" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:bg-background/50"}`}>סטטיסטיקות</Button>
@@ -616,6 +655,19 @@ export default function Home() {
                   >
                     <ClassList />
                   </motion.div>
+                )}
+
+                {activeTab === "majors" && (
+                    <motion.div
+                        key="majors"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.3 }}
+                        className="mt-0"
+                    >
+                        <MajorsTab teachers={teachers} classes={allClasses} timeSlots={timeSlots} />
+                    </motion.div>
                 )}
 
                 {activeTab === "timetable" && (
@@ -690,10 +742,7 @@ export default function Home() {
         isOpen={!!recommendation}
         onOpenChange={(open) => !open && setRecommendation(null)}
         recommendationResult={recommendation}
-        onConfirm={() => {
-            setRecommendation(null);
-            setActiveTab('timetable');
-        }}
+        onAssign={handleAssignSubstitute}
       />
 
       <ClassTimetableDialog
@@ -709,3 +758,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
