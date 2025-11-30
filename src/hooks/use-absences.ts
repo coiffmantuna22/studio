@@ -1,3 +1,4 @@
+
 import { useMemo } from 'react';
 import { startOfDay, isSameDay, addDays, isWithinInterval, parseISO } from 'date-fns';
 import { daysOfWeek } from '@/lib/constants';
@@ -75,34 +76,7 @@ export function useAbsences({ teachers, classes, substitutions, timeSlots, dateR
                               );
 
                               let isCovered = !!substitution;
-
-                              if (isCovered && substitution?.substituteTeacherId) {
-                                  const substituteTeacher = teachers.find(t => t.id === substitution.substituteTeacherId);
-                                  if (substituteTeacher) {
-                                      const substituteAbsences = (substituteTeacher.absences || []).filter(absence => {
-                                          try {
-                                              const absenceDate = typeof absence.date === 'string' ? new Date(absence.date) : absence.date;
-                                              return isSameDay(startOfDay(absenceDate), currentDay);
-                                          } catch (e) {
-                                              return false;
-                                          }
-                                      });
-
-                                      const isSubstituteAbsent = substituteAbsences.some(absence => {
-                                          if (absence.isAllDay) return true;
-                                          const lessonStart = parseTimeToNumber(lessonSlot.start);
-                                          const lessonEnd = parseTimeToNumber(lessonSlot.end);
-                                          const absenceStart = parseTimeToNumber(absence.startTime);
-                                          const absenceEnd = parseTimeToNumber(absence.endTime);
-                                          return lessonStart < absenceEnd && lessonEnd > absenceStart;
-                                      });
-
-                                      if (isSubstituteAbsent) {
-                                          isCovered = false;
-                                      }
-                                  }
-                              }
-
+                              
                               affectedLessons.push({
                                   ...lesson,
                                   date: currentDay,
