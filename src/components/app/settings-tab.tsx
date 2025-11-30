@@ -258,37 +258,38 @@ export default function SettingsTab({ timeSlots, onUpdate, onStartNewYear, isIni
             </form>
         </Form>
         </Card>
+        
         {!isInitialSetup && (
-        <Card className="border-destructive/50">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-destructive">
-                    <AlertTriangle />
-                    אזור מסוכן
-                </CardTitle>
-                <CardDescription>
-                    פעולות אלו הן בלתי הפיכות וישפיעו על כל הנתונים במערכת.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                 <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button variant="destructive">התחל שנת לימודים חדשה</Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                        <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            פעולה זו תמחק לצמיתות את <strong>כל</strong> מערכות השעות (כיתות ומורים), את כל ההיעדרויות ואת כל רישומי ההחלפות. לא ניתן לבטל פעולה זו.
-                        </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                        <AlertDialogCancel>ביטול</AlertDialogCancel>
-                        <AlertDialogAction className='bg-destructive text-destructive-foreground hover:bg-destructive/90' onClick={onStartNewYear}>אני מבין, התחל שנה חדשה</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            </CardContent>
-        </Card>
+            <Card className="border-destructive/50">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-destructive">
+                        <AlertTriangle />
+                        אזור מסוכן
+                    </CardTitle>
+                    <CardDescription>
+                        פעולות אלו הן בלתי הפיכות וישפיעו על כל הנתונים במערכת.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive">התחל שנת לימודים חדשה</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                            <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                פעולה זו תמחק לצמיתות את <strong>כל</strong> מערכות השעות (כיתות ומורים), את כל ההיעדרויות ואת כל רישומי ההחלפות. לא ניתן לבטל פעולה זו.
+                            </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                            <AlertDialogCancel>ביטול</AlertDialogCancel>
+                            <AlertDialogAction className='bg-destructive text-destructive-foreground hover:bg-destructive/90' onClick={onStartNewYear}>אני מבין, התחל שנה חדשה</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </CardContent>
+            </Card>
         )}
   </div>
   );
